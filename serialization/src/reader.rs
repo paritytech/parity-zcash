@@ -1,6 +1,11 @@
 use std::{io, marker};
 use compact_integer::CompactInteger;
 
+/// Deserialize transaction witness data.
+pub const DESERIALIZE_TRANSACTION_WITNESS: u32 = 0x40000000;
+/// Deserialize transaction joint split data.
+pub const DESERIALIZE_TRANSACTION_JOINT_SPLIT: u32 = 0x80000000;
+
 pub fn deserialize<R, T>(buffer: R) -> Result<T, Error> where R: io::Read, T: Deserializable {
 	let mut reader = Reader::from_read(buffer);
 	let result = try!(reader.read());
@@ -41,6 +46,7 @@ pub trait Deserializable {
 pub struct Reader<T> {
 	buffer: T,
 	peeked: Option<u8>,
+	flags: u32,
 }
 
 impl<'a> Reader<&'a [u8]> {
@@ -49,6 +55,7 @@ impl<'a> Reader<&'a [u8]> {
 		Reader {
 			buffer: buffer,
 			peeked: None,
+			flags: 0,
 		}
 	}
 }
@@ -77,7 +84,18 @@ impl<R> Reader<R> where R: io::Read {
 		Reader {
 			buffer: read,
 			peeked: None,
+			flags: 0,
 		}
+	}
+
+	/// Are transactions read from this stream with witness data?
+	pub fn read_transaction_witness(&self) -> bool {
+		(self.flags & DESERIALIZE_TRANSACTION_WITNESS) != 0
+	}
+
+	/// Are transactions read from this stream with the joint split data?
+	pub fn read_transaction_joint_split(&self) -> bool {
+		(self.flags & DESERIALIZE_TRANSACTION_JOINT_SPLIT) != 0
 	}
 
 	pub fn read<T>(&mut self) -> Result<T, Error> where T: Deserializable {

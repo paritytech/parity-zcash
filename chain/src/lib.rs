@@ -10,6 +10,7 @@ pub mod constants;
 
 mod block;
 mod block_header;
+mod join_split;
 mod merkle_root;
 mod transaction;
 
@@ -28,6 +29,7 @@ pub use primitives::{hash, bytes, bigint, compact};
 
 pub use block::Block;
 pub use block_header::BlockHeader;
+pub use join_split::{JointSplit, JointSplitDescription};
 pub use merkle_root::{merkle_root, merkle_node_hash};
 pub use transaction::{Transaction, TransactionInput, TransactionOutput, OutPoint};
 

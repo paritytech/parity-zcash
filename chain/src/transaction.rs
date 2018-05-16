@@ -9,6 +9,7 @@ use ser::{deserialize, serialize, serialize_with_flags, SERIALIZE_TRANSACTION_WI
 use crypto::dhash256;
 use hash::H256;
 use constants::{SEQUENCE_FINAL, LOCKTIME_THRESHOLD};
+use join_split::{JointSplit, deserialize_joint_split};
 use ser::{Error, Serializable, Deserializable, Stream, Reader};
 
 /// Must be zero.
@@ -96,6 +97,7 @@ pub struct Transaction {
 	pub inputs: Vec<TransactionInput>,
 	pub outputs: Vec<TransactionOutput>,
 	pub lock_time: u32,
+	pub joint_split: Option<JointSplit>,
 }
 
 impl From<&'static str> for Transaction {
@@ -232,7 +234,8 @@ impl Deserializable for Transaction {
 	fn deserialize<T>(reader: &mut Reader<T>) -> Result<Self, Error> where Self: Sized, T: io::Read {
 		let version = reader.read()?;
 		let mut inputs: Vec<TransactionInput> = reader.read_list()?;
-		let read_witness = if inputs.is_empty() {
+
+		let read_witness = if reader.read_transaction_witness() && inputs.is_empty() {
 			let witness_flag: u8 = reader.read()?;
 			if witness_flag != WITNESS_FLAG {
 				return Err(Error::MalformedData);
@@ -250,11 +253,18 @@ impl Deserializable for Transaction {
 			}
 		}
 
+		let joint_split = if version >= 2 && reader.read_transaction_joint_split() {
+			deserialize_joint_split(reader)?
+		} else {
+			None
+		};
+
 		Ok(Transaction {
 			version: version,
 			inputs: inputs,
 			outputs: outputs,
 			lock_time: reader.read()?,
+			joint_split: joint_split,
 		})
 	}
 }

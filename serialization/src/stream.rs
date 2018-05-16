@@ -4,8 +4,10 @@ use std::borrow::Borrow;
 use compact_integer::CompactInteger;
 use bytes::Bytes;
 
-/// Do not serialize transaction witness data.
+/// Serialize transaction witness data.
 pub const SERIALIZE_TRANSACTION_WITNESS: u32 = 0x40000000;
+/// Serialize transaction joint split data.
+pub const SERIALIZE_TRANSACTION_JOINT_SPLIT: u32 = 0x80000000;
 
 pub fn serialize<T>(t: &T) -> Bytes where T: Serializable{
 	let mut stream = Stream::default();
@@ -73,6 +75,11 @@ impl Stream {
 	/// Are transactions written to this stream with witness data?
 	pub fn include_transaction_witness(&self) -> bool {
 		(self.flags & SERIALIZE_TRANSACTION_WITNESS) != 0
+	}
+
+	/// Are transactions written to this stream with the joint split data?
+	pub fn include_transaction_joint_split(&self) -> bool {
+		(self.flags & SERIALIZE_TRANSACTION_JOINT_SPLIT) != 0
 	}
 
 	/// Serializes the struct and appends it to the end of stream.

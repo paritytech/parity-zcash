@@ -225,6 +225,7 @@ impl TransactionInputSigner {
 			outputs: outputs,
 			version: self.version,
 			lock_time: self.lock_time,
+			joint_split: None, // TODO
 		};
 
 		let mut stream = Stream::default();

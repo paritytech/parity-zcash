@@ -5,6 +5,9 @@ use crypto::dhash256;
 use compact::Compact;
 use hash::H256;
 
+#[derive(Debug, PartialEq, Default, Clone)]
+pub struct EquihashSolution(pub Vec<u8>); // TODO: len = 1344
+
 #[derive(PartialEq, Clone, Serializable, Deserializable)]
 pub struct BlockHeader {
 	pub version: u32,
@@ -13,6 +16,7 @@ pub struct BlockHeader {
 	pub time: u32,
 	pub bits: Compact,
 	pub nonce: u32,
+	pub equihash_solution: Option<EquihashSolution>,
 }
 
 impl BlockHeader {
