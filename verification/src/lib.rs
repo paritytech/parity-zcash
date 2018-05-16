@@ -58,6 +58,7 @@ extern crate lazy_static;
 extern crate log;
 extern crate parking_lot;
 extern crate rayon;
+extern crate blake2_rfc;
 
 extern crate storage;
 extern crate chain;

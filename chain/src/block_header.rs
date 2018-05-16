@@ -1,21 +1,23 @@
+use std::io;
 use std::fmt;
 use hex::FromHex;
 use ser::{deserialize, serialize};
 use crypto::dhash256;
 use compact::Compact;
 use hash::H256;
+use ser::{Error, Serializable, Deserializable, Stream, Reader};
 
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct EquihashSolution(pub Vec<u8>); // TODO: len = 1344
 
-#[derive(PartialEq, Clone, Serializable, Deserializable)]
+#[derive(PartialEq, Clone)]
 pub struct BlockHeader {
 	pub version: u32,
 	pub previous_header_hash: H256,
 	pub merkle_root_hash: H256,
 	pub time: u32,
 	pub bits: Compact,
-	pub nonce: u32,
+	pub nonce: u32, // TODO: changed to H256 in Zcash
 	pub equihash_solution: Option<EquihashSolution>,
 }
 
@@ -43,6 +45,46 @@ impl From<&'static str> for BlockHeader {
 		deserialize(&s.from_hex().unwrap() as &[u8]).unwrap()
 	}
 }
+
+impl Serializable for BlockHeader {
+	fn serialize(&self, stream: &mut Stream) {
+		unimplemented!()
+	}
+}
+
+impl Deserializable for BlockHeader {
+	fn deserialize<T>(reader: &mut Reader<T>) -> Result<Self, Error> where Self: Sized, T: io::Read {
+		let version = reader.read()?;
+		let previous_header_hash = reader.read()?;
+		let merkle_root_hash = reader.read()?;
+
+		// TODO: rename to transaction format - original, witness, zcash, must be enum, not flags
+		if reader.read_transaction_joint_split() {
+			let _reserved_hash: H256 = reader.read()?;
+		}
+
+		let time = reader.read()?;
+		let bits = reader.read()?;
+		let nonce = reader.read()?;
+
+		let equihash_solution = if reader.read_transaction_joint_split() {
+			Some(EquihashSolution(reader.read_list()?))
+		} else {
+			None
+		};
+
+		Ok(BlockHeader {
+			version,
+			previous_header_hash,
+			merkle_root_hash,
+			time,
+			bits,
+			nonce,
+			equihash_solution,
+		})
+	}
+}
+
 
 #[cfg(test)]
 mod tests {
