@@ -59,6 +59,7 @@ extern crate log;
 extern crate parking_lot;
 extern crate rayon;
 extern crate blake2_rfc;
+extern crate byteorder;
 
 extern crate storage;
 extern crate chain;
@@ -74,6 +75,7 @@ pub mod constants;
 mod canon;
 mod deployments;
 mod duplex_store;
+mod equihash;
 mod error;
 mod sigops;
 mod timestamp;

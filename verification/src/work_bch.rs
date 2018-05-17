@@ -227,6 +227,7 @@ mod tests {
 				time: 1269211443,
 				bits: 0x207fffff.into(),
 				nonce: 0,
+				equihash_solution: None,
 			});
 
 		// create x100 pre-HF blocks
@@ -286,6 +287,7 @@ mod tests {
 				time: 1269211443,
 				bits: initial_bits.into(),
 				nonce: 0,
+				equihash_solution: None,
 			});
 
 		// Pile up some blocks every 10 mins to establish some history.

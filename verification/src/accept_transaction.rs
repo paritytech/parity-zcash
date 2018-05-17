@@ -506,6 +506,7 @@ mod tests {
 					.into_bytes(),
 			}],
 			lock_time: 0xffffffff,
+			joint_split: None,
 		}.into();
 
 		assert_eq!(transaction.raw.outputs[0].script_pubkey.len(), 46 + 2);

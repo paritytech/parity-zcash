@@ -248,6 +248,7 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 				nonce: self.nonce,
 				merkle_root_hash: self.merkle_root,
 				version: self.version,
+				equihash_solution: None,
 			}
 		)
 	}
@@ -335,6 +336,7 @@ impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
 				version: self.version,
 				inputs: self.inputs,
 				outputs: self.outputs,
+				joint_split: None,
 			}
 		)
 	}
