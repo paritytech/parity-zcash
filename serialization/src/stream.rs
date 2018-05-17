@@ -6,8 +6,8 @@ use bytes::Bytes;
 
 /// Serialize transaction witness data.
 pub const SERIALIZE_TRANSACTION_WITNESS: u32 = 0x40000000;
-/// Serialize transaction joint split data.
-pub const SERIALIZE_TRANSACTION_JOINT_SPLIT: u32 = 0x80000000;
+/// Serialize everything in ZCash format.
+pub const SERIALIZE_ZCASH: u32 = 0x80000000;
 
 pub fn serialize<T>(t: &T) -> Bytes where T: Serializable{
 	let mut stream = Stream::default();
@@ -77,9 +77,9 @@ impl Stream {
 		(self.flags & SERIALIZE_TRANSACTION_WITNESS) != 0
 	}
 
-	/// Are transactions written to this stream with the joint split data?
-	pub fn include_transaction_joint_split(&self) -> bool {
-		(self.flags & SERIALIZE_TRANSACTION_JOINT_SPLIT) != 0
+	/// Is data serialized to this stream in ZCash format?
+	pub fn is_zcash_stream(&self) -> bool {
+		(self.flags & SERIALIZE_ZCASH) != 0
 	}
 
 	/// Serializes the struct and appends it to the end of stream.

@@ -12,10 +12,10 @@ pub use primitives::{hash, bytes, compact};
 pub use compact_integer::CompactInteger;
 pub use list::List;
 pub use reader::{Reader, Deserializable, deserialize, deserialize_iterator, ReadIterator, Error,
-	DESERIALIZE_TRANSACTION_JOINT_SPLIT,
+	DESERIALIZE_ZCASH,
 };
 pub use stream::{
 	Stream, Serializable, serialize, serialize_with_flags, serialize_list, serialized_list_size,
-	serialized_list_size_with_flags, SERIALIZE_TRANSACTION_WITNESS, SERIALIZE_TRANSACTION_JOINT_SPLIT,
+	serialized_list_size_with_flags, SERIALIZE_TRANSACTION_WITNESS, SERIALIZE_ZCASH,
 };
 

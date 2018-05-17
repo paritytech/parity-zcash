@@ -226,7 +226,7 @@ mod tests {
 				merkle_root_hash: 0.into(),
 				time: 1269211443,
 				bits: 0x207fffff.into(),
-				nonce: 0,
+				nonce: 0.into(),
 				equihash_solution: None,
 			});
 
@@ -286,7 +286,7 @@ mod tests {
 				merkle_root_hash: 0.into(),
 				time: 1269211443,
 				bits: initial_bits.into(),
-				nonce: 0,
+				nonce: 0.into(),
 				equihash_solution: None,
 			});
 

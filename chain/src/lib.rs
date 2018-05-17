@@ -28,7 +28,7 @@ pub use rustc_serialize::hex;
 pub use primitives::{hash, bytes, bigint, compact};
 
 pub use block::Block;
-pub use block_header::BlockHeader;
+pub use block_header::{BlockHeader, BlockHeaderNonce};
 pub use join_split::{JointSplit, JointSplitDescription};
 pub use merkle_root::{merkle_root, merkle_node_hash};
 pub use transaction::{Transaction, TransactionInput, TransactionOutput, OutPoint};

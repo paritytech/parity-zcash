@@ -235,7 +235,7 @@ impl Deserializable for Transaction {
 		let version = reader.read()?;
 		let mut inputs: Vec<TransactionInput> = reader.read_list()?;
 
-		let read_witness = if reader.read_transaction_witness() && inputs.is_empty() {
+		let read_witness = if inputs.is_empty() {
 			let witness_flag: u8 = reader.read()?;
 			if witness_flag != WITNESS_FLAG {
 				return Err(Error::MalformedData);
@@ -253,7 +253,7 @@ impl Deserializable for Transaction {
 			}
 		}
 
-		let joint_split = if version >= 2 && reader.read_transaction_joint_split() {
+		let joint_split = if version >= 2 && reader.is_zcash_reader() {
 			deserialize_joint_split(reader)?
 		} else {
 			None
@@ -342,6 +342,7 @@ mod tests {
 				script_pubkey: "76a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac".into(),
 			}],
 			lock_time: 0x00000011,
+			joint_split: None,
 		};
 		assert_eq!(actual, expected);
 	}

@@ -293,7 +293,7 @@ mod tests {
 					merkle_root_hash: Default::default(),
 					time: time,
 					bits: 0.into(),
-					nonce: height,
+					nonce: height.into(),
 					equihash_solution: None,
 				};
 				previous_header_hash = header.hash();

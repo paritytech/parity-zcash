@@ -2337,6 +2337,7 @@ mod tests {
 				script_pubkey: script_pubkey.to_bytes(),
 			}],
 			lock_time: 0,
+			joint_split: None,
 		};
 		let tx2 = Transaction {
 			version: 1,
@@ -2354,6 +2355,7 @@ mod tests {
 				script_pubkey: Builder::default().into_bytes(),
 			}],
 			lock_time: 0,
+			joint_split: None,
 		};
 
 		let checker = TransactionSignatureChecker {

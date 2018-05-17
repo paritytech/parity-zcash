@@ -74,6 +74,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let user_agent_suffix = match consensus.fork {
 		ConsensusFork::BitcoinCore => "",
 		ConsensusFork::BitcoinCash(_) => "/UAHF",
+		ConsensusFork::ZCash => "/ZCash",
 	};
 	let user_agent = match network {
 		Network::Testnet | Network::Mainnet | Network::Unitest | Network::Other(_) => format!("{}{}", USER_AGENT, user_agent_suffix),
@@ -122,6 +123,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let services = match &consensus.fork {
 		&ConsensusFork::BitcoinCash(_) => services.with_bitcoin_cash(true),
 		&ConsensusFork::BitcoinCore => services.with_witness(true),
+		&ConsensusFork::ZCash => services,
 	};
 
 	let verification_level = match matches.value_of("verification-level") {

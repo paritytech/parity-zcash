@@ -245,7 +245,7 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 				time: self.time,
 				previous_header_hash: self.parent,
 				bits: self.bits,
-				nonce: self.nonce,
+				nonce: self.nonce.into(),
 				merkle_root_hash: self.merkle_root,
 				version: self.version,
 				equihash_solution: None,

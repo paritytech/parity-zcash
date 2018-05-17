@@ -11,7 +11,7 @@ use jsonrpc_macros::Trailing;
 use jsonrpc_core::Error;
 use {storage, chain};
 use global_script::Script;
-use chain::OutPoint;
+use chain::{OutPoint, BlockHeaderNonce};
 use verification;
 use ser::serialize;
 use network::Network;
@@ -99,7 +99,10 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 					bits: block.header.raw.bits.into(),
 					hash: block.hash().clone().into(),
 					merkleroot: block.header.raw.merkle_root_hash.clone().into(),
-					nonce: block.header.raw.nonce,
+					nonce: match block.header.raw.nonce {
+						BlockHeaderNonce::U32(v) => v,
+						BlockHeaderNonce::H256(_) => unimplemented!("TODO"),
+					},
 					time: block.header.raw.time,
 					tx: block.transactions.into_iter().map(|t| t.hash.into()).collect(),
 					version: block.header.raw.version,

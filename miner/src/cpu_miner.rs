@@ -161,6 +161,7 @@ mod tests {
 					script_pubkey: script_pubkey,
 				}],
 				lock_time: 0,
+				joint_split: None,
 			};
 
 			P2shCoinbaseTransactionBuilder {

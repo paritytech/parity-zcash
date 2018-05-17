@@ -17,8 +17,20 @@ pub struct BlockHeader {
 	pub merkle_root_hash: H256,
 	pub time: u32,
 	pub bits: Compact,
-	pub nonce: u32, // TODO: changed to H256 in Zcash
+	pub nonce: BlockHeaderNonce,
 	pub equihash_solution: Option<EquihashSolution>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum BlockHeaderNonce {
+	U32(u32),
+	H256(H256),
+}
+
+impl From<u32> for BlockHeaderNonce {
+	fn from(nonce: u32) -> Self {
+		BlockHeaderNonce::U32(nonce)
+	}
 }
 
 impl BlockHeader {
@@ -48,26 +60,51 @@ impl From<&'static str> for BlockHeader {
 
 impl Serializable for BlockHeader {
 	fn serialize(&self, stream: &mut Stream) {
-		unimplemented!()
+		let is_zcash_format = stream.is_zcash_stream();
+
+		stream
+			.append(&self.version)
+			.append(&self.previous_header_hash)
+			.append(&self.merkle_root_hash);
+		if is_zcash_format {
+			stream.append(&H256::default());
+		}
+		stream
+			.append(&self.time)
+			.append(&self.bits);
+		
+		match self.nonce {
+			BlockHeaderNonce::U32(ref v) => stream.append(v),
+			BlockHeaderNonce::H256(ref v) => stream.append(v),
+		};
+
+		if let Some(ref equihash_solution) = self.equihash_solution {
+			stream.append_list(&equihash_solution.0);
+		}
 	}
 }
 
 impl Deserializable for BlockHeader {
 	fn deserialize<T>(reader: &mut Reader<T>) -> Result<Self, Error> where Self: Sized, T: io::Read {
+		let is_zcash_format = reader.is_zcash_reader();
+
 		let version = reader.read()?;
 		let previous_header_hash = reader.read()?;
 		let merkle_root_hash = reader.read()?;
 
 		// TODO: rename to transaction format - original, witness, zcash, must be enum, not flags
-		if reader.read_transaction_joint_split() {
+		if is_zcash_format {
 			let _reserved_hash: H256 = reader.read()?;
 		}
 
 		let time = reader.read()?;
 		let bits = reader.read()?;
-		let nonce = reader.read()?;
+		let nonce = match is_zcash_format {
+			true => BlockHeaderNonce::H256(reader.read()?),
+			false => BlockHeaderNonce::U32(reader.read()?),
+		};
 
-		let equihash_solution = if reader.read_transaction_joint_split() {
+		let equihash_solution = if is_zcash_format {
 			Some(EquihashSolution(reader.read_list()?))
 		} else {
 			None
@@ -99,7 +136,8 @@ mod tests {
 			merkle_root_hash: [3; 32].into(),
 			time: 4,
 			bits: 5.into(),
-			nonce: 6,
+			nonce: 6.into(),
+			equihash_solution: None,
 		};
 
 		let mut stream = Stream::default();
@@ -136,7 +174,8 @@ mod tests {
 			merkle_root_hash: [3; 32].into(),
 			time: 4,
 			bits: 5.into(),
-			nonce: 6,
+			nonce: 6.into(),
+			equihash_solution: None,
 		};
 
 		assert_eq!(expected, reader.read().unwrap());
