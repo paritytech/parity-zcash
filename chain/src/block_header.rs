@@ -61,7 +61,7 @@ impl From<&'static str> for BlockHeader {
 impl Serializable for BlockHeader {
 	fn serialize(&self, stream: &mut Stream) {
 		let is_zcash_format = stream.is_zcash_stream();
-
+println!("=== is_zcash_format = {}", is_zcash_format);
 		stream
 			.append(&self.version)
 			.append(&self.previous_header_hash)
@@ -140,7 +140,7 @@ mod tests {
 			equihash_solution: None,
 		};
 
-		let mut stream = Stream::default();
+		let mut stream = Stream::new();
 		stream.append(&block_header);
 
 		let expected = vec![
@@ -166,7 +166,7 @@ mod tests {
 			6, 0, 0, 0,
 		];
 
-		let mut reader = Reader::new(&buffer);
+		let mut reader = Reader::new(&buffer, 0);
 
 		let expected = BlockHeader {
 			version: 1,

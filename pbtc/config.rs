@@ -4,7 +4,8 @@ use storage;
 use message::Services;
 use network::{Network, ConsensusParams, ConsensusFork, BitcoinCashConsensusParams};
 use p2p::InternetProtocol;
-use seednodes::{mainnet_seednodes, testnet_seednodes, bitcoin_cash_seednodes, bitcoin_cash_testnet_seednodes};
+use seednodes::{mainnet_seednodes, testnet_seednodes, bitcoin_cash_seednodes,
+	bitcoin_cash_testnet_seednodes, zcash_seednodes};
 use rpc_apis::ApiSet;
 use {USER_AGENT, REGTEST_USER_AGENT};
 use primitives::hash::H256;
@@ -74,7 +75,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let user_agent_suffix = match consensus.fork {
 		ConsensusFork::BitcoinCore => "",
 		ConsensusFork::BitcoinCash(_) => "/UAHF",
-		ConsensusFork::ZCash => "/ZCash",
+		ConsensusFork::ZCash => "",
 	};
 	let user_agent = match network {
 		Network::Testnet | Network::Mainnet | Network::Unitest | Network::Other(_) => format!("{}{}", USER_AGENT, user_agent_suffix),
@@ -83,13 +84,13 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 
 	let port = match matches.value_of("port") {
 		Some(port) => port.parse().map_err(|_| "Invalid port".to_owned())?,
-		None => network.port(),
+		None => network.port(&consensus.fork),
 	};
 
 	let connect = match matches.value_of("connect") {
 		Some(s) => Some(match s.parse::<net::SocketAddr>() {
 			Err(_) => s.parse::<net::IpAddr>()
-				.map(|ip| net::SocketAddr::new(ip, network.port()))
+				.map(|ip| net::SocketAddr::new(ip, network.port(&consensus.fork)))
 				.map_err(|_| "Invalid connect".to_owned()),
 			Ok(a) => Ok(a),
 		}?),
@@ -99,6 +100,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let seednodes: Vec<String> = match matches.value_of("seednode") {
 		Some(s) => vec![s.parse().map_err(|_| "Invalid seednode".to_owned())?],
 		None => match (network, &consensus.fork) {
+			(Network::Mainnet, &ConsensusFork::ZCash) => zcash_seednodes().into_iter().map(Into::into).collect(),
 			(Network::Mainnet, &ConsensusFork::BitcoinCash(_)) => bitcoin_cash_seednodes().into_iter().map(Into::into).collect(),
 			(Network::Testnet, &ConsensusFork::BitcoinCash(_)) => bitcoin_cash_testnet_seednodes().into_iter().map(Into::into).collect(),
 			(Network::Mainnet, _) => mainnet_seednodes().into_iter().map(Into::into).collect(),
@@ -139,7 +141,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 			let edge: H256 = s.parse().map_err(|_| "Invalid verification edge".to_owned())?;
 			edge.reversed()
 		},
-		_ => network.default_verification_edge(),
+		_ => network.default_verification_edge(&consensus.fork),
 	};
 
 	let config = Config {
@@ -171,14 +173,15 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 
 fn parse_consensus_fork(network: Network, db: &storage::SharedStore, matches: &clap::ArgMatches) -> Result<ConsensusFork, String> {
 	let old_consensus_fork = db.consensus_fork()?;
-	let new_consensus_fork = match (matches.is_present("btc"), matches.is_present("bch")) {
-		(false, false) => match &old_consensus_fork {
+	let new_consensus_fork = match (matches.is_present("btc"), matches.is_present("bch"), matches.is_present("zcash")) {
+		(false, false, false) => match &old_consensus_fork {
 			&Some(ref old_consensus_fork) => old_consensus_fork,
-			&None => return Err("You must select fork on first run: --btc, --bch".into()),
+			&None => return Err("You must select fork on first run: --btc, --bch or --zcash".into()),
 		},
-		(true, false) => "btc",
-		(false, true) => "bch",
-		_ => return Err("You can only pass single fork argument: --btc, --bch".into()),
+		(true, false, false) => "btc",
+		(false, true, false) => "bch",
+		(false, false, true) => "zcash",
+		_ => return Err("You can only pass single fork argument: --btc, --bch or --zcash".into()),
 	};
 
 	match &old_consensus_fork {
@@ -191,6 +194,7 @@ fn parse_consensus_fork(network: Network, db: &storage::SharedStore, matches: &c
 	Ok(match new_consensus_fork {
 		"btc" => ConsensusFork::BitcoinCore,
 		"bch" => ConsensusFork::BitcoinCash(BitcoinCashConsensusParams::new(network)),
+		"zcash" => ConsensusFork::ZCash,
 		_ => unreachable!("hardcoded above"),
 	})
 }

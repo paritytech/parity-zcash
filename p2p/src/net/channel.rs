@@ -23,7 +23,7 @@ impl Channel {
 	}
 
 	pub fn read_message(&self) -> ReadAnyMessage<SharedTcpStream> {
-		read_any_message(self.stream.clone(), self.peer_info.magic)
+		read_any_message(self.stream.clone(), self.peer_info.flags, self.peer_info.magic)
 	}
 
 	pub fn shutdown(&self) {

@@ -1,5 +1,6 @@
 use std::{io, marker};
 use compact_integer::CompactInteger;
+use flags::get_default_flags;
 
 /// Deserialize transaction witness data.
 pub const DESERIALIZE_TRANSACTION_WITNESS: u32 = 0x40000000;
@@ -15,6 +16,18 @@ pub fn deserialize<R, T>(buffer: R) -> Result<T, Error> where R: io::Read, T: De
 	} else {
 		Err(Error::UnreadData)
 	}
+}
+
+pub fn deserialize_with_flags<R, T>(buffer: R, flags: u32) -> Result<T, Error> where R: io::Read, T: Deserializable {
+	let mut reader = Reader::from_read_with_flags(buffer, flags);
+	let result = try!(reader.read());
+
+	if reader.is_finished() {
+		Ok(result)
+	} else {
+		Err(Error::UnreadData)
+	}
+
 }
 
 pub fn deserialize_iterator<R, T>(buffer: R) -> ReadIterator<R, T> where R: io::Read, T: Deserializable {
@@ -51,11 +64,11 @@ pub struct Reader<T> {
 
 impl<'a> Reader<&'a [u8]> {
 	/// Convenient way of creating for slice of bytes
-	pub fn new(buffer: &'a [u8]) -> Self {
+	pub fn new(buffer: &'a [u8], flags: u32) -> Self {
 		Reader {
 			buffer: buffer,
 			peeked: None,
-			flags: 0,
+			flags: flags | get_default_flags(),
 		}
 	}
 }
@@ -81,10 +94,14 @@ impl<T> io::Read for Reader<T> where T: io::Read {
 
 impl<R> Reader<R> where R: io::Read {
 	pub fn from_read(read: R) -> Self {
+		Self::from_read_with_flags(read, 0)
+	}
+
+	pub fn from_read_with_flags(read: R, flags: u32) -> Self {
 		Reader {
 			buffer: read,
 			peeked: None,
-			flags: 0,
+			flags: flags,
 		}
 	}
 

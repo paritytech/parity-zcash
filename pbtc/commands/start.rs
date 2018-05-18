@@ -4,9 +4,10 @@ use std::sync::Arc;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::atomic::{AtomicBool, Ordering};
 use sync::{create_sync_peers, create_local_sync_node, create_sync_connection_factory, SyncListener};
+use network::ConsensusFork;
 use primitives::hash::H256;
 use util::{init_db, node_table_path};
-use {config, p2p, PROTOCOL_VERSION, PROTOCOL_MINIMUM};
+use {config, p2p, PROTOCOL_VERSION, PROTOCOL_MINIMUM, ZCASH_PROTOCOL_VERSION, ZCASH_PROTOCOL_MINIMUM};
 use super::super::rpc;
 
 enum BlockNotifierTask {
@@ -88,25 +89,39 @@ pub fn start(cfg: config::Config) -> Result<(), String> {
 
 	let nodes_path = node_table_path(&cfg);
 
+	let SERIALIZE_ZCASH = 0x80000000; // TODO
+	let serialization_flags = match cfg.consensus.fork {
+		ConsensusFork::ZCash => SERIALIZE_ZCASH,
+		_ => 0,
+	};
+
 	let p2p_cfg = p2p::Config {
 		threads: cfg.p2p_threads,
 		inbound_connections: cfg.inbound_connections,
 		outbound_connections: cfg.outbound_connections,
 		connection: p2p::NetConfig {
-			protocol_version: PROTOCOL_VERSION,
-			protocol_minimum: PROTOCOL_MINIMUM,
+			protocol_version: match &cfg.consensus.fork {
+				&ConsensusFork::ZCash => ZCASH_PROTOCOL_VERSION,
+				_ => PROTOCOL_VERSION,
+			},
+			protocol_minimum: match &cfg.consensus.fork {
+				&ConsensusFork::ZCash => ZCASH_PROTOCOL_MINIMUM,
+				_ => PROTOCOL_MINIMUM,
+			},
 			magic: cfg.consensus.magic(),
 			local_address: SocketAddr::new("127.0.0.1".parse().unwrap(), cfg.port),
 			services: cfg.services,
 			user_agent: cfg.user_agent,
 			start_height: 0,
 			relay: true,
+			serialization_flags: serialization_flags,
 		},
 		peers: cfg.connect.map_or_else(|| vec![], |x| vec![x]),
 		seeds: cfg.seednodes,
 		node_table_path: nodes_path,
 		preferable_services: cfg.services,
 		internet_protocol: cfg.internet_protocol,
+		serialization_flags: serialization_flags,
 	};
 
 	let sync_peers = create_sync_peers();

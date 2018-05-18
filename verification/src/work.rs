@@ -58,7 +58,7 @@ pub fn retarget_timespan(retarget_timestamp: u32, last_timestamp: u32) -> u32 {
 
 /// Returns work required for given header
 pub fn work_required(parent_hash: H256, time: u32, height: u32, store: &BlockHeaderProvider, consensus: &ConsensusParams) -> Compact {
-	let max_bits = consensus.network.max_bits().into();
+	let max_bits = consensus.network.max_bits(&consensus.fork).into();
 	if height == 0 {
 		return max_bits;
 	}
@@ -79,13 +79,13 @@ pub fn work_required(parent_hash: H256, time: u32, height: u32, store: &BlockHea
 	}
 
 	if consensus.network == Network::Testnet {
-		return work_required_testnet(parent_hash, time, height, store, Network::Testnet)
+		return work_required_testnet(parent_hash, time, height, store, consensus)
 	}
 
 	parent_header.bits
 }
 
-pub fn work_required_testnet(parent_hash: H256, time: u32, height: u32, store: &BlockHeaderProvider, network: Network) -> Compact {
+pub fn work_required_testnet(parent_hash: H256, time: u32, height: u32, store: &BlockHeaderProvider, consensus: &ConsensusParams) -> Compact {
 	assert!(height != 0, "cannot calculate required work for genesis block");
 
 	let mut bits = Vec::new();
@@ -93,7 +93,7 @@ pub fn work_required_testnet(parent_hash: H256, time: u32, height: u32, store: &
 
 	let parent_header = store.block_header(block_ref.clone()).expect("height != 0; qed");
 	let max_time_gap = parent_header.time + DOUBLE_SPACING_SECONDS;
-	let max_bits = network.max_bits().into();
+	let max_bits = consensus.network.max_bits(&consensus.fork).into();
 	if time > max_time_gap {
 		return max_bits;
 	}
@@ -152,7 +152,7 @@ pub fn block_reward_satoshi(block_height: u32) -> u64 {
 mod tests {
 	use primitives::hash::H256;
 	use primitives::compact::Compact;
-	use network::Network;
+	use network::{Network, ConsensusFork};
 	use super::{is_valid_proof_of_work_hash, is_valid_proof_of_work, block_reward_satoshi};
 
 	fn is_valid_pow(max: Compact, bits: u32, hash: &'static str) -> bool {
@@ -163,14 +163,14 @@ mod tests {
 	#[test]
 	fn test_is_valid_proof_of_work() {
 		// block 2
-		assert!(is_valid_pow(Network::Mainnet.max_bits().into(), 486604799u32, "000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd"));
+		assert!(is_valid_pow(Network::Mainnet.max_bits(&ConsensusFork::BitcoinCore).into(), 486604799u32, "000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd"));
 		// block 400_000
-		assert!(is_valid_pow(Network::Mainnet.max_bits().into(), 403093919u32, "000000000000000004ec466ce4732fe6f1ed1cddc2ed4b328fff5224276e3f6f"));
+		assert!(is_valid_pow(Network::Mainnet.max_bits(&ConsensusFork::BitcoinCore).into(), 403093919u32, "000000000000000004ec466ce4732fe6f1ed1cddc2ed4b328fff5224276e3f6f"));
 
 		// other random tests
-		assert!(is_valid_pow(Network::Regtest.max_bits().into(), 0x181bc330u32, "00000000000000001bc330000000000000000000000000000000000000000000"));
-		assert!(!is_valid_pow(Network::Regtest.max_bits().into(), 0x181bc330u32, "00000000000000001bc330000000000000000000000000000000000000000001"));
-		assert!(!is_valid_pow(Network::Regtest.max_bits().into(), 0x181bc330u32, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
+		assert!(is_valid_pow(Network::Regtest.max_bits(&ConsensusFork::BitcoinCore).into(), 0x181bc330u32, "00000000000000001bc330000000000000000000000000000000000000000000"));
+		assert!(!is_valid_pow(Network::Regtest.max_bits(&ConsensusFork::BitcoinCore).into(), 0x181bc330u32, "00000000000000001bc330000000000000000000000000000000000000000001"));
+		assert!(!is_valid_pow(Network::Regtest.max_bits(&ConsensusFork::BitcoinCore).into(), 0x181bc330u32, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
 	}
 
 	#[test]

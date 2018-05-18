@@ -15,6 +15,9 @@ args:
     - bch:
         long: bch
         help: Use Bitcoin Cash verification rules (BCH).
+    - zcash:
+        long: zcash
+        help: Use ZCash verification rules (ZCH).
     - connect:
         short: c
         long: connect

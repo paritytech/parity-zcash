@@ -196,7 +196,7 @@ impl Deserializable for V70001 {
 impl From<&'static str> for Version {
 	fn from(s: &'static str) -> Self {
 		let bytes: Bytes = s.into();
-		deserialize_payload(&bytes, 0).unwrap()
+		deserialize_payload(&bytes, 0, 0).unwrap()
 	}
 }
 
@@ -222,7 +222,7 @@ mod test {
 			start_height: 98645,
 		});
 
-		assert_eq!(serialize_payload(&version, 0), Ok(expected));
+		assert_eq!(serialize_payload(&version, 0, 0), Ok(expected));
 	}
 
 	#[test]
@@ -241,6 +241,6 @@ mod test {
 			start_height: 98645,
 		});
 
-		assert_eq!(expected, deserialize_payload(&raw, 0).unwrap());
+		assert_eq!(expected, deserialize_payload(&raw, 0, 0).unwrap());
 	}
 }

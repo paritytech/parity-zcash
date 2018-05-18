@@ -15,6 +15,7 @@ pub struct Config {
 	pub user_agent: String,
 	pub start_height: i32,
 	pub relay: bool,
+	pub serialization_flags: u32,
 }
 
 impl Config {

@@ -148,7 +148,7 @@ mod tests {
 			0xff, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
 		];
 
-		let mut reader = Reader::new(&buffer);
+		let mut reader = Reader::new(&buffer, 0);
 		assert_eq!(reader.read::<CompactInteger>().unwrap(), 0u64.into());
 		assert_eq!(reader.read::<CompactInteger>().unwrap(), 0xfcu64.into());
 		assert_eq!(reader.read::<CompactInteger>().unwrap(), 0xfdu64.into());

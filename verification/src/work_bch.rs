@@ -24,7 +24,7 @@ pub fn work_required_bitcoin_cash(parent_header: IndexedBlockHeader, time: u32, 
 	}
 
 	if consensus.network == Network::Testnet {
-		return work_required_testnet(parent_header.hash, time, height, store, Network::Testnet)
+		return work_required_testnet(parent_header.hash, time, height, store, consensus)
 	}
 
 	if parent_header.raw.bits == max_bits {
@@ -140,7 +140,7 @@ fn work_required_bitcoin_cash_adjusted(parent_header: IndexedBlockHeader, time: 
 	// Special difficulty rule for testnet:
 	// If the new block's timestamp is more than 2 * 10 minutes then allow
 	// mining of a min-difficulty block.
-	let max_bits = consensus.network.max_bits();
+	let max_bits = consensus.network.max_bits(&consensus.fork);
 	if consensus.network == Network::Testnet {
 		let max_time_gap = parent_header.raw.time + DOUBLE_SPACING_SECONDS;
 		if time > max_time_gap {
@@ -163,7 +163,7 @@ fn work_required_bitcoin_cash_adjusted(parent_header: IndexedBlockHeader, time: 
 
 	// Compute the target based on time and work done during the interval.
 	let next_target = compute_target(first_header, last_header, store);
-	let max_bits = consensus.network.max_bits();
+	let max_bits = consensus.network.max_bits(&consensus.fork);
 	if next_target > max_bits {
 		return max_bits.into();
 	}
@@ -275,7 +275,7 @@ mod tests {
 		}));
 
 
-		let limit_bits = uahf_consensus.network.max_bits();
+		let limit_bits = uahf_consensus.network.max_bits(&ConsensusFork::BitcoinCore);
 		let initial_bits = limit_bits >> 4;
 		let mut header_provider = MemoryBlockHeaderProvider::default();
 

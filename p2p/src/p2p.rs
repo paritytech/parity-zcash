@@ -402,6 +402,10 @@ impl Context {
 	pub fn nodes(&self) -> Vec<Node> {
 		self.node_table.read().nodes()
 	}
+
+	pub fn serialization_flags(&self) -> u32 {
+		self.config.serialization_flags
+	}
 }
 
 pub struct P2P {
