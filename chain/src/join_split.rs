@@ -1,49 +1,8 @@
 use std::io;
 use rustc_serialize::hex::ToHex;
 use hash::{H256, H512};
-use ser::{Error, Serializable, Deserializable, Stream, Reader};
-
-#[derive(Clone, Serializable, Deserializable)]
-pub struct ZKProof(pub Vec<u8>); // TODO: len == 296
-
-impl ::std::fmt::Debug for ZKProof {
-	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
-		write!(f, "ZKProof({})", self.0.to_hex())
-	}
-}
-
-impl Default for ZKProof {
-	fn default() -> Self {
-		ZKProof([0; 296].to_vec())
-	}
-}
-
-impl PartialEq for ZKProof {
-	fn eq(&self, c: &ZKProof) -> bool {
-		self.0.iter().zip(c.0.iter()).all(|(l, r)| l == r)
-	}
-}
-
-#[derive(Clone, Serializable, Deserializable)]
-pub struct CipherText(pub Vec<u8>); // TODO: len == 601
-
-impl PartialEq for CipherText {
-	fn eq(&self, c: &CipherText) -> bool {
-		self.0.iter().zip(c.0.iter()).all(|(l, r)| l == r)
-	}
-}
-
-impl ::std::fmt::Debug for CipherText {
-	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
-		write!(f, "CipherText({})", self.0.to_hex())
-	}
-}
-
-impl Default for CipherText {
-	fn default() -> Self {
-		CipherText([0; 601].to_vec())
-	}
-}
+use ser::{Error, Serializable, Deserializable, Stream, Reader, FixedArray_H256_2,
+	FixedArray_u8_296, FixedArray_u8_601_2};
 
 #[derive(Debug, PartialEq, Default, Clone)]
 pub struct JointSplit {
@@ -57,13 +16,21 @@ pub struct JointSplitDescription {
 	pub value_pub_old: u64,
 	pub value_pub_new: u64,
 	pub anchor: H256,
-	pub nullifiers: Vec<H256>,
-	pub commitments: Vec<H256>,
+	pub nullifiers: FixedArray_H256_2,
+	pub commitments: FixedArray_H256_2,
 	pub ephemeral_key: H256,
 	pub random_seed: H256,
-	pub macs: Vec<H256>,
-	pub zkproof: ZKProof,
-	pub ciphertexts: CipherText,
+	pub macs: FixedArray_H256_2,
+	pub zkproof: FixedArray_u8_296,
+	pub ciphertexts: FixedArray_u8_601_2,
+}
+
+pub fn serialize_joint_split(stream: &mut Stream, joint_split: &Option<JointSplit>) {
+	if let &Some(ref joint_split) = joint_split {
+		stream.append_list(&joint_split.descriptions)
+			.append(&joint_split.pubkey)
+			.append(&joint_split.sig);
+	}
 }
 
 pub fn deserialize_joint_split<T>(reader: &mut Reader<T>) -> Result<Option<JointSplit>, Error> where T: io::Read {

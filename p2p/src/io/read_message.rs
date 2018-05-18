@@ -43,13 +43,11 @@ impl<M, A> Future for ReadMessage<M, A> where A: AsyncRead, M: Payload {
 			let next_state = match self.state {
 				ReadMessageState::ReadHeader { version, ref mut future } => {
 					let (read, header) = try_ready!(future.poll());
-println!("=== 10: {:?}", header);
 					let header = match header {
 						Ok(header) => header,
 						Err(err) => return Ok((read, Err(err)).into()),
 					};
-let s: String = header.command.clone().into();
-println!("=== 11: {}", s);
+
 					if header.command != M::command() {
 						return Ok((read, Err(Error::InvalidCommand)).into());
 					}

@@ -9,6 +9,7 @@ use seednodes::{mainnet_seednodes, testnet_seednodes, bitcoin_cash_seednodes,
 use rpc_apis::ApiSet;
 use {USER_AGENT, REGTEST_USER_AGENT};
 use primitives::hash::H256;
+use ser;
 use rpc::HttpConfiguration as RpcHttpConfig;
 use verification::VerificationLevel;
 use sync::VerificationParameters;
@@ -60,6 +61,11 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 
 	let consensus_fork = parse_consensus_fork(network, &db, &matches)?;
 	let consensus = ConsensusParams::new(network, consensus_fork);
+
+	match consensus.fork {
+		ConsensusFork::ZCash => ser::set_default_flags(ser::SERIALIZE_ZCASH),
+		_ => (),
+	};
 
 	let (in_connections, out_connections) = match network {
 		Network::Testnet | Network::Mainnet | Network::Other(_) => (10, 10),

@@ -61,7 +61,6 @@ impl From<&'static str> for BlockHeader {
 impl Serializable for BlockHeader {
 	fn serialize(&self, stream: &mut Stream) {
 		let is_zcash_format = stream.is_zcash_stream();
-println!("=== is_zcash_format = {}", is_zcash_format);
 		stream
 			.append(&self.version)
 			.append(&self.previous_header_hash)

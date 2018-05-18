@@ -9,7 +9,7 @@ use ser::{deserialize, serialize, serialize_with_flags, SERIALIZE_TRANSACTION_WI
 use crypto::dhash256;
 use hash::H256;
 use constants::{SEQUENCE_FINAL, LOCKTIME_THRESHOLD};
-use join_split::{JointSplit, deserialize_joint_split};
+use join_split::{JointSplit, deserialize_joint_split, serialize_joint_split};
 use ser::{Error, Serializable, Deserializable, Stream, Reader};
 
 /// Must be zero.
@@ -207,6 +207,16 @@ impl Deserializable for TransactionInput {
 
 impl Serializable for Transaction {
 	fn serialize(&self, stream: &mut Stream) {
+		if stream.is_zcash_stream() {
+			stream
+				.append(&self.version)
+				.append_list(&self.inputs)
+				.append_list(&self.outputs)
+				.append(&self.lock_time);
+			serialize_joint_split(stream, &self.joint_split);
+			return;
+		}
+
 		let include_transaction_witness = stream.include_transaction_witness() && self.has_witness();
 		match include_transaction_witness {
 			false => stream
@@ -234,8 +244,8 @@ impl Deserializable for Transaction {
 	fn deserialize<T>(reader: &mut Reader<T>) -> Result<Self, Error> where Self: Sized, T: io::Read {
 		let version = reader.read()?;
 		let mut inputs: Vec<TransactionInput> = reader.read_list()?;
-
-		let read_witness = if inputs.is_empty() {
+		// TODO: default flags must be: ZCASH, WITNESS, ...
+		let read_witness = if inputs.is_empty() && !reader.is_zcash_reader() {
 			let witness_flag: u8 = reader.read()?;
 			if witness_flag != WITNESS_FLAG {
 				return Err(Error::MalformedData);
@@ -252,7 +262,7 @@ impl Deserializable for Transaction {
 				input.script_witness = reader.read_list()?;
 			}
 		}
-
+		let lock_time = reader.read()?;
 		let joint_split = if version >= 2 && reader.is_zcash_reader() {
 			deserialize_joint_split(reader)?
 		} else {
@@ -263,7 +273,7 @@ impl Deserializable for Transaction {
 			version: version,
 			inputs: inputs,
 			outputs: outputs,
-			lock_time: reader.read()?,
+			lock_time: lock_time,
 			joint_split: joint_split,
 		})
 	}

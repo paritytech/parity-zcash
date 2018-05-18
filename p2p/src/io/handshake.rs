@@ -104,24 +104,20 @@ impl<A> Future for Handshake<A> where A: AsyncRead + AsyncWrite {
 			let next_state = match self.state {
 				HandshakeState::SendVersion(ref mut future) => {
 					let (stream, _) = try_ready!(future.poll());
-println!("=== 1");
 					HandshakeState::ReceiveVersion(read_message(stream, self.flags, self.magic, 0))
 				},
 				HandshakeState::ReceiveVersion(ref mut future) => {
 					let (stream, version) = try_ready!(future.poll());
-println!("=== 2: {:?}", version);
 					let version = match version {
 						Ok(version) => version,
 						Err(err) => return Ok((stream, Err(err.into())).into()),
 					};
 
 					if version.version() < self.min_version {
-println!("=== 2.1: {} < {}", version.version(), self.min_version);
 						return Ok((stream, Err(Error::InvalidVersion)).into());
 					}
 					if let (Some(self_nonce), Some(nonce)) = (self.nonce, version.nonce()) {
 						if self_nonce == nonce {
-println!("=== 2.2: {} == {}", self_nonce, nonce);
 							return Ok((stream, Err(Error::InvalidVersion)).into());
 						}
 					}
@@ -133,7 +129,6 @@ println!("=== 2.2: {} == {}", self_nonce, nonce);
 				},
 				HandshakeState::SendVerack { ref mut version, ref mut future } => {
 					let (stream, _) = try_ready!(future.poll());
-println!("=== 3");
 					let version = version.take().expect("verack must be preceded by version");
 
 					HandshakeState::ReceiveVerack {
@@ -143,7 +138,6 @@ println!("=== 3");
 				},
 				HandshakeState::ReceiveVerack { ref mut version, ref mut future } => {
 					let (stream, _verack) = try_ready!(future.poll());
-println!("=== 4");
 					let version = version.take().expect("verack must be preceded by version");
 
 					let result = HandshakeResult {

@@ -22,6 +22,7 @@ extern crate import;
 extern crate rpc as ethcore_rpc;
 extern crate primitives;
 extern crate verification;
+extern crate serialization as ser;
 
 mod commands;
 mod config;

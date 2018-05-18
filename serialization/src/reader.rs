@@ -94,7 +94,7 @@ impl<T> io::Read for Reader<T> where T: io::Read {
 
 impl<R> Reader<R> where R: io::Read {
 	pub fn from_read(read: R) -> Self {
-		Self::from_read_with_flags(read, 0)
+		Self::from_read_with_flags(read, get_default_flags())
 	}
 
 	pub fn from_read_with_flags(read: R, flags: u32) -> Self {

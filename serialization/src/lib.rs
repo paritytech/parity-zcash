@@ -2,6 +2,7 @@ extern crate byteorder;
 extern crate primitives;
 
 mod compact_integer;
+mod fixed_array;
 mod flags;
 mod impls;
 mod list;
@@ -12,6 +13,7 @@ pub use primitives::{hash, bytes, compact};
 
 // TODO: use same flags for both serialization && deserialization (they're used this way on network layer)
 
+pub use fixed_array::*;
 pub use flags::{set_default_flags, get_default_flags};
 pub use compact_integer::CompactInteger;
 pub use list::List;
