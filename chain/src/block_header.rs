@@ -5,6 +5,7 @@ use ser::{deserialize, serialize};
 use crypto::dhash256;
 use compact::Compact;
 use hash::H256;
+use primitives::bytes::Bytes;
 use ser::{Error, Serializable, Deserializable, Stream, Reader};
 
 #[derive(Debug, PartialEq, Default, Clone)]
@@ -18,6 +19,7 @@ pub struct BlockHeader {
 	pub time: u32,
 	pub bits: Compact,
 	pub nonce: BlockHeaderNonce,
+	pub hash_final_sapling_root: Option<H256>,
 	pub equihash_solution: Option<EquihashSolution>,
 }
 
@@ -37,17 +39,44 @@ impl BlockHeader {
 	pub fn hash(&self) -> H256 {
 		dhash256(&serialize(self))
 	}
+
+	pub fn equihash_input(&self) -> Bytes {
+		let mut stream = Stream::new();
+		stream
+			.append(&self.version)
+			.append(&self.previous_header_hash)
+			.append(&self.merkle_root_hash);
+
+		if let Some(hash_final_sapling_root) = self.hash_final_sapling_root.as_ref() {
+			stream.append(hash_final_sapling_root);
+		}
+
+		stream
+			.append(&self.time)
+			.append(&self.bits);
+		
+		match self.nonce {
+			BlockHeaderNonce::U32(ref v) => stream.append(v),
+			BlockHeaderNonce::H256(ref v) => stream.append(v),
+		};
+
+		stream.out()
+	}
 }
 
 impl fmt::Debug for BlockHeader {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use rustc_serialize::hex::ToHex;
+
 		f.debug_struct("BlockHeader")
 			.field("version", &self.version)
 			.field("previous_header_hash", &self.previous_header_hash.reversed())
 			.field("merkle_root_hash", &self.merkle_root_hash.reversed())
+			.field("hash_final_sapling_root", &self.hash_final_sapling_root)
 			.field("time", &self.time)
 			.field("bits", &self.bits)
 			.field("nonce", &self.nonce)
+			.field("equihash_solution", &self.equihash_solution.as_ref().map(|s| s.0.to_hex()))
 			.finish()
 	}
 }
@@ -60,13 +89,12 @@ impl From<&'static str> for BlockHeader {
 
 impl Serializable for BlockHeader {
 	fn serialize(&self, stream: &mut Stream) {
-		let is_zcash_format = stream.is_zcash_stream();
 		stream
 			.append(&self.version)
 			.append(&self.previous_header_hash)
 			.append(&self.merkle_root_hash);
-		if is_zcash_format {
-			stream.append(&H256::default());
+		if let Some(hash_final_sapling_root) = self.hash_final_sapling_root.as_ref() {
+			stream.append(hash_final_sapling_root);
 		}
 		stream
 			.append(&self.time)
@@ -92,9 +120,11 @@ impl Deserializable for BlockHeader {
 		let merkle_root_hash = reader.read()?;
 
 		// TODO: rename to transaction format - original, witness, zcash, must be enum, not flags
-		if is_zcash_format {
-			let _reserved_hash: H256 = reader.read()?;
-		}
+		let hash_final_sapling_root = if is_zcash_format {
+			Some(reader.read()?)
+		} else {
+			None
+		};
 
 		let time = reader.read()?;
 		let bits = reader.read()?;
@@ -113,6 +143,7 @@ impl Deserializable for BlockHeader {
 			version,
 			previous_header_hash,
 			merkle_root_hash,
+			hash_final_sapling_root,
 			time,
 			bits,
 			nonce,

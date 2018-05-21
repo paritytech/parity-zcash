@@ -59,6 +59,7 @@ pub enum Error {
 	UnexpectedWitness,
 	/// Database error
 	Database(DBError),
+	InvalidEquihashSolution,
 }
 
 impl From<DBError> for Error {

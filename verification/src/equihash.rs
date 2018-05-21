@@ -2,6 +2,7 @@
 
 use blake2_rfc::blake2b::Blake2b;
 use byteorder::{BigEndian, LittleEndian, ByteOrder, WriteBytesExt};
+use chain::BlockHeader;
 use primitives::hex::ToHex;
 
 pub struct EquihashParams {
@@ -37,6 +38,16 @@ impl EquihashParams {
 	pub fn hash_length(&self) -> usize {
 		(self.K as usize + 1) * self.collision_byte_length()
 	}
+}
+
+pub fn verify_block_equihash_solution(params: &EquihashParams, header: &BlockHeader) -> bool {
+	let equihash_solution = match header.equihash_solution.as_ref() {
+		Some(equihash_solution) => equihash_solution,
+		None => return false,
+	};
+
+	let input = header.equihash_input();
+	verify_equihash_solution(params, &input, &equihash_solution.0)
 }
 
 pub fn verify_equihash_solution(params: &EquihashParams, input: &[u8], solution: &[u8]) -> bool {
@@ -117,12 +128,18 @@ fn merge_rows(row1: &[u8], row2: &[u8], len: usize, indices_len: usize, trim: us
 }
 
 fn distinct_indices(row1: &[u8], row2: &[u8], len: usize, indices_len: usize) -> bool {
-	for i in 0..indices_len / 4 {
-		for j in 0..indices_len / 4 {
+	let mut i = 0;
+	let mut j = 0;
+	while i < indices_len {
+		while j < indices_len {
 			if row1[len + i..len + i + 4] == row2[len + j..len + j + 4] {
 				return false;
 			}
+
+			j += 4;
 		}
+
+		i += 4;
 	}
 
 	true

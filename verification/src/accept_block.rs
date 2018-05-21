@@ -269,7 +269,7 @@ impl<'a> BlockCoinbaseScript<'a> {
 		}
 
 		let prefix = script::Builder::default()
-			.push_num(self.height.into())
+			.push_i64(self.height.into())
 			.into_script();
 
 		let matches = self.block.transactions.first()

@@ -55,6 +55,20 @@ impl Builder {
 		self
 	}
 
+	/// Push integer to the end of script
+	pub fn push_i64(mut self, int: i64) -> Self {
+		if int == -1 || (int >= 1 && int <= 16) {
+			let shift: i64 = (Opcode::OP_1 as u8 - 1) as i64;
+			self.data.push((int + shift) as u8);
+			self
+		} else if int == 0 {
+			self.data.push(Opcode::OP_0 as u8);
+			self
+		} else {
+			self.push_num(int.into())
+		}
+	}
+
 	/// Appends num push operation to the end of script
 	pub fn push_num(self, num: Num) -> Self {
 		self.push_data(&num.to_bytes())

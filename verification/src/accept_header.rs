@@ -1,4 +1,4 @@
-use network::ConsensusParams;
+use network::{ConsensusParams, ConsensusFork};
 use storage::BlockHeaderProvider;
 use canon::CanonHeader;
 use error::Error;
@@ -8,6 +8,7 @@ use deployments::Deployments;
 
 pub struct HeaderAcceptor<'a> {
 	pub version: HeaderVersion<'a>,
+	pub equihash: HeaderEquihashSolution<'a>,
 	pub work: HeaderWork<'a>,
 	pub median_timestamp: HeaderMedianTimestamp<'a>,
 }
@@ -22,6 +23,7 @@ impl<'a> HeaderAcceptor<'a> {
 	) -> Self {
 		let csv_active = deployments.as_ref().csv(height, store, consensus);
 		HeaderAcceptor {
+			equihash: HeaderEquihashSolution::new(header, consensus),
 			work: HeaderWork::new(header, store, height, consensus),
 			median_timestamp: HeaderMedianTimestamp::new(header, store, csv_active),
 			version: HeaderVersion::new(header, height, consensus),
@@ -29,6 +31,7 @@ impl<'a> HeaderAcceptor<'a> {
 	}
 
 	pub fn check(&self) -> Result<(), Error> {
+		try!(self.equihash.check());
 		try!(self.version.check());
 		try!(self.work.check());
 		try!(self.median_timestamp.check());
@@ -60,6 +63,39 @@ impl<'a> HeaderVersion<'a> {
 			Err(Error::OldVersionBlock)
 		} else {
 			Ok(())
+		}
+	}
+}
+
+pub struct HeaderEquihashSolution<'a> {
+	header: CanonHeader<'a>,
+	consensus: &'a ConsensusParams,
+}
+
+impl<'a> HeaderEquihashSolution<'a> {
+	fn new(header: CanonHeader<'a>, consensus: &'a ConsensusParams) -> Self {
+		HeaderEquihashSolution {
+			header: header,
+			consensus: consensus,
+		}
+	}
+
+	fn check(&self) -> Result<(), Error> {
+		match self.consensus.fork {
+			ConsensusFork::ZCash => (),
+			_ => return Ok(()),
+		}
+
+		use equihash;
+		let is_solution_correct = equihash::verify_block_equihash_solution(&equihash::EquihashParams {
+			N: 200,
+			K: 9,
+		}, &self.header.raw);
+
+		if is_solution_correct {
+			Ok(())
+		} else {
+			Err(Error::InvalidEquihashSolution)
 		}
 	}
 }
