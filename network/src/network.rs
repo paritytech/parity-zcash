@@ -60,9 +60,9 @@ impl Network {
 			(&ConsensusFork::BitcoinCash(_), Network::Mainnet) => BITCOIN_CASH_MAGIC_MAINNET,
 			(&ConsensusFork::BitcoinCash(_), Network::Testnet) => BITCOIN_CASH_MAGIC_TESTNET,
 			(&ConsensusFork::BitcoinCash(_), Network::Regtest) => BITCOIN_CASH_MAGIC_REGTEST,
-			(&ConsensusFork::ZCash, Network::Mainnet) => ZCASH_MAGIC_MAINNET,
-			(&ConsensusFork::ZCash, Network::Testnet) => ZCASH_MAGIC_TESTNET,
-			(&ConsensusFork::ZCash, Network::Regtest) => ZCASH_MAGIC_REGTEST,
+			(&ConsensusFork::ZCash(_), Network::Mainnet) => ZCASH_MAGIC_MAINNET,
+			(&ConsensusFork::ZCash(_), Network::Testnet) => ZCASH_MAGIC_TESTNET,
+			(&ConsensusFork::ZCash(_), Network::Regtest) => ZCASH_MAGIC_REGTEST,
 			(_, Network::Mainnet) => MAGIC_MAINNET,
 			(_, Network::Testnet) => MAGIC_TESTNET,
 			(_, Network::Regtest) => MAGIC_REGTEST,
@@ -73,9 +73,9 @@ impl Network {
 
 	pub fn max_bits(&self, fork: &ConsensusFork) -> U256 {
 		match (fork, *self) {
-			(&ConsensusFork::ZCash, Network::Mainnet) => ZCASH_MAX_BITS_MAINNET.clone(),
-			(&ConsensusFork::ZCash, Network::Testnet) => ZCASH_MAX_BITS_TESTNET.clone(),
-			(&ConsensusFork::ZCash, Network::Testnet) => ZCASH_MAX_BITS_REGTEST.clone(),
+			(&ConsensusFork::ZCash(_), Network::Mainnet) => ZCASH_MAX_BITS_MAINNET.clone(),
+			(&ConsensusFork::ZCash(_), Network::Testnet) => ZCASH_MAX_BITS_TESTNET.clone(),
+			(&ConsensusFork::ZCash(_), Network::Testnet) => ZCASH_MAX_BITS_REGTEST.clone(),
 			(_, Network::Mainnet) | (_, Network::Other(_)) => MAX_BITS_MAINNET.clone(),
 			(_, Network::Testnet) => MAX_BITS_TESTNET.clone(),
 			(_, Network::Regtest) => MAX_BITS_REGTEST.clone(),
@@ -85,9 +85,9 @@ impl Network {
 
 	pub fn port(&self, fork: &ConsensusFork) -> u16 {
 		match (fork, *self) {
-			(&ConsensusFork::ZCash, Network::Mainnet) | (&ConsensusFork::ZCash, Network::Other(_)) => 8233,
-			(&ConsensusFork::ZCash, Network::Testnet) => 18233,
-			(&ConsensusFork::ZCash, Network::Regtest) | (&ConsensusFork::ZCash, Network::Unitest) => 18344,
+			(&ConsensusFork::ZCash(_), Network::Mainnet) | (&ConsensusFork::ZCash(_), Network::Other(_)) => 8233,
+			(&ConsensusFork::ZCash(_), Network::Testnet) => 18233,
+			(&ConsensusFork::ZCash(_), Network::Regtest) | (&ConsensusFork::ZCash(_), Network::Unitest) => 18344,
 			(_, Network::Mainnet) | (_, Network::Other(_)) => 8333,
 			(_, Network::Testnet) => 18333,
 			(_, Network::Regtest) | (_, Network::Unitest) => 18444,
@@ -105,7 +105,7 @@ impl Network {
 	pub fn genesis_block(&self, fork: &ConsensusFork) -> Block {
 		match (fork, *self) {
 			// TODO
-			(&ConsensusFork::ZCash, Network::Mainnet) | (&ConsensusFork::ZCash, Network::Other(_)) => {
+			(&ConsensusFork::ZCash(_), Network::Mainnet) | (&ConsensusFork::ZCash(_), Network::Other(_)) => {
 				use serialization;
 				use chain;
 				use chain::hex::FromHex;
@@ -114,9 +114,9 @@ impl Network {
 				let genesis: chain::Block = serialization::deserialize_with_flags(&origin as &[u8], serialization::DESERIALIZE_ZCASH).unwrap();
 				genesis
 			},
-			(&ConsensusFork::ZCash, Network::Testnet) =>
+			(&ConsensusFork::ZCash(_), Network::Testnet) =>
 				"".into(),
-			(&ConsensusFork::ZCash, Network::Regtest) | (&ConsensusFork::ZCash, Network::Unitest) =>
+			(&ConsensusFork::ZCash(_), Network::Regtest) | (&ConsensusFork::ZCash(_), Network::Unitest) =>
 				"".into(),
 
 			(_, Network::Mainnet) | (_, Network::Other(_)) => "0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c0101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4d04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73ffffffff0100f2052a01000000434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac00000000".into(),

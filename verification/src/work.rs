@@ -6,6 +6,7 @@ use chain::{IndexedBlockHeader, BlockHeader};
 use network::{Network, ConsensusParams, ConsensusFork};
 use storage::{BlockHeaderProvider, BlockRef};
 use work_bch::work_required_bitcoin_cash;
+use work_zcash::work_required_zcash;
 
 use constants::{
 	DOUBLE_SPACING_SECONDS, TARGET_TIMESPAN_SECONDS,
@@ -66,6 +67,11 @@ pub fn work_required(parent_hash: H256, time: u32, height: u32, store: &BlockHea
 	let parent_header = store.block_header(parent_hash.clone().into()).expect("self.height != 0; qed");
 
 	match consensus.fork {
+		ConsensusFork::ZCash(ref fork) =>
+			return work_required_zcash(IndexedBlockHeader {
+				hash: parent_hash,
+				raw: parent_header
+			}, time, height, store, fork, max_bits),
 		ConsensusFork::BitcoinCash(ref fork) if height >= fork.height =>
 			return work_required_bitcoin_cash(IndexedBlockHeader {
 				hash: parent_hash,

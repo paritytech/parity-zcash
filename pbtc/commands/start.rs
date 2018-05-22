@@ -91,7 +91,7 @@ pub fn start(cfg: config::Config) -> Result<(), String> {
 
 	let SERIALIZE_ZCASH = 0x80000000; // TODO
 	let serialization_flags = match cfg.consensus.fork {
-		ConsensusFork::ZCash => SERIALIZE_ZCASH,
+		ConsensusFork::ZCash(_) => SERIALIZE_ZCASH,
 		_ => 0,
 	};
 
@@ -101,11 +101,11 @@ pub fn start(cfg: config::Config) -> Result<(), String> {
 		outbound_connections: cfg.outbound_connections,
 		connection: p2p::NetConfig {
 			protocol_version: match &cfg.consensus.fork {
-				&ConsensusFork::ZCash => ZCASH_PROTOCOL_VERSION,
+				&ConsensusFork::ZCash(_) => ZCASH_PROTOCOL_VERSION,
 				_ => PROTOCOL_VERSION,
 			},
 			protocol_minimum: match &cfg.consensus.fork {
-				&ConsensusFork::ZCash => ZCASH_PROTOCOL_MINIMUM,
+				&ConsensusFork::ZCash(_) => ZCASH_PROTOCOL_MINIMUM,
 				_ => PROTOCOL_MINIMUM,
 			},
 			magic: cfg.consensus.magic(),

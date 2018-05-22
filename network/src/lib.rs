@@ -11,6 +11,6 @@ mod network;
 
 pub use primitives::{hash, compact};
 
-pub use consensus::{ConsensusParams, ConsensusFork, BitcoinCashConsensusParams};
+pub use consensus::{ConsensusParams, ConsensusFork, BitcoinCashConsensusParams, ZCashConsensusParams};
 pub use deployments::Deployment;
 pub use network::{Magic, Network};

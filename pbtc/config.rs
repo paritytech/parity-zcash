@@ -2,7 +2,7 @@ use std::net;
 use clap;
 use storage;
 use message::Services;
-use network::{Network, ConsensusParams, ConsensusFork, BitcoinCashConsensusParams};
+use network::{Network, ConsensusParams, ConsensusFork, BitcoinCashConsensusParams, ZCashConsensusParams};
 use p2p::InternetProtocol;
 use seednodes::{mainnet_seednodes, testnet_seednodes, bitcoin_cash_seednodes,
 	bitcoin_cash_testnet_seednodes, zcash_seednodes};
@@ -63,7 +63,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let consensus = ConsensusParams::new(network, consensus_fork);
 
 	match consensus.fork {
-		ConsensusFork::ZCash => ser::set_default_flags(ser::SERIALIZE_ZCASH),
+		ConsensusFork::ZCash(_) => ser::set_default_flags(ser::SERIALIZE_ZCASH),
 		_ => (),
 	};
 
@@ -81,7 +81,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let user_agent_suffix = match consensus.fork {
 		ConsensusFork::BitcoinCore => "",
 		ConsensusFork::BitcoinCash(_) => "/UAHF",
-		ConsensusFork::ZCash => "",
+		ConsensusFork::ZCash(_) => "",
 	};
 	let user_agent = match network {
 		Network::Testnet | Network::Mainnet | Network::Unitest | Network::Other(_) => format!("{}{}", USER_AGENT, user_agent_suffix),
@@ -106,7 +106,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let seednodes: Vec<String> = match matches.value_of("seednode") {
 		Some(s) => vec![s.parse().map_err(|_| "Invalid seednode".to_owned())?],
 		None => match (network, &consensus.fork) {
-			(Network::Mainnet, &ConsensusFork::ZCash) => zcash_seednodes().into_iter().map(Into::into).collect(),
+			(Network::Mainnet, &ConsensusFork::ZCash(_)) => zcash_seednodes().into_iter().map(Into::into).collect(),
 			(Network::Mainnet, &ConsensusFork::BitcoinCash(_)) => bitcoin_cash_seednodes().into_iter().map(Into::into).collect(),
 			(Network::Testnet, &ConsensusFork::BitcoinCash(_)) => bitcoin_cash_testnet_seednodes().into_iter().map(Into::into).collect(),
 			(Network::Mainnet, _) => mainnet_seednodes().into_iter().map(Into::into).collect(),
@@ -131,7 +131,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let services = match &consensus.fork {
 		&ConsensusFork::BitcoinCash(_) => services.with_bitcoin_cash(true),
 		&ConsensusFork::BitcoinCore => services.with_witness(true),
-		&ConsensusFork::ZCash => services,
+		&ConsensusFork::ZCash(_) => services,
 	};
 
 	let verification_level = match matches.value_of("verification-level") {
@@ -200,7 +200,7 @@ fn parse_consensus_fork(network: Network, db: &storage::SharedStore, matches: &c
 	Ok(match new_consensus_fork {
 		"btc" => ConsensusFork::BitcoinCore,
 		"bch" => ConsensusFork::BitcoinCash(BitcoinCashConsensusParams::new(network)),
-		"zcash" => ConsensusFork::ZCash,
+		"zcash" => ConsensusFork::ZCash(ZCashConsensusParams::new(network)),
 		_ => unreachable!("hardcoded above"),
 	})
 }

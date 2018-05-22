@@ -248,6 +248,7 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 				nonce: self.nonce.into(),
 				merkle_root_hash: self.merkle_root,
 				version: self.version,
+				hash_final_sapling_root: None,
 				equihash_solution: None,
 			}
 		)

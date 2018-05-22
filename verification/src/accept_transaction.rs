@@ -321,7 +321,7 @@ impl<'a> TransactionEval<'a> {
 		};
 		let signature_version = match params.fork {
 			ConsensusFork::BitcoinCash(ref fork) if height >= fork.height => SignatureVersion::ForkId,
-			ConsensusFork::BitcoinCore | ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash => SignatureVersion::Base,
+			ConsensusFork::BitcoinCore | ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash(_) => SignatureVersion::Base,
 		};
 
 		let verify_checksequence = deployments.csv();

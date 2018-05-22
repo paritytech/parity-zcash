@@ -82,7 +82,7 @@ impl<'a> HeaderEquihashSolution<'a> {
 
 	fn check(&self) -> Result<(), Error> {
 		match self.consensus.fork {
-			ConsensusFork::ZCash => (),
+			ConsensusFork::ZCash(_) => (),
 			_ => return Ok(()),
 		}
 

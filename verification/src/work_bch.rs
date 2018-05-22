@@ -172,7 +172,7 @@ fn work_required_bitcoin_cash_adjusted(parent_header: IndexedBlockHeader, time: 
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
 	use std::collections::HashMap;
 	use primitives::bytes::Bytes;
 	use primitives::hash::H256;
@@ -184,12 +184,16 @@ mod tests {
 	use super::work_required_bitcoin_cash_adjusted;
 
 	#[derive(Default)]
-	struct MemoryBlockHeaderProvider {
+	pub struct MemoryBlockHeaderProvider {
 		pub by_height: Vec<BlockHeader>,
 		pub by_hash: HashMap<H256, usize>,
 	}
 
 	impl MemoryBlockHeaderProvider {
+		pub fn last(&self) -> &BlockHeader {
+			self.by_height.last().unwrap()
+		}
+
 		pub fn insert(&mut self, header: BlockHeader) {
 			self.by_hash.insert(header.hash(), self.by_height.len());
 			self.by_height.push(header);
@@ -227,6 +231,7 @@ mod tests {
 				time: 1269211443,
 				bits: 0x207fffff.into(),
 				nonce: 0.into(),
+				hash_final_sapling_root: None,
 				equihash_solution: None,
 			});
 
@@ -287,6 +292,7 @@ mod tests {
 				time: 1269211443,
 				bits: initial_bits.into(),
 				nonce: 0.into(),
+				hash_final_sapling_root: None,
 				equihash_solution: None,
 			});
 

@@ -44,6 +44,15 @@ pub struct BitcoinCashConsensusParams {
 }
 
 #[derive(Debug, Clone)]
+/// ZCash consensus parameters.
+pub struct ZCashConsensusParams {
+	pub pow_averaging_window: u32,
+	pub pow_max_adjust_down: u32,
+	pub pow_max_adjust_up: u32,
+	pub pow_target_spacing: u32,
+}
+
+#[derive(Debug, Clone)]
 /// Concurrent consensus rule forks.
 pub enum ConsensusFork {
 	/// No fork.
@@ -56,7 +65,7 @@ pub enum ConsensusFork {
 	/// BUIP-HF Digest for replay protected signature verification across hard forks - https://github.com/Bitcoin-UAHF/spec/blob/master/replay-protected-sighash.md
 	BitcoinCash(BitcoinCashConsensusParams),
 	/// ZCash.
-	ZCash,
+	ZCash(ZCashConsensusParams),
 }
 
 impl ConsensusParams {
@@ -65,19 +74,19 @@ impl ConsensusParams {
 			Network::Mainnet | Network::Other(_) => ConsensusParams {
 				network: network,
 				bip16_time: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 1333238400,			// Apr 1 2012
 				},
 				bip34_height: match fork {
-					ConsensusFork::ZCash => 1,
+					ConsensusFork::ZCash(_) => 1,
 					_ => 227931,				// 000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8
 				},
 				bip65_height: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 388381,				// 000000000000000004c2b624ed5d7756c508d90fd0da2c7c679febfa6c4735f0
 				},
 				bip66_height: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 363725,				// 00000000000000000379eaa19dce8c9b722d46ae6a57c2f1a988119488b50931
 				},
 				segwit_deployment: match fork {
@@ -88,7 +97,7 @@ impl ConsensusParams {
 						timeout: 1510704000,
 						activation: Some(481824),
 					}),
-					ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash => None,
+					ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash(_) => None,
 				},
 				fork: fork,
 				rule_change_activation_threshold: 1916, // 95%
@@ -104,19 +113,19 @@ impl ConsensusParams {
 			Network::Testnet => ConsensusParams {
 				network: network,
 				bip16_time: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 1333238400,			// Apr 1 2012
 				},
 				bip34_height: match fork {
-					ConsensusFork::ZCash => 1,
+					ConsensusFork::ZCash(_) => 1,
 					_ => 21111,					// 0000000023b3a96d3484e5abb3755c413e7d41500f8e2a5c3f0dd01299cd8ef8
 				},
 				bip65_height: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 581885,				// 00000000007f6655f22f98e72ed80d8b06dc761d5da09df0fa1dc4be4f861eb6
 				},
 				bip66_height: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 330776,				// 000000002104c8c45e99a8853285a3b592602a3ccde2b832481da85e9e4ba182
 				},
 				segwit_deployment: match fork {
@@ -127,7 +136,7 @@ impl ConsensusParams {
 						timeout: 1493596800,
 						activation: Some(834624),
 					}),
-					ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash => None,
+					ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash(_) => None,
 				},
 				fork: fork,
 				rule_change_activation_threshold: 1512, // 75%
@@ -143,19 +152,19 @@ impl ConsensusParams {
 			Network::Regtest | Network::Unitest => ConsensusParams {
 				network: network,
 				bip16_time: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 1333238400,			// Apr 1 2012
 				},
 				bip34_height: match fork {
-					ConsensusFork::ZCash => 1,
+					ConsensusFork::ZCash(_) => 1,
 					_ => 100000000,				// not activated on regtest
 				},
 				bip65_height: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 1351,
 				},
 				bip66_height: match fork {
-					ConsensusFork::ZCash => 0,
+					ConsensusFork::ZCash(_) => 0,
 					_ => 1251,					// used only in rpc tests
 				},
 				segwit_deployment: match fork {
@@ -166,7 +175,7 @@ impl ConsensusParams {
 						timeout: ::std::u32::MAX,
 						activation: None,
 					}),
-					ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash => None,
+					ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash(_) => None,
 				},
 				fork: fork,
 				rule_change_activation_threshold: 108, // 75%
@@ -212,7 +221,7 @@ impl ConsensusFork {
 		match *self {
 			ConsensusFork::BitcoinCore => 0,
 			ConsensusFork::BitcoinCash(ref fork) => fork.height,
-			ConsensusFork::ZCash => 0,
+			ConsensusFork::ZCash(_) => 0,
 		}
 	}
 
@@ -227,7 +236,7 @@ impl ConsensusFork {
 			// size of first fork block must be larger than 1MB
 			ConsensusFork::BitcoinCash(ref fork) if height == fork.height => 1_000_001,
 			ConsensusFork::BitcoinCore | ConsensusFork::BitcoinCash(_) => 0,
-			ConsensusFork::ZCash => 0,
+			ConsensusFork::ZCash(_) => 0,
 		}
 	}
 
@@ -236,7 +245,7 @@ impl ConsensusFork {
 			ConsensusFork::BitcoinCash(ref fork) if median_time_past >= fork.monolith_time => 32_000_000,
 			ConsensusFork::BitcoinCash(ref fork) if height >= fork.height => 8_000_000,
 			ConsensusFork::BitcoinCore | ConsensusFork::BitcoinCash(_) => 1_000_000,
-			ConsensusFork::ZCash => 2_000_000,
+			ConsensusFork::ZCash(_) => 2_000_000,
 		}
 	}
 
@@ -245,13 +254,13 @@ impl ConsensusFork {
 			// according to REQ-5: max_block_sigops = 20000 * ceil((max(blocksize_bytes, 1000000) / 1000000))
 			ConsensusFork::BitcoinCash(ref fork) if height >= fork.height =>
 				20_000 * (1 + (block_size - 1) / 1_000_000),
-			ConsensusFork::BitcoinCore | ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash => 20_000,
+			ConsensusFork::BitcoinCore | ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash(_) => 20_000,
 		}
 	}
 
 	pub fn max_block_sigops_cost(&self, height: u32, block_size: usize) -> usize {
 		match *self {
-			ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash =>
+			ConsensusFork::BitcoinCash(_) | ConsensusFork::ZCash(_) =>
 				self.max_block_sigops(height, block_size) * Self::witness_scale_factor(),
 			ConsensusFork::BitcoinCore =>
 				80_000,
@@ -260,7 +269,7 @@ impl ConsensusFork {
 
 	pub fn max_block_weight(&self, _height: u32) -> usize {
 		match *self {
-			ConsensusFork::BitcoinCore | ConsensusFork::ZCash =>
+			ConsensusFork::BitcoinCore | ConsensusFork::ZCash(_) =>
 				4_000_000,
 			ConsensusFork::BitcoinCash(_) =>
 				unreachable!("BitcoinCash has no SegWit; weight is only checked with SegWit activated; qed"),
@@ -287,6 +296,43 @@ impl BitcoinCashConsensusParams {
 				monolith_time: 1526400000,
 			},
 		}
+	}
+}
+
+impl ZCashConsensusParams {
+	pub fn new(network: Network) -> Self {
+		match network {
+			Network::Mainnet | Network::Other(_) => ZCashConsensusParams {
+				pow_averaging_window: 17,
+				pow_max_adjust_down: 32,
+				pow_max_adjust_up: 16,
+				pow_target_spacing: (2.5 * 60.0) as u32,
+			},
+			Network::Testnet => ZCashConsensusParams {
+				pow_averaging_window: 17,
+				pow_max_adjust_down: 32,
+				pow_max_adjust_up: 16,
+				pow_target_spacing: (2.5 * 60.0) as u32,
+			},
+			Network::Regtest | Network::Unitest => ZCashConsensusParams {
+				pow_averaging_window: 17,
+				pow_max_adjust_down: 0,
+				pow_max_adjust_up: 0,
+				pow_target_spacing: (2.5 * 60.0) as u32,
+			},
+		}
+	}
+
+	pub fn averaging_window_timespan(&self) -> u32 {
+		self.pow_averaging_window * self.pow_target_spacing
+	}
+
+	pub fn min_actual_timespan(&self) -> u32 {
+		(self.averaging_window_timespan() * (100 - self.pow_max_adjust_up)) / 100
+	}
+
+	pub fn max_actual_timespan(&self) -> u32 {
+		(self.averaging_window_timespan() * (100 + self.pow_max_adjust_down)) / 100
 	}
 }
 

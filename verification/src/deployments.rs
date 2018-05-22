@@ -294,6 +294,7 @@ mod tests {
 					time: time,
 					bits: 0.into(),
 					nonce: height.into(),
+					hash_final_sapling_root: None,
 					equihash_solution: None,
 				};
 				previous_header_hash = header.hash();
