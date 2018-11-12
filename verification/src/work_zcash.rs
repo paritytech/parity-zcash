@@ -114,25 +114,22 @@ mod tests {
 			header_provider.insert(header);
 		}
 
-		// Result should be unchanged, modulo integer division precision loss
-		let mut expected: U256 = Compact::new(0x1e7fffff).into();
-		expected = expected / fork.averaging_window_timespan().into();
-		expected = expected * fork.averaging_window_timespan().into();
-		let actual = work_required_zcash(header_provider.last().clone().into(),
-			0, header_provider.by_height.len() as u32, &header_provider, &fork, max_bits.into());
-		assert_eq!(actual, expected.into());
-
 		// Result should be the same as if last difficulty was used
+println!("=== last_block = {}", last_block);
+println!("=== first_block = {}", first_block);
+println!("=== last_block_mtp = {}", median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider));
+println!("=== first_block_mtp = {}", median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider));
 		let bits_avg: U256 = header_provider.by_height[last_block as usize].bits.into();
+println!("=== incorrect");
 		let expected = calculate_work_required(bits_avg,
 			median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider),
 			median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider),
 			&fork, max_bits.into());
+println!("=== correct");
 		let actual = work_required_zcash(header_provider.last().clone().into(),
 			0, header_provider.by_height.len() as u32, &header_provider, &fork, max_bits.into());
 		assert_eq!(actual, expected);
 
-/*
 		// Result should be unchanged, modulo integer division precision loss
 		let mut bits_expected: U256 = Compact::new(0x1e7fffff).into();
 		bits_expected = bits_expected / fork.averaging_window_timespan().into();
@@ -141,7 +138,7 @@ mod tests {
 			median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider),
 			median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider),
 			&fork, max_bits.into()), bits_expected.into());
-
+/*
 		// Randomise the final block time (plus 1 to ensure it is always different)
 		use std::rand::{task_rng, Rng};
 		header_provider.by_height[last_block].time += task_rng().gen_range(1, fork.pow_target_spacing / 2);

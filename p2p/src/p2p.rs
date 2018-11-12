@@ -167,9 +167,9 @@ impl Context {
 					channel.session().initialize();
 					Context::on_message(context, channel)
 				},
-				Ok(DeadlineStatus::Meet(Err(_))) => {
+				Ok(DeadlineStatus::Meet(Err(err))) => {
 					// protocol error
-					trace!("Handshake with {} failed", socket);
+					trace!("Handshake with {} failed with: {}", socket, err);
 					// TODO: close socket
 					context.node_table.write().note_failure(&socket);
 					context.connection_counter.note_close_outbound_connection();
