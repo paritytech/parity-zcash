@@ -1,5 +1,6 @@
 extern crate byteorder;
 extern crate primitives;
+extern crate rustc_hex as hex;
 
 mod compact_integer;
 mod fixed_array;

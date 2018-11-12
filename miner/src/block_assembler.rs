@@ -3,9 +3,9 @@ use primitives::hash::H256;
 use primitives::compact::Compact;
 use chain::{OutPoint, TransactionOutput, IndexedTransaction};
 use storage::{SharedStore, TransactionOutputProvider};
-use network::ConsensusParams;
+use network::{ConsensusParams, ConsensusFork, TransactionOrdering};
 use memory_pool::{MemoryPool, OrderingStrategy, Entry};
-use verification::{work_required, block_reward_satoshi, transaction_sigops};
+use verification::{work_required, block_reward_satoshi, transaction_sigops, median_timestamp_inclusive};
 
 const BLOCK_VERSION: u32 = 0x20000000;
 const BLOCK_HEADER_SIZE: u32 = 4 + 32 + 32 + 4 + 4 + 4;
@@ -116,7 +116,9 @@ impl SizePolicy {
 
 /// Block assembler
 pub struct BlockAssembler {
+	/// Maximal block size.
 	pub max_block_size: u32,
+	/// Maximal # of sigops in the block.
 	pub max_block_sigops: u32,
 }
 
@@ -130,6 +132,8 @@ struct FittingTransactionsIterator<'a, T> {
 	block_height: u32,
 	/// New block time
 	block_time: u32,
+	/// Are OP_CHECKDATASIG && OP_CHECKDATASIGVERIFY enabled for this block.
+	checkdatasig_active: bool,
 	/// Size policy decides if transactions size fits the block
 	block_size: SizePolicy,
 	/// Sigops policy decides if transactions sigops fits the block
@@ -143,12 +147,21 @@ struct FittingTransactionsIterator<'a, T> {
 }
 
 impl<'a, T> FittingTransactionsIterator<'a, T> where T: Iterator<Item = &'a Entry> {
-	fn new(store: &'a TransactionOutputProvider, iter: T, max_block_size: u32, max_block_sigops: u32, block_height: u32, block_time: u32) -> Self {
+	fn new(
+		store: &'a TransactionOutputProvider,
+		iter: T,
+		max_block_size: u32,
+		max_block_sigops: u32,
+		block_height: u32,
+		block_time: u32,
+		checkdatasig_active: bool,
+	) -> Self {
 		FittingTransactionsIterator {
 			store: store,
 			iter: iter,
 			block_height: block_height,
 			block_time: block_time,
+			checkdatasig_active,
 			// reserve some space for header and transations len field
 			block_size: SizePolicy::new(BLOCK_HEADER_SIZE + 4, max_block_size, 1_000, 50),
 			sigops: SizePolicy::new(0, max_block_sigops, 8, 50),
@@ -190,7 +203,7 @@ impl<'a, T> Iterator for FittingTransactionsIterator<'a, T> where T: Iterator<It
 
 			let transaction_size = entry.size as u32;
 			let bip16_active = true;
-			let sigops_count = transaction_sigops(&entry.transaction, self, bip16_active) as u32;
+			let sigops_count = transaction_sigops(&entry.transaction, self, bip16_active, self.checkdatasig_active) as u32;
 
 			let size_step = self.block_size.decide(transaction_size);
 			let sigops_step = self.sigops.decide(sigops_count);
@@ -233,7 +246,7 @@ impl<'a, T> Iterator for FittingTransactionsIterator<'a, T> where T: Iterator<It
 }
 
 impl BlockAssembler {
-	pub fn create_new_block(&self, store: &SharedStore, mempool: &MemoryPool, time: u32, consensus: &ConsensusParams) -> BlockTemplate {
+	pub fn create_new_block(&self, store: &SharedStore, mempool: &MemoryPool, time: u32, median_timestamp: u32, consensus: &ConsensusParams) -> BlockTemplate {
 		// get best block
 		// take it's hash && height
 		let best_block = store.best_block();
@@ -242,17 +255,38 @@ impl BlockAssembler {
 		let bits = work_required(previous_header_hash.clone(), time, height, store.as_block_header_provider(), consensus);
 		let version = BLOCK_VERSION;
 
+		let checkdatasig_active = match consensus.fork {
+			ConsensusFork::BitcoinCash(ref fork) => median_timestamp >= fork.magnetic_anomaly_time,
+			_ => false
+		};
+
 		let mut coinbase_value = block_reward_satoshi(height);
 		let mut transactions = Vec::new();
 
 		let mempool_iter = mempool.iter(OrderingStrategy::ByTransactionScore);
-		let tx_iter = FittingTransactionsIterator::new(store.as_transaction_output_provider(), mempool_iter, self.max_block_size, self.max_block_sigops, height, time);
+		let tx_iter = FittingTransactionsIterator::new(
+			store.as_transaction_output_provider(),
+			mempool_iter,
+			self.max_block_size,
+			self.max_block_sigops,
+			height,
+			time,
+			checkdatasig_active);
 		for entry in tx_iter {
 			// miner_fee is i64, but we can safely cast it to u64
 			// memory pool should restrict miner fee to be positive
 			coinbase_value += entry.miner_fee as u64;
 			let tx = IndexedTransaction::new(entry.hash.clone(), entry.transaction.clone());
 			transactions.push(tx);
+		}
+
+		// sort block transactions
+		let median_time_past = median_timestamp_inclusive(previous_header_hash.clone(), store.as_block_header_provider());
+		match consensus.fork.transaction_ordering(median_time_past) {
+			TransactionOrdering::Canonical => transactions.sort_unstable_by(|tx1, tx2|
+				tx1.hash.cmp(&tx2.hash)),
+			// memory pool iter returns transactions in topological order
+			TransactionOrdering::Topological => (),
 		}
 
 		BlockTemplate {
@@ -271,7 +305,16 @@ impl BlockAssembler {
 
 #[cfg(test)]
 mod tests {
-	use super::{SizePolicy, NextStep};
+	extern crate test_data;
+
+	use std::sync::Arc;
+	use db::BlockChainDatabase;
+	use primitives::hash::H256;
+	use storage::SharedStore;
+	use network::{ConsensusParams, ConsensusFork, Network, BitcoinCashConsensusParams};
+	use memory_pool::MemoryPool;
+	use self::test_data::{ChainBuilder, TransactionBuilder};
+	use super::{BlockAssembler, SizePolicy, NextStep, BlockTemplate};
 
 	#[test]
 	fn test_size_policy() {
@@ -316,5 +359,42 @@ mod tests {
 	#[test]
 	fn test_fitting_transactions_iterator_locked_transaction() {
 		// TODO
+	}
+
+	#[test]
+	fn block_assembler_transaction_order() {
+		fn construct_block(consensus: ConsensusParams) -> (BlockTemplate, H256, H256) {
+			let chain = &mut ChainBuilder::new();
+			TransactionBuilder::with_default_input(0).set_output(30).store(chain)	// transaction0
+				.into_input(0).set_output(50).store(chain);							// transaction0 -> transaction1
+			let hash0 = chain.at(0).hash();
+			let hash1 = chain.at(1).hash();
+
+			let mut pool = MemoryPool::new();
+			let storage: SharedStore = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
+			pool.insert_verified(chain.at(0).into());
+			pool.insert_verified(chain.at(1).into());
+
+			(BlockAssembler {
+				max_block_size: 0xffffffff,
+				max_block_sigops: 0xffffffff,
+			}.create_new_block(&storage, &pool, 0, 0, &consensus), hash0, hash1)
+		}
+
+		// when topological consensus is used
+		let topological_consensus = ConsensusParams::new(Network::Mainnet, ConsensusFork::BitcoinCore);
+		let (block, hash0, hash1) = construct_block(topological_consensus);
+		assert!(hash1 < hash0);
+		assert_eq!(block.transactions[0].hash, hash0);
+		assert_eq!(block.transactions[1].hash, hash1);
+
+		// when canonocal consensus is used
+		let mut canonical_fork = BitcoinCashConsensusParams::new(Network::Mainnet);
+		canonical_fork.magnetic_anomaly_time = 0;
+		let canonical_consensus = ConsensusParams::new(Network::Mainnet, ConsensusFork::BitcoinCash(canonical_fork));
+		let (block, hash0, hash1) = construct_block(canonical_consensus);
+		assert!(hash1 < hash0);
+		assert_eq!(block.transactions[0].hash, hash1);
+		assert_eq!(block.transactions[1].hash, hash0);
 	}
 }

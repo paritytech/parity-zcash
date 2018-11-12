@@ -1,6 +1,6 @@
 use std::{fmt, io};
+use hex::ToHex;
 use primitives::hash::H256;
-use primitives::hex::ToHex;
 use {
 	Serializable, Stream,
 	Deserializable, Reader, Error as ReaderError
@@ -60,7 +60,7 @@ macro_rules! impl_fixed_array_u8 {
 
 		impl fmt::Debug for $name {
 			fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-				self.0.to_hex().fmt(f)
+				self.0.to_hex::<String>().fmt(f)
 			}
 		}
 

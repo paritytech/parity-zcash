@@ -3,7 +3,7 @@
 use blake2_rfc::blake2b::Blake2b;
 use byteorder::{BigEndian, LittleEndian, ByteOrder, WriteBytesExt};
 use chain::BlockHeader;
-use primitives::hex::ToHex;
+//use hex::ToHex;
 
 pub struct EquihashParams {
 	pub N: u32,

@@ -98,6 +98,9 @@ pub struct VerificationFlags {
 	///
 	/// This opcode replaces OP_LEFT => enabling both OP_NUM2BIN && OP_LEFT would be an error
 	pub verify_num2bin: bool,
+
+	/// Support OP_CHECKDATASIG and OP_CHECKDATASIGVERIFY opcodes.
+	pub verify_checkdatasig: bool,
 }
 
 impl VerificationFlags {
@@ -133,6 +136,16 @@ impl VerificationFlags {
 
 	pub fn verify_nulldummy(mut self, value: bool) -> Self {
 		self.verify_nulldummy = value;
+		self
+	}
+
+	pub fn verify_sigpushonly(mut self, value: bool) -> Self {
+		self.verify_sigpushonly = value;
+		self
+	}
+
+	pub fn verify_cleanstack(mut self, value: bool) -> Self {
+		self.verify_cleanstack = value;
 		self
 	}
 
@@ -183,6 +196,11 @@ impl VerificationFlags {
 
 	pub fn verify_num2bin(mut self, value: bool) -> Self {
 		self.verify_num2bin = value;
+		self
+	}
+
+	pub fn verify_checkdatasig(mut self, value: bool) -> Self {
+		self.verify_checkdatasig = value;
 		self
 	}
 }

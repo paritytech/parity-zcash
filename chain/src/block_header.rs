@@ -1,6 +1,6 @@
 use std::io;
 use std::fmt;
-use hex::FromHex;
+use hex::{ToHex, FromHex};
 use ser::{deserialize, serialize};
 use crypto::dhash256;
 use compact::Compact;
@@ -66,8 +66,6 @@ impl BlockHeader {
 
 impl fmt::Debug for BlockHeader {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		use rustc_serialize::hex::ToHex;
-
 		f.debug_struct("BlockHeader")
 			.field("version", &self.version)
 			.field("previous_header_hash", &self.previous_header_hash.reversed())
@@ -76,14 +74,14 @@ impl fmt::Debug for BlockHeader {
 			.field("time", &self.time)
 			.field("bits", &self.bits)
 			.field("nonce", &self.nonce)
-			.field("equihash_solution", &self.equihash_solution.as_ref().map(|s| s.0.to_hex()))
+			.field("equihash_solution", &self.equihash_solution.as_ref().map(|s| s.0.to_hex::<String>()))
 			.finish()
 	}
 }
 
 impl From<&'static str> for BlockHeader {
 	fn from(s: &'static str) -> Self {
-		deserialize(&s.from_hex().unwrap() as &[u8]).unwrap()
+		deserialize(&s.from_hex::<Vec<u8>>().unwrap() as &[u8]).unwrap()
 	}
 }
 
