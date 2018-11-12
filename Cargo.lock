@@ -1469,6 +1469,7 @@ dependencies = [
  "network 0.1.0",
  "parking_lot 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "primitives 0.1.0",
+ "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "script 0.1.0",
  "serialization 0.1.0",

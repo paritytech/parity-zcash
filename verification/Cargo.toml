@@ -20,5 +20,6 @@ storage = { path = "../storage" }
 bitcrypto = { path = "../crypto" }
 
 [dev-dependencies]
+rand = "0.4"
 test-data = { path = "../test-data" }
 db = { path = "../db" }

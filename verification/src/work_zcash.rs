@@ -8,27 +8,25 @@ use timestamp::median_timestamp_inclusive;
 use work::{is_retarget_height, work_required_testnet, work_required_retarget};
 
 /// Returns work required for given header for the ZCash block
-pub fn work_required_zcash(parent_header: IndexedBlockHeader, time: u32, height: u32, store: &BlockHeaderProvider, fork: &ZCashConsensusParams, max_bits: Compact) -> Compact {
+pub fn work_required_zcash(parent_header: IndexedBlockHeader, store: &BlockHeaderProvider, fork: &ZCashConsensusParams, max_bits: Compact) -> Compact {
 	// Find the first block in the averaging interval
-	let mut oldest_hash = parent_header.hash.clone();
+	let parent_hash = parent_header.hash.clone();
+	let mut oldest_hash = parent_header.raw.previous_header_hash;
 	let mut bits_total: U256 = parent_header.raw.bits.into();
 	for i in 1..fork.pow_averaging_window {
-		let block_number = match height.checked_sub(i + 1) {
-			Some(block_number) => block_number,
-			None => {
-println!("=== XXX");
-				return max_bits
-			},
+		let previous_header = match store.block_header(oldest_hash.into()) {
+			Some(previous_header) => previous_header,
+			None => return max_bits,
 		};
 
-		let previous_header = store.block_header(block_number.into()).expect("block_number > 0 && block_number < height; qed");
 		bits_total = bits_total + previous_header.bits.into();
-		oldest_hash = previous_header.hash();
+		oldest_hash = previous_header.previous_header_hash;
 	}
-println!("=== bits_total = {:?}", Compact::from_u256(bits_total));
+
 	let bits_avg = bits_total / fork.pow_averaging_window.into();
-	let parent_mtp = median_timestamp_inclusive(parent_header.hash.clone(), store);
+	let parent_mtp = median_timestamp_inclusive(parent_hash, store);
 	let oldest_mtp = median_timestamp_inclusive(oldest_hash, store);
+
 	calculate_work_required(bits_avg, parent_mtp, oldest_mtp, fork, max_bits)
 }
 
@@ -36,19 +34,17 @@ fn calculate_work_required(bits_avg: U256, parent_mtp: u32, oldest_mtp: u32, for
 	// Limit adjustment step
 	// Use medians to prevent time-warp attacks
 	let actual_timespan = parent_mtp - oldest_mtp;
-println!("=== parent_mtp: {}", parent_mtp);
-println!("=== oldest_mtp: {}", oldest_mtp);
-println!("=== actual_timespan_0: {}", actual_timespan);
+
 	let mut actual_timespan = fork.averaging_window_timespan() as i64 +
 		(actual_timespan as i64 - fork.averaging_window_timespan() as i64) / 4;
-println!("=== actual_timespan_1: {}", actual_timespan);
+
 	if actual_timespan < fork.min_actual_timespan() as i64 {
 		actual_timespan = fork.min_actual_timespan() as i64;
 	}
 	if actual_timespan > fork.max_actual_timespan() as i64 {
 		actual_timespan = fork.max_actual_timespan() as i64;
 	}
-println!("=== actual_timespan_2: {}", actual_timespan);
+
 	// Retarget
 	let actual_timespan = actual_timespan as u32;
 	let mut bits_new = bits_avg / fork.averaging_window_timespan().into();
@@ -105,7 +101,7 @@ mod tests {
 				time: header_provider.last().time + fork.pow_target_spacing,
 				bits: Compact::new(0x1e7fffff),
 				version: 0,
-				previous_header_hash: 0.into(),
+				previous_header_hash: header_provider.by_height[i as usize - 1].hash(),
 				merkle_root_hash: 0.into(),
 				nonce: 0.into(),
 				hash_final_sapling_root: None,
@@ -115,49 +111,66 @@ mod tests {
 		}
 
 		// Result should be the same as if last difficulty was used
-println!("=== last_block = {}", last_block);
-println!("=== first_block = {}", first_block);
-println!("=== last_block_mtp = {}", median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider));
-println!("=== first_block_mtp = {}", median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider));
 		let bits_avg: U256 = header_provider.by_height[last_block as usize].bits.into();
-println!("=== incorrect");
 		let expected = calculate_work_required(bits_avg,
 			median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider),
 			median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider),
 			&fork, max_bits.into());
-println!("=== correct");
 		let actual = work_required_zcash(header_provider.last().clone().into(),
-			0, header_provider.by_height.len() as u32, &header_provider, &fork, max_bits.into());
+			&header_provider, &fork, max_bits.into());
 		assert_eq!(actual, expected);
 
 		// Result should be unchanged, modulo integer division precision loss
 		let mut bits_expected: U256 = Compact::new(0x1e7fffff).into();
 		bits_expected = bits_expected / fork.averaging_window_timespan().into();
 		bits_expected = bits_expected * fork.averaging_window_timespan().into(); 
-		assert_eq!(calculate_work_required(bits_expected,
-			median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider),
-			median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider),
-			&fork, max_bits.into()), bits_expected.into());
-/*
+		assert_eq!(work_required_zcash(header_provider.last().clone().into(),
+			&header_provider, &fork, max_bits.into()),
+			bits_expected.into());
+
 		// Randomise the final block time (plus 1 to ensure it is always different)
-		use std::rand::{task_rng, Rng};
-		header_provider.by_height[last_block].time += task_rng().gen_range(1, fork.pow_target_spacing / 2);
+		use rand::{thread_rng, Rng};
+		let mut last_header = header_provider.by_height[last_block as usize].clone();
+		last_header.time += thread_rng().gen_range(1, fork.pow_target_spacing / 2);
+		header_provider.replace_last(last_header);
 
 		// Result should be the same as if last difficulty was used
-		bits_expected = header_provider.by_height[last_block].bits;
-		assert_eq!(calculate_work_required(bits_expected,
+		let bits_avg: U256 = header_provider.by_height[last_block as usize].bits.into();
+		let expected = calculate_work_required(bits_avg,
 			median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider),
 			median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider),
-			&fork, max_bits.into()), bits_expected.into());
+			&fork, max_bits.into());
+		let actual = work_required_zcash(header_provider.last().clone().into(),
+			&header_provider, &fork, max_bits.into());
+		assert_eq!(actual, expected);
 
-    // Result should be the same as if last difficulty was used
-    bnAvg.SetCompact(blocks[lastBlk].nBits);
-    EXPECT_EQ(CalculateNextWorkRequired(bnAvg,
-                                        blocks[lastBlk].GetMedianTimePast(),
-                                        blocks[firstBlk].GetMedianTimePast(),
-                                        params),
-              GetNextWorkRequired(&blocks[lastBlk], nullptr, params));
-    // Result should not be unchanged
-    EXPECT_NE(0x1e7fffff, GetNextWorkRequired(&blocks[lastBlk], nullptr, params));*/
+		// Result should not be unchanged
+		let bits_expected = Compact::new(0x1e7fffff);
+		assert!(work_required_zcash(header_provider.last().clone().into(),
+			&header_provider, &fork, max_bits.into()) != bits_expected);
+
+		// Change the final block difficulty
+		let mut last_header = header_provider.by_height[last_block as usize].clone();
+		last_header.bits = Compact::new(0x1e0fffff);
+		header_provider.replace_last(last_header);
+
+		// Result should not be the same as if last difficulty was used
+		let bits_avg = header_provider.by_height[last_block as usize].bits;
+		let expected = calculate_work_required(bits_avg.into(),
+			median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider),
+			median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider),
+			&fork, max_bits.into());
+		let actual = work_required_zcash(header_provider.last().clone().into(),
+			&header_provider, &fork, max_bits.into());
+		assert!(actual != expected);
+
+		// Result should be the same as if the average difficulty was used
+		let bits_avg = "0000796968696969696969696969696969696969696969696969696969696969".parse().unwrap();
+		let expected = calculate_work_required(bits_avg,
+			median_timestamp_inclusive(header_provider.by_height[last_block as usize].hash(), &header_provider),
+			median_timestamp_inclusive(header_provider.by_height[first_block as usize].hash(), &header_provider),
+			&fork, max_bits.into());
+		let actual = work_required_zcash(header_provider.last().clone().into(),
+			&header_provider, &fork, max_bits.into());
 	}
 }

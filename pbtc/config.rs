@@ -210,7 +210,7 @@ fn parse_consensus_fork(network: Network, db: &storage::SharedStore, matches: &c
 	match new_consensus_fork {
 		"btc" => Ok(ConsensusFork::BitcoinCore),
 		"bch" => Ok(ConsensusFork::BitcoinCash(BitcoinCashConsensusParams::new(network))),
-		"zcash" => ConsensusFork::ZCash(ZCashConsensusParams::new(network)),
+		"zcash" => Ok(ConsensusFork::ZCash(ZCashConsensusParams::new(network))),
 		_ => Err(String::from("Fork mandatory")),
 	}
 }

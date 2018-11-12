@@ -71,7 +71,7 @@ pub fn work_required(parent_hash: H256, time: u32, height: u32, store: &BlockHea
 			return work_required_zcash(IndexedBlockHeader {
 				hash: parent_hash,
 				raw: parent_header
-			}, time, height, store, fork, max_bits),
+			}, store, fork, max_bits),
 		ConsensusFork::BitcoinCash(ref fork) if height >= fork.height =>
 			return work_required_bitcoin_cash(IndexedBlockHeader {
 				hash: parent_hash,

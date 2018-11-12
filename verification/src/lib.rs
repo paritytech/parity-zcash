@@ -60,6 +60,8 @@ extern crate parking_lot;
 extern crate rayon;
 extern crate blake2_rfc;
 extern crate byteorder;
+#[cfg(test)]
+extern crate rand;
 
 extern crate storage;
 extern crate chain;

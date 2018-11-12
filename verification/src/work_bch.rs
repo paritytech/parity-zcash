@@ -198,6 +198,13 @@ pub mod tests {
 			self.by_hash.insert(header.hash(), self.by_height.len());
 			self.by_height.push(header);
 		}
+
+		pub fn replace_last(&mut self, header: BlockHeader) {
+			let idx = self.by_height.len() - 1;
+			self.by_hash.remove(&self.by_height[idx].hash());
+			self.by_hash.insert(header.hash(), idx);
+			self.by_height[idx] = header;
+		}
 	}
 
 	impl BlockHeaderProvider for MemoryBlockHeaderProvider {
