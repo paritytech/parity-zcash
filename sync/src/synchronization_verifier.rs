@@ -263,7 +263,7 @@ pub mod tests {
 	use std::sync::atomic::Ordering;
 	use std::collections::{HashSet, HashMap};
 	use db::BlockChainDatabase;
-	use network::{Network, ConsensusParams, ConsensusFork};
+	use network::{Network, ConsensusParams};
 	use verification::{VerificationLevel, BackwardsCompatibleChainVerifier as ChainVerifier, Error as VerificationError, TransactionError};
 	use synchronization_client_core::CoreVerificationSink;
 	use synchronization_executor::tests::DummyTaskExecutor;
@@ -351,7 +351,7 @@ pub mod tests {
 	#[test]
 	fn verifier_wrapper_switches_to_full_mode() {
 		let storage: StorageRef = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore)));
+		let verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest)));
 
 		// switching to full verification when block is already in db
 		assert_eq!(ChainVerifierWrapper::new(verifier.clone(), &storage, VerificationParameters {
@@ -382,7 +382,7 @@ pub mod tests {
 					.build()
 				.merkled_header()
 					.parent(rolling_hash.clone())
-					.bits(Network::Unitest.max_bits(&ConsensusFork::BitcoinCore).into())
+					.bits(Network::Unitest.max_bits().into())
 					.build()
 				.build();
 			rolling_hash = next_block.hash();
@@ -392,7 +392,7 @@ pub mod tests {
 		let coinbase_transaction_hash = blocks[0].transactions[0].hash.clone();
 		let last_block_hash = blocks[blocks.len() - 1].hash().clone();
 		let storage: StorageRef = Arc::new(BlockChainDatabase::init_test_chain(blocks));
-		let verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore)));
+		let verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest)));
 		let bad_transaction_block: IndexedBlock = test_data::block_builder()
 			.transaction().coinbase().output().value(50).build().build()
 			.transaction()
@@ -401,7 +401,7 @@ pub mod tests {
 				.build()
 			.merkled_header()
 				.parent(last_block_hash)
-				.bits(Network::Unitest.max_bits(&ConsensusFork::BitcoinCore).into())
+				.bits(Network::Unitest.max_bits().into())
 				.build()
 			.build().into();
 
@@ -424,7 +424,7 @@ pub mod tests {
 	#[test]
 	fn verification_level_none_accept_incorrect_block() {
 		let storage: StorageRef = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore)));
+		let verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest)));
 		let bad_block: IndexedBlock = test_data::block_builder().header().build().build().into();
 
 		// Ok(()) when nothing is verified

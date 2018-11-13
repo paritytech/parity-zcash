@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::atomic::{AtomicBool, Ordering};
 use sync::{create_sync_peers, create_local_sync_node, create_sync_connection_factory, SyncListener};
-use network::ConsensusFork;
 use primitives::hash::H256;
 use util::{init_db, node_table_path};
 use {config, p2p, PROTOCOL_VERSION, PROTOCOL_MINIMUM, ZCASH_PROTOCOL_VERSION, ZCASH_PROTOCOL_MINIMUM};
@@ -94,14 +93,8 @@ pub fn start(cfg: config::Config) -> Result<(), String> {
 		inbound_connections: cfg.inbound_connections,
 		outbound_connections: cfg.outbound_connections,
 		connection: p2p::NetConfig {
-			protocol_version: match &cfg.consensus.fork {
-				&ConsensusFork::ZCash(_) => ZCASH_PROTOCOL_VERSION,
-				_ => PROTOCOL_VERSION,
-			},
-			protocol_minimum: match &cfg.consensus.fork {
-				&ConsensusFork::ZCash(_) => ZCASH_PROTOCOL_MINIMUM,
-				_ => PROTOCOL_MINIMUM,
-			},
+			protocol_version: ZCASH_PROTOCOL_VERSION,
+			protocol_minimum: ZCASH_PROTOCOL_MINIMUM,
 			magic: cfg.consensus.magic(),
 			local_address: SocketAddr::new(cfg.host, cfg.port),
 			services: cfg.services,

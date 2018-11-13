@@ -1,7 +1,7 @@
 use std::ops;
 use ser::Serializable;
 use chain::IndexedTransaction;
-use network::{ConsensusParams, ConsensusFork};
+use network::{ConsensusParams};
 use duplex_store::NoopStore;
 use sigops::transaction_sigops;
 use error::TransactionError;
@@ -47,7 +47,7 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			is_coinbase: TransactionMemoryPoolCoinbase::new(transaction),
 			size: TransactionSize::new(transaction, consensus),
-			sigops: TransactionSigops::new(transaction, ConsensusFork::absolute_maximum_block_sigops()),
+			sigops: TransactionSigops::new(transaction, 20_000),
 		}
 	}
 
@@ -160,7 +160,7 @@ impl<'a> TransactionSize<'a> {
 
 	fn check(&self) -> Result<(), TransactionError> {
 		let size = self.transaction.raw.serialized_size();
-		if size > self.consensus.fork.max_transaction_size() {
+		if size > self.consensus.max_transaction_size() {
 			Err(TransactionError::MaxSize)
 		} else {
 			Ok(())

@@ -279,10 +279,10 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		let previous_block_header = self.storage.block_header(previous_block_height.into()).expect("best block is in db; qed");
 		let median_timestamp = median_timestamp_inclusive(previous_block_header.hash(), self.storage.as_block_header_provider());
 		let new_block_height = previous_block_height + 1;
-		let max_block_size = self.consensus.fork.max_block_size(new_block_height, median_timestamp);
+		let max_block_size = 2_000_000;
 		let block_assembler = BlockAssembler {
 			max_block_size: max_block_size as u32,
-			max_block_sigops: self.consensus.fork.max_block_sigops(new_block_height, max_block_size) as u32,
+			max_block_sigops: 20_000,
 		};
 		let memory_pool = &*self.memory_pool.read();
 		block_assembler.create_new_block(&self.storage, memory_pool, time::get_time().sec as u32, median_timestamp, &self.consensus)
@@ -343,7 +343,7 @@ pub mod tests {
 	use synchronization_chain::Chain;
 	use message::types;
 	use message::common::{InventoryVector, InventoryType};
-	use network::{ConsensusParams, ConsensusFork, Network};
+	use network::{ConsensusParams, Network};
 	use chain::Transaction;
 	use db::{BlockChainDatabase};
 	use miner::MemoryPool;
@@ -377,12 +377,12 @@ pub mod tests {
 		let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let sync_state = SynchronizationStateRef::new(SynchronizationState::with_storage(storage.clone()));
-		let chain = Chain::new(storage.clone(), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore), memory_pool.clone());
+		let chain = Chain::new(storage.clone(), ConsensusParams::new(Network::Unitest), memory_pool.clone());
 		let sync_peers = Arc::new(PeersImpl::default());
 		let executor = DummyTaskExecutor::new();
 		let server = Arc::new(DummyServer::new());
 		let config = Config { close_connection_on_bad_block: true };
-		let chain_verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Mainnet, ConsensusFork::BitcoinCore)));
+		let chain_verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Mainnet)));
 		let client_core = SynchronizationClientCore::new(config, sync_state.clone(), sync_peers.clone(), executor.clone(), chain, chain_verifier);
 		let mut verifier = match verifier {
 			Some(verifier) => verifier,
@@ -390,7 +390,7 @@ pub mod tests {
 		};
 		verifier.set_sink(Arc::new(CoreVerificationSink::new(client_core.clone())));
 		let client = SynchronizationClient::new(sync_state.clone(), client_core, verifier);
-		let local_node = LocalNode::new(ConsensusParams::new(Network::Mainnet, ConsensusFork::BitcoinCore), storage, memory_pool, sync_peers, sync_state, executor.clone(), client, server.clone());
+		let local_node = LocalNode::new(ConsensusParams::new(Network::Mainnet), storage, memory_pool, sync_peers, sync_state, executor.clone(), client, server.clone());
 		(executor, server, local_node)
 	}
 

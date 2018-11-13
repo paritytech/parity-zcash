@@ -1,9 +1,9 @@
-use network::{ConsensusParams, ConsensusFork, TransactionOrdering};
+use network::{ConsensusParams};
 use storage::{TransactionOutputProvider, BlockHeaderProvider};
 use script;
 use sigops::{transaction_sigops};
 use work::block_reward_satoshi;
-use duplex_store::{transaction_index_for_output_check, DuplexTransactionOutputProvider};
+use duplex_store::DuplexTransactionOutputProvider;
 use deployments::BlockDeployments;
 use canon::CanonBlock;
 use error::{Error, TransactionError};
@@ -16,7 +16,6 @@ pub struct BlockAcceptor<'a> {
 	pub sigops: BlockSigops<'a>,
 	pub coinbase_claim: BlockCoinbaseClaim<'a>,
 	pub coinbase_script: BlockCoinbaseScript<'a>,
-	pub ordering: BlockTransactionOrdering<'a>,
 }
 
 impl<'a> BlockAcceptor<'a> {
@@ -35,7 +34,6 @@ impl<'a> BlockAcceptor<'a> {
 			coinbase_script: BlockCoinbaseScript::new(block, consensus, height),
 			coinbase_claim: BlockCoinbaseClaim::new(block, consensus, store, height, median_time_past),
 			sigops: BlockSigops::new(block, store, consensus, height, median_time_past),
-			ordering: BlockTransactionOrdering::new(block, consensus, median_time_past),
 		}
 	}
 
@@ -45,7 +43,6 @@ impl<'a> BlockAcceptor<'a> {
 		self.serialized_size.check()?;
 		self.coinbase_claim.check()?;
 		self.coinbase_script.check()?;
-		self.ordering.check()?;
 		Ok(())
 	}
 }
@@ -104,12 +101,7 @@ impl<'a> BlockSerializedSize<'a> {
 	fn check(&self) -> Result<(), Error> {
 		let size = self.block.size();
 
-		// block size (without witness) is valid for all forks:
-		// before SegWit: it is main check for size
-		// after SegWit: without witness data, block size should be <= 1_000_000
-		// after BitcoinCash fork: block size is increased to 8_000_000
-		if size < self.consensus.fork.min_block_size(self.height) ||
-			size > self.consensus.fork.max_block_size(self.height, self.median_time_past) {
+		if size > 2_000_000 {
 			return Err(Error::Size(size));
 		}
 
@@ -135,10 +127,7 @@ impl<'a> BlockSigops<'a> {
 		median_time_past: u32,
 	) -> Self {
 		let bip16_active = block.header.raw.time >= consensus.bip16_time;
-		let checkdatasig_active = match consensus.fork {
-			ConsensusFork::BitcoinCash(ref fork) => median_time_past >= fork.magnetic_anomaly_time,
-			_ => false,
-		};
+		let checkdatasig_active = false;
 
 		BlockSigops {
 			block: block,
@@ -157,7 +146,7 @@ impl<'a> BlockSigops<'a> {
 			.fold(0, |acc, tx_sigops| (acc + tx_sigops));
 
 		let size = self.block.size();
-		if sigops > self.consensus.fork.max_block_sigops(self.height, size) {
+		if sigops > 20_000 {
 			return Err(Error::MaximumSigops);
 		}
 
@@ -169,7 +158,6 @@ pub struct BlockCoinbaseClaim<'a> {
 	block: CanonBlock<'a>,
 	store: &'a TransactionOutputProvider,
 	height: u32,
-	transaction_ordering: TransactionOrdering,
 }
 
 impl<'a> BlockCoinbaseClaim<'a> {
@@ -184,7 +172,6 @@ impl<'a> BlockCoinbaseClaim<'a> {
 			block: block,
 			store: store,
 			height: height,
-			transaction_ordering: consensus_params.fork.transaction_ordering(median_time_past),
 		}
 	}
 
@@ -197,8 +184,7 @@ impl<'a> BlockCoinbaseClaim<'a> {
 			// (1) Total sum of all referenced outputs
 			let mut incoming: u64 = 0;
 			for input in tx.raw.inputs.iter() {
-				let prevout_tx_idx = transaction_index_for_output_check(self.transaction_ordering, tx_idx);
-				let prevout = store.transaction_output(&input.previous_output, prevout_tx_idx);
+				let prevout = store.transaction_output(&input.previous_output, tx_idx);
 				let (sum, overflow) = incoming.overflowing_add(prevout.map(|o| o.value).unwrap_or(0));
 				if overflow {
 					return Err(Error::ReferencedInputsSumOverflow);
@@ -276,43 +262,14 @@ impl<'a> BlockCoinbaseScript<'a> {
 	}
 }
 
-pub struct BlockTransactionOrdering<'a> {
-	block: CanonBlock<'a>,
-	transaction_ordering: TransactionOrdering,
-}
-
-impl<'a> BlockTransactionOrdering<'a> {
-	fn new(block: CanonBlock<'a>, consensus: &'a ConsensusParams, median_time_past: u32) -> Self {
-		BlockTransactionOrdering {
-			block,
-			transaction_ordering: consensus.fork.transaction_ordering(median_time_past),
-		}
-	}
-
-	fn check(&self) -> Result<(), Error> {
-		match self.transaction_ordering {
-			// topological transaction ordering is checked in TransactionMissingInputs
-			TransactionOrdering::Topological => Ok(()),
-			// canonical transaction ordering means that transactions are ordered by
-			// their id (i.e. hash) in ascending order
-			TransactionOrdering::Canonical =>
-				if self.block.transactions.windows(2).skip(1).all(|w| w[0].hash < w[1].hash) {
-					Ok(())
-				} else {
-					Err(Error::NonCanonicalTransactionOrdering)
-				},
-		}
-	}
-}
-
 #[cfg(test)]
 mod tests {
 	extern crate test_data;
 
 	use chain::{IndexedBlock, Transaction};
-	use network::{Network, ConsensusFork, ConsensusParams, BitcoinCashConsensusParams};
+	use network::{Network, ConsensusParams};
 	use {Error, CanonBlock};
-	use super::{BlockCoinbaseScript, BlockTransactionOrdering};
+	use super::{BlockCoinbaseScript};
 
 	#[test]
 	fn test_block_coinbase_script() {
@@ -341,43 +298,5 @@ mod tests {
 		};
 
 		assert_eq!(coinbase_script_validator2.check(), Err(Error::CoinbaseScript));
-	}
-
-	#[test]
-	fn block_transaction_ordering_works() {
-		let tx1: Transaction = test_data::TransactionBuilder::with_output(1).into();
-		let tx2: Transaction = test_data::TransactionBuilder::with_output(2).into();
-		let tx3: Transaction = test_data::TransactionBuilder::with_output(3).into();
-		let bad_block: IndexedBlock = test_data::block_builder()
-			.with_transaction(tx1.clone())
-			.with_transaction(tx2.clone())
-			.with_transaction(tx3.clone())
-			.header().build()
-			.build()
-			.into();
-		let good_block: IndexedBlock = test_data::block_builder()
-			.with_transaction(tx1)
-			.with_transaction(tx3)
-			.with_transaction(tx2)
-			.header().build()
-			.build()
-			.into();
-
-		let bad_block = CanonBlock::new(&bad_block);
-		let good_block = CanonBlock::new(&good_block);
-
-		// when topological ordering is used => we don't care about tx ordering
-		let consensus = ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore);
-		let checker = BlockTransactionOrdering::new(bad_block, &consensus, 0);
-		assert_eq!(checker.check(), Ok(()));
-
-		// when topological ordering is used => we care about tx ordering
-		let mut bch = BitcoinCashConsensusParams::new(Network::Unitest);
-		bch.magnetic_anomaly_time = 0;
-		let consensus = ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCash(bch));
-		let checker = BlockTransactionOrdering::new(bad_block, &consensus, 0);
-		assert_eq!(checker.check(), Err(Error::NonCanonicalTransactionOrdering));
-		let checker = BlockTransactionOrdering::new(good_block, &consensus, 0);
-		assert_eq!(checker.check(), Ok(()));
 	}
 }

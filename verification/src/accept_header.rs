@@ -1,4 +1,4 @@
-use network::{ConsensusParams, ConsensusFork};
+use network::{ConsensusParams};
 use storage::BlockHeaderProvider;
 use canon::CanonHeader;
 use error::Error;
@@ -81,11 +81,6 @@ impl<'a> HeaderEquihashSolution<'a> {
 	}
 
 	fn check(&self) -> Result<(), Error> {
-		match self.consensus.fork {
-			ConsensusFork::ZCash(_) => (),
-			_ => return Ok(()),
-		}
-
 		use equihash;
 		let is_solution_correct = equihash::verify_block_equihash_solution(&equihash::EquihashParams {
 			N: 200,

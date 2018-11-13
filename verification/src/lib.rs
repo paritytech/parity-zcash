@@ -82,7 +82,6 @@ mod error;
 mod sigops;
 mod timestamp;
 mod work;
-mod work_bch;
 mod work_zcash;
 
 // pre-verification

@@ -3,7 +3,7 @@ use primitives::hash::H256;
 use primitives::compact::Compact;
 use chain::{OutPoint, TransactionOutput, IndexedTransaction};
 use storage::{SharedStore, TransactionOutputProvider};
-use network::{ConsensusParams, ConsensusFork, TransactionOrdering};
+use network::ConsensusParams;
 use memory_pool::{MemoryPool, OrderingStrategy, Entry};
 use verification::{work_required, block_reward_satoshi, transaction_sigops, median_timestamp_inclusive};
 
@@ -255,11 +255,6 @@ impl BlockAssembler {
 		let bits = work_required(previous_header_hash.clone(), time, height, store.as_block_header_provider(), consensus);
 		let version = BLOCK_VERSION;
 
-		let checkdatasig_active = match consensus.fork {
-			ConsensusFork::BitcoinCash(ref fork) => median_timestamp >= fork.magnetic_anomaly_time,
-			_ => false
-		};
-
 		let mut coinbase_value = block_reward_satoshi(height);
 		let mut transactions = Vec::new();
 
@@ -271,22 +266,13 @@ impl BlockAssembler {
 			self.max_block_sigops,
 			height,
 			time,
-			checkdatasig_active);
+			false);
 		for entry in tx_iter {
 			// miner_fee is i64, but we can safely cast it to u64
 			// memory pool should restrict miner fee to be positive
 			coinbase_value += entry.miner_fee as u64;
 			let tx = IndexedTransaction::new(entry.hash.clone(), entry.transaction.clone());
 			transactions.push(tx);
-		}
-
-		// sort block transactions
-		let median_time_past = median_timestamp_inclusive(previous_header_hash.clone(), store.as_block_header_provider());
-		match consensus.fork.transaction_ordering(median_time_past) {
-			TransactionOrdering::Canonical => transactions.sort_unstable_by(|tx1, tx2|
-				tx1.hash.cmp(&tx2.hash)),
-			// memory pool iter returns transactions in topological order
-			TransactionOrdering::Topological => (),
 		}
 
 		BlockTemplate {
@@ -311,7 +297,7 @@ mod tests {
 	use db::BlockChainDatabase;
 	use primitives::hash::H256;
 	use storage::SharedStore;
-	use network::{ConsensusParams, ConsensusFork, Network, BitcoinCashConsensusParams};
+	use network::{ConsensusParams, Network};
 	use memory_pool::MemoryPool;
 	use self::test_data::{ChainBuilder, TransactionBuilder};
 	use super::{BlockAssembler, SizePolicy, NextStep, BlockTemplate};
@@ -382,19 +368,10 @@ mod tests {
 		}
 
 		// when topological consensus is used
-		let topological_consensus = ConsensusParams::new(Network::Mainnet, ConsensusFork::BitcoinCore);
+		let topological_consensus = ConsensusParams::new(Network::Mainnet);
 		let (block, hash0, hash1) = construct_block(topological_consensus);
 		assert!(hash1 < hash0);
 		assert_eq!(block.transactions[0].hash, hash0);
 		assert_eq!(block.transactions[1].hash, hash1);
-
-		// when canonocal consensus is used
-		let mut canonical_fork = BitcoinCashConsensusParams::new(Network::Mainnet);
-		canonical_fork.magnetic_anomaly_time = 0;
-		let canonical_consensus = ConsensusParams::new(Network::Mainnet, ConsensusFork::BitcoinCash(canonical_fork));
-		let (block, hash0, hash1) = construct_block(canonical_consensus);
-		assert!(hash1 < hash0);
-		assert_eq!(block.transactions[0].hash, hash1);
-		assert_eq!(block.transactions[1].hash, hash0);
 	}
 }

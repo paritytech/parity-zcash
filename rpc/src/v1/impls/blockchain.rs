@@ -14,7 +14,7 @@ use global_script::Script;
 use chain::OutPoint;
 use verification;
 use ser::serialize;
-use network::{Network, ConsensusFork, ZCashConsensusParams};
+use network::{Network};
 use primitives::hash::H256 as GlobalH256;
 
 pub struct BlockChainClient<T: BlockChainClientCoreApi> {
@@ -33,16 +33,13 @@ pub trait BlockChainClientCoreApi: Send + Sync + 'static {
 
 pub struct BlockChainClientCore {
 	network: Network,
-	fork: ConsensusFork,
 	storage: storage::SharedStore,
 }
 
 impl BlockChainClientCore {
 	pub fn new(network: Network, storage: storage::SharedStore) -> Self {
-		let fork = ConsensusFork::ZCash(ZCashConsensusParams::new(network));
 		BlockChainClientCore {
 			network: network,
-			fork,
 			storage: storage,
 		}
 	}
@@ -62,7 +59,7 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 	}
 
 	fn difficulty(&self) -> f64 {
-		self.storage.difficulty(self.network.max_bits(&self.fork).into())
+		self.storage.difficulty(self.network.max_bits().into())
 	}
 
 	fn raw_block(&self, hash: GlobalH256) -> Option<RawBlock> {
@@ -94,7 +91,7 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 					weight: block_size as u32, // TODO: segwit
 					height: height,
 					mediantime: Some(median_time),
-					difficulty: block.header.raw.bits.to_f64(self.network.max_bits(&self.fork).into()),
+					difficulty: block.header.raw.bits.to_f64(self.network.max_bits().into()),
 					chainwork: U256::default(), // TODO: read from storage
 					previousblockhash: Some(block.header.raw.previous_header_hash.clone().into()),
 					nextblockhash: height.and_then(|h| self.storage.block_hash(h + 1).map(|h| h.into())),

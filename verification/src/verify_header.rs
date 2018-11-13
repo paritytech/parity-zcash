@@ -34,7 +34,7 @@ impl<'a> HeaderProofOfWork<'a> {
 	fn new(header: &'a IndexedBlockHeader, consensus: &ConsensusParams) -> Self {
 		HeaderProofOfWork {
 			header: header,
-			max_work_bits: consensus.network.max_bits(&consensus.fork).into(),
+			max_work_bits: consensus.network.max_bits().into(),
 		}
 	}
 

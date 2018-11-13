@@ -1235,7 +1235,7 @@ pub mod tests {
 	use message::common::InventoryVector;
 	use message::{Services, types};
 	use miner::MemoryPool;
-	use network::{ConsensusParams, ConsensusFork, Network};
+	use network::{ConsensusParams, Network};
 	use primitives::hash::H256;
 	use verification::BackwardsCompatibleChainVerifier as ChainVerifier;
 	use inbound_connection::tests::DummyOutboundSyncConnection;
@@ -1286,11 +1286,11 @@ pub mod tests {
 		};
 		let sync_state = SynchronizationStateRef::new(SynchronizationState::with_storage(storage.clone()));
 		let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
-		let chain = Chain::new(storage.clone(), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore), memory_pool.clone());
+		let chain = Chain::new(storage.clone(), ConsensusParams::new(Network::Unitest), memory_pool.clone());
 		let executor = DummyTaskExecutor::new();
 		let config = Config { close_connection_on_bad_block: true };
 
-		let chain_verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore)));
+		let chain_verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest)));
 		let client_core = SynchronizationClientCore::new(config, sync_state.clone(), sync_peers.clone(), executor.clone(), chain, chain_verifier.clone());
 		{
 			client_core.lock().set_verify_headers(false);

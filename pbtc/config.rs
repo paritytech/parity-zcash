@@ -2,7 +2,7 @@ use std::net;
 use clap;
 use storage;
 use message::Services;
-use network::{Network, ConsensusParams, ConsensusFork, BitcoinCashConsensusParams, ZCashConsensusParams};
+use network::{Network, ConsensusParams};
 use p2p::InternetProtocol;
 use seednodes::{mainnet_seednodes, testnet_seednodes, bitcoin_cash_seednodes,
 	bitcoin_cash_testnet_seednodes, zcash_seednodes};
@@ -59,8 +59,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 		(true, true) => return Err("Only one testnet option can be used".into()),
 	};
 
-	let consensus_fork = parse_consensus_fork(network, &db, &matches)?;
-	let consensus = ConsensusParams::new(network, consensus_fork);
+	let consensus = ConsensusParams::new(network);
 
 	let (in_connections, out_connections) = match network {
 		Network::Testnet | Network::Mainnet | Network::Other(_) => (10, 10),
@@ -73,11 +72,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	};
 
 	// to skip idiotic 30 seconds delay in test-scripts
-	let user_agent_suffix = match consensus.fork {
-		ConsensusFork::BitcoinCore => "",
-		ConsensusFork::BitcoinCash(_) => "/UAHF",
-		ConsensusFork::ZCash(_) => "",
-	};
+	let user_agent_suffix = "";
 	let user_agent = match network {
 		Network::Testnet | Network::Mainnet | Network::Unitest | Network::Other(_) => format!("{}{}", USER_AGENT, user_agent_suffix),
 		Network::Regtest => REGTEST_USER_AGENT.into(),
@@ -85,13 +80,13 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 
 	let port = match matches.value_of("port") {
 		Some(port) => port.parse().map_err(|_| "Invalid port".to_owned())?,
-		None => network.port(&consensus.fork),
+		None => network.port(),
 	};
 
 	let connect = match matches.value_of("connect") {
 		Some(s) => Some(match s.parse::<net::SocketAddr>() {
 			Err(_) => s.parse::<net::IpAddr>()
-				.map(|ip| net::SocketAddr::new(ip, network.port(&consensus.fork)))
+				.map(|ip| net::SocketAddr::new(ip, network.port()))
 				.map_err(|_| "Invalid connect".to_owned()),
 			Ok(a) => Ok(a),
 		}?),
@@ -100,13 +95,9 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 
 	let seednodes: Vec<String> = match matches.value_of("seednode") {
 		Some(s) => vec![s.parse().map_err(|_| "Invalid seednode".to_owned())?],
-		None => match (network, &consensus.fork) {
-			(Network::Mainnet, &ConsensusFork::ZCash(_)) => zcash_seednodes().into_iter().map(Into::into).collect(),
-			(Network::Mainnet, &ConsensusFork::BitcoinCash(_)) => bitcoin_cash_seednodes().into_iter().map(Into::into).collect(),
-			(Network::Testnet, &ConsensusFork::BitcoinCash(_)) => bitcoin_cash_testnet_seednodes().into_iter().map(Into::into).collect(),
-			(Network::Mainnet, _) => mainnet_seednodes().into_iter().map(Into::into).collect(),
-			(Network::Testnet, _) => testnet_seednodes().into_iter().map(Into::into).collect(),
-			(Network::Other(_), _) | (Network::Regtest, _) | (Network::Unitest, _) => Vec::new(),
+		None => match network {
+			Network::Mainnet => zcash_seednodes().into_iter().map(Into::into).collect(),
+			Network::Other(_) | Network::Testnet | Network::Regtest | Network::Unitest => Vec::new(),
 		},
 	};
 
@@ -131,11 +122,6 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	};
 
 	let services = Services::default().with_network(true);
-	let services = match &consensus.fork {
-		&ConsensusFork::BitcoinCash(_) => services.with_bitcoin_cash(true),
-		&ConsensusFork::BitcoinCore => services.with_witness(true),
-		&ConsensusFork::ZCash(_) => services,
-	};
 
 	let verification_level = match matches.value_of("verification-level") {
 		Some(s) if s == "full" => VerificationLevel::Full,
@@ -150,7 +136,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 			let edge: H256 = s.parse().map_err(|_| "Invalid verification edge".to_owned())?;
 			edge.reversed()
 		},
-		_ => network.default_verification_edge(&consensus.fork),
+		_ => network.default_verification_edge(),
 	};
 
 	let config = Config {
@@ -179,34 +165,6 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	};
 
 	Ok(config)
-}
-
-fn parse_consensus_fork(network: Network, db: &storage::SharedStore, matches: &clap::ArgMatches) -> Result<ConsensusFork, String> {
-	let old_consensus_fork = db.consensus_fork()?;
-	let new_consensus_fork = match (matches.is_present("btc"), matches.is_present("bch"), matches.is_present("zcash")) {
-		(false, false, false) => match &old_consensus_fork {
-			&Some(ref old_consensus_fork) => old_consensus_fork,
-			&None => return Err("You must select fork on first run: --btc, --bch or --zcash".into()),
-		},
-		(true, false, false) => "btc",
-		(false, true, false) => "bch",
-		(false, false, true) => "zcash",
-		_ => return Err("You can only pass single fork argument: --btc, --bch or --zcash".into()),
-	};
-
-	match &old_consensus_fork {
-		&None => db.set_consensus_fork(new_consensus_fork)?,
-		&Some(ref old_consensus_fork) if old_consensus_fork == new_consensus_fork => (),
-		&Some(ref old_consensus_fork) =>
-			return Err(format!("Cannot select '{}' fork with non-empty database of '{}' fork", new_consensus_fork, old_consensus_fork)),
-	}
-
-	match new_consensus_fork {
-		"btc" => Ok(ConsensusFork::BitcoinCore),
-		"bch" => Ok(ConsensusFork::BitcoinCash(BitcoinCashConsensusParams::new(network))),
-		"zcash" => Ok(ConsensusFork::ZCash(ZCashConsensusParams::new(network))),
-		_ => Err(String::from("Fork mandatory")),
-	}
 }
 
 fn parse_rpc_config(network: Network, matches: &clap::ArgMatches) -> Result<RpcHttpConfig, String> {
