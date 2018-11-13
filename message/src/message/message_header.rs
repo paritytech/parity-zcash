@@ -67,7 +67,7 @@ mod tests {
 
 	#[test]
 	fn test_message_header_serialization() {
-		let expected = "f9beb4d96164647200000000000000001f000000ed52399b".into();
+		let expected = "24e927646164647200000000000000001f000000ed52399b".into();
 		let header = MessageHeader {
 			magic: Network::Mainnet.magic(),
 			command: "addr".into(),
@@ -80,7 +80,7 @@ mod tests {
 
 	#[test]
 	fn test_message_header_deserialization() {
-		let raw: Bytes = "f9beb4d96164647200000000000000001f000000ed52399b".into();
+		let raw: Bytes = "24e927646164647200000000000000001f000000ed52399b".into();
 		let expected = MessageHeader {
 			magic: Network::Mainnet.magic(),
 			command: "addr".into(),

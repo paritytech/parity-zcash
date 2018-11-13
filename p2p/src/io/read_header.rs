@@ -38,7 +38,7 @@ mod tests {
 
 	#[test]
 	fn test_read_header() {
-		let raw: Bytes = "f9beb4d96164647200000000000000001f000000ed52399b".into();
+		let raw: Bytes = "24e927646164647200000000000000001f000000ed52399b".into();
 		let expected = MessageHeader {
 			magic: Network::Mainnet.magic(),
 			command: "addr".into(),
@@ -58,7 +58,7 @@ mod tests {
 
 	#[test]
 	fn test_read_too_short_header() {
-		let raw: Bytes = "f9beb4d96164647200000000000000001f000000ed5239".into();
+		let raw: Bytes = "24e927646164647200000000000000001f000000ed5239".into();
 		assert!(read_header(raw.as_ref(), Network::Mainnet.magic()).wait().is_err());
 	}
 }

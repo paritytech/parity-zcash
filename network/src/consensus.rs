@@ -71,7 +71,7 @@ impl ConsensusParams {
 			Network::Regtest | Network::Unitest => ConsensusParams {
 				network: network,
 				bip16_time: 0,
-				bip34_height: 1,
+				bip34_height: 100000000,
 				bip65_height: 0,
 				bip66_height: 0,
 				segwit_deployment: None,

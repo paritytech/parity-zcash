@@ -1,4 +1,4 @@
-use network::{ConsensusParams};
+use network::{Network, ConsensusParams};
 use storage::BlockHeaderProvider;
 use canon::CanonHeader;
 use error::Error;
@@ -81,6 +81,11 @@ impl<'a> HeaderEquihashSolution<'a> {
 	}
 
 	fn check(&self) -> Result<(), Error> {
+		match self.consensus.network {
+			Network::Unitest => return Ok(()),
+			_ => (),
+		};
+
 		use equihash;
 		let is_solution_correct = equihash::verify_block_equihash_solution(&equihash::EquihashParams {
 			N: 200,

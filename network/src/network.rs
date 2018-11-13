@@ -50,8 +50,9 @@ impl Network {
 	pub fn max_bits(&self) -> U256 {
 		match *self {
 			Network::Mainnet => ZCASH_MAX_BITS_MAINNET.clone(),
-			Network::Testnet | Network::Unitest | Network::Regtest => ZCASH_MAX_BITS_TESTNET.clone(),
+			Network::Testnet | Network::Regtest => ZCASH_MAX_BITS_TESTNET.clone(),
 			Network::Other(_) => Compact::max_value().into(),
+			Network::Unitest => Compact::max_value().into(),
 		}
 	}
 

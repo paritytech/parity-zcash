@@ -243,7 +243,10 @@ fn to_big_endian(num: u32) -> [u8; 4] {
 
 #[cfg(test)]
 mod tests {
-/*
+	use primitives::bigint::{U256, Uint};
+	use byteorder::WriteBytesExt;
+	use super::*;
+
 	fn get_minimal_from_indices(indices: &[u32], collision_bit_length: usize) -> Vec<u8> {
 		let indices_len = indices.len() * 4;
 		let min_len = (collision_bit_length + 1) * indices_len / (8 * 4);
@@ -313,5 +316,5 @@ mod tests {
 				2261, 15185, 36112, 104243, 23779, 118390, 118332, 130041, 32642, 69878, 76925, 80080, 45858, 116805, 92842, 111026, 15972, 115059, 85191, 90330, 68190, 122819, 81830, 91132, 23460, 49807, 52426, 80391, 69567, 114474, 104973, 122568,
 			],
 		));
-	}*/
+	}
 }

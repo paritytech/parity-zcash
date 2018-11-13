@@ -175,8 +175,8 @@ mod tests {
 	fn verify_smoky() {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let b1 = test_data::block_h1();
-		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Unitest));
-		assert!(verifier.verify(VerificationLevel::Full, &b1.into()).is_ok());
+		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Mainnet));
+		assert_eq!(verifier.verify(VerificationLevel::Full, &b1.into()), Ok(()));
 	}
 
 	#[test]
@@ -187,8 +187,8 @@ mod tests {
 				test_data::block_h1().into(),
 			]);
 		let b1 = test_data::block_h2();
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
-		assert!(verifier.verify(VerificationLevel::Full, &b1.into()).is_ok());
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Mainnet));
+		assert_eq!(verifier.verify(VerificationLevel::Full, &b1.into()), Ok(()));
 	}
 
 	#[test]
@@ -255,7 +255,7 @@ mod tests {
 			.build();
 
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
-		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
+		assert_eq!(verifier.verify(VerificationLevel::Full, &block.into()), Ok(()));
 	}
 
 	#[test]
