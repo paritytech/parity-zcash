@@ -43,7 +43,7 @@ pub struct VerboseBlock {
 	/// TODO: bitcoind always returns value, but we can calculate this only if height(block) > 2
 	pub mediantime: Option<u32>,
 	/// Block nonce
-	pub nonce: u32,
+	pub nonce: H256,
 	/// Block nbits
 	pub bits: u32,
 	/// Block difficulty
@@ -76,7 +76,7 @@ mod tests {
 	#[test]
 	fn verbose_block_serialize() {
 		let block = VerboseBlock::default();
-		assert_eq!(serde_json::to_string(&block).unwrap(), r#"{"hash":"0000000000000000000000000000000000000000000000000000000000000000","confirmations":0,"size":0,"strippedsize":0,"weight":0,"height":null,"version":0,"versionHex":"","merkleroot":"0000000000000000000000000000000000000000000000000000000000000000","tx":[],"time":0,"mediantime":null,"nonce":0,"bits":0,"difficulty":0.0,"chainwork":"0","previousblockhash":null,"nextblockhash":null}"#);
+		assert_eq!(serde_json::to_string(&block).unwrap(), r#"{"hash":"0000000000000000000000000000000000000000000000000000000000000000","confirmations":0,"size":0,"strippedsize":0,"weight":0,"height":null,"version":0,"versionHex":"","merkleroot":"0000000000000000000000000000000000000000000000000000000000000000","tx":[],"time":0,"mediantime":null,"nonce":"0000000000000000000000000000000000000000000000000000000000000000","bits":0,"difficulty":0.0,"chainwork":"0","previousblockhash":null,"nextblockhash":null}"#);
 
 		let block = VerboseBlock {
 			hash: H256::from(1),
@@ -91,21 +91,21 @@ mod tests {
 			tx: vec![H256::from(3), H256::from(4)],
 			time: 111,
 			mediantime: Some(100),
-			nonce: 124,
+			nonce: 124.into(),
 			bits: 13513,
 			difficulty: 555.555,
 			chainwork: U256::from(3),
 			previousblockhash: Some(H256::from(4)),
 			nextblockhash: Some(H256::from(5)),
 		};
-		assert_eq!(serde_json::to_string(&block).unwrap(), r#"{"hash":"0100000000000000000000000000000000000000000000000000000000000000","confirmations":-1,"size":500000,"strippedsize":444444,"weight":5236235,"height":3513513,"version":1,"versionHex":"01","merkleroot":"0200000000000000000000000000000000000000000000000000000000000000","tx":["0300000000000000000000000000000000000000000000000000000000000000","0400000000000000000000000000000000000000000000000000000000000000"],"time":111,"mediantime":100,"nonce":124,"bits":13513,"difficulty":555.555,"chainwork":"3","previousblockhash":"0400000000000000000000000000000000000000000000000000000000000000","nextblockhash":"0500000000000000000000000000000000000000000000000000000000000000"}"#);
+		assert_eq!(serde_json::to_string(&block).unwrap(), r#"{"hash":"0100000000000000000000000000000000000000000000000000000000000000","confirmations":-1,"size":500000,"strippedsize":444444,"weight":5236235,"height":3513513,"version":1,"versionHex":"01","merkleroot":"0200000000000000000000000000000000000000000000000000000000000000","tx":["0300000000000000000000000000000000000000000000000000000000000000","0400000000000000000000000000000000000000000000000000000000000000"],"time":111,"mediantime":100,"nonce":"7c00000000000000000000000000000000000000000000000000000000000000","bits":13513,"difficulty":555.555,"chainwork":"3","previousblockhash":"0400000000000000000000000000000000000000000000000000000000000000","nextblockhash":"0500000000000000000000000000000000000000000000000000000000000000"}"#);
 	}
 
 	#[test]
 	fn verbose_block_deserialize() {
 		let block = VerboseBlock::default();
 		assert_eq!(
-			serde_json::from_str::<VerboseBlock>(r#"{"hash":"0000000000000000000000000000000000000000000000000000000000000000","confirmations":0,"size":0,"strippedsize":0,"weight":0,"height":null,"version":0,"versionHex":"","merkleroot":"0000000000000000000000000000000000000000000000000000000000000000","tx":[],"time":0,"mediantime":null,"nonce":0,"bits":0,"difficulty":0.0,"chainwork":"0","previousblockhash":null,"nextblockhash":null}"#).unwrap(),
+			serde_json::from_str::<VerboseBlock>(r#"{"hash":"0000000000000000000000000000000000000000000000000000000000000000","confirmations":0,"size":0,"strippedsize":0,"weight":0,"height":null,"version":0,"versionHex":"","merkleroot":"0000000000000000000000000000000000000000000000000000000000000000","tx":[],"time":0,"mediantime":null,"nonce":"0000000000000000000000000000000000000000000000000000000000000000","bits":0,"difficulty":0.0,"chainwork":"0","previousblockhash":null,"nextblockhash":null}"#).unwrap(),
 			block);
 
 		let block = VerboseBlock {
@@ -121,7 +121,7 @@ mod tests {
 			tx: vec![H256::from(3), H256::from(4)],
 			time: 111,
 			mediantime: Some(100),
-			nonce: 124,
+			nonce: 124.into(),
 			bits: 13513,
 			difficulty: 555.555,
 			chainwork: U256::from(3),
@@ -129,7 +129,7 @@ mod tests {
 			nextblockhash: Some(H256::from(5)),
 		};
 		assert_eq!(
-			serde_json::from_str::<VerboseBlock>(r#"{"hash":"0100000000000000000000000000000000000000000000000000000000000000","confirmations":-1,"size":500000,"strippedsize":444444,"weight":5236235,"height":3513513,"version":1,"versionHex":"01","merkleroot":"0200000000000000000000000000000000000000000000000000000000000000","tx":["0300000000000000000000000000000000000000000000000000000000000000","0400000000000000000000000000000000000000000000000000000000000000"],"time":111,"mediantime":100,"nonce":124,"bits":13513,"difficulty":555.555,"chainwork":"3","previousblockhash":"0400000000000000000000000000000000000000000000000000000000000000","nextblockhash":"0500000000000000000000000000000000000000000000000000000000000000"}"#).unwrap(),
+			serde_json::from_str::<VerboseBlock>(r#"{"hash":"0100000000000000000000000000000000000000000000000000000000000000","confirmations":-1,"size":500000,"strippedsize":444444,"weight":5236235,"height":3513513,"version":1,"versionHex":"01","merkleroot":"0200000000000000000000000000000000000000000000000000000000000000","tx":["0300000000000000000000000000000000000000000000000000000000000000","0400000000000000000000000000000000000000000000000000000000000000"],"time":111,"mediantime":100,"nonce":"7c00000000000000000000000000000000000000000000000000000000000000","bits":13513,"difficulty":555.555,"chainwork":"3","previousblockhash":"0400000000000000000000000000000000000000000000000000000000000000","nextblockhash":"0500000000000000000000000000000000000000000000000000000000000000"}"#).unwrap(),
 			block);
 	}
 
@@ -143,6 +143,6 @@ mod tests {
 	fn get_block_response_verbose_serialize() {
 		let block = VerboseBlock::default();
 		let verbose_response = GetBlockResponse::Verbose(block);
-		assert_eq!(serde_json::to_string(&verbose_response).unwrap(), r#"{"hash":"0000000000000000000000000000000000000000000000000000000000000000","confirmations":0,"size":0,"strippedsize":0,"weight":0,"height":null,"version":0,"versionHex":"","merkleroot":"0000000000000000000000000000000000000000000000000000000000000000","tx":[],"time":0,"mediantime":null,"nonce":0,"bits":0,"difficulty":0.0,"chainwork":"0","previousblockhash":null,"nextblockhash":null}"#);
+		assert_eq!(serde_json::to_string(&verbose_response).unwrap(), r#"{"hash":"0000000000000000000000000000000000000000000000000000000000000000","confirmations":0,"size":0,"strippedsize":0,"weight":0,"height":null,"version":0,"versionHex":"","merkleroot":"0000000000000000000000000000000000000000000000000000000000000000","tx":[],"time":0,"mediantime":null,"nonce":"0000000000000000000000000000000000000000000000000000000000000000","bits":0,"difficulty":0.0,"chainwork":"0","previousblockhash":null,"nextblockhash":null}"#);
 	}
 }

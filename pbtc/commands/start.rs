@@ -89,12 +89,6 @@ pub fn start(cfg: config::Config) -> Result<(), String> {
 
 	let nodes_path = node_table_path(&cfg);
 
-	let SERIALIZE_ZCASH = 0x80000000; // TODO
-	let serialization_flags = match cfg.consensus.fork {
-		ConsensusFork::ZCash(_) => SERIALIZE_ZCASH,
-		_ => 0,
-	};
-
 	let p2p_cfg = p2p::Config {
 		threads: cfg.p2p_threads,
 		inbound_connections: cfg.inbound_connections,
@@ -114,14 +108,12 @@ pub fn start(cfg: config::Config) -> Result<(), String> {
 			user_agent: cfg.user_agent,
 			start_height: 0,
 			relay: true,
-			serialization_flags: serialization_flags,
 		},
 		peers: cfg.connect.map_or_else(|| vec![], |x| vec![x]),
 		seeds: cfg.seednodes,
 		node_table_path: nodes_path,
 		preferable_services: cfg.services,
 		internet_protocol: cfg.internet_protocol,
-		serialization_flags: serialization_flags,
 	};
 
 	let sync_peers = create_sync_peers();

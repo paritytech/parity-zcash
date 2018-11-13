@@ -996,8 +996,8 @@ mod tests {
 	#[test]
 	fn memory_pool_transactions_are_reverified_after_reorganization() {
 		let b0 = test_data::block_builder().header().build().build();
-		let b1 = test_data::block_builder().header().nonce(1).parent(b0.hash()).build().build();
-		let b2 = test_data::block_builder().header().nonce(2).parent(b0.hash()).build().build();
+		let b1 = test_data::block_builder().header().nonce(1.into()).parent(b0.hash()).build().build();
+		let b2 = test_data::block_builder().header().nonce(2.into()).parent(b0.hash()).build().build();
 		let b3 = test_data::block_builder().header().parent(b2.hash()).build().build();
 
 		let tx1: Transaction = test_data::TransactionBuilder::with_version(1).into();
@@ -1029,13 +1029,13 @@ mod tests {
 	fn fork_chain_block_transaction_is_removed_from_on_block_insert() {
 		let genesis = test_data::genesis();
 		let b0 = test_data::block_builder().header().parent(genesis.hash()).build().build(); // genesis -> b0
-		let b1 = test_data::block_builder().header().nonce(1).parent(b0.hash()).build()
+		let b1 = test_data::block_builder().header().nonce(1.into()).parent(b0.hash()).build()
 			.transaction().output().value(10).build().build()
 			.build(); // genesis -> b0 -> b1[tx1]
 		let b2 = test_data::block_builder().header().parent(b1.hash()).build()
 			.transaction().output().value(20).build().build()
 			.build(); // genesis -> b0 -> b1[tx1] -> b2[tx2]
-		let b3 = test_data::block_builder().header().nonce(2).parent(b0.hash()).build()
+		let b3 = test_data::block_builder().header().nonce(2.into()).parent(b0.hash()).build()
 			.transaction().output().value(30).build().build()
 			.build(); // genesis -> b0 -> b3[tx3]
 		let b4 = test_data::block_builder().header().parent(b3.hash()).build()
@@ -1086,7 +1086,7 @@ mod tests {
 	fn double_spend_transaction_is_removed_from_memory_pool_when_output_is_spent_in_block_transaction() {
 		let genesis = test_data::genesis();
 		let tx0 = genesis.transactions[0].clone();
-		let b0 = test_data::block_builder().header().nonce(1).parent(genesis.hash()).build()
+		let b0 = test_data::block_builder().header().nonce(1.into()).parent(genesis.hash()).build()
 			.transaction()
 				.lock_time(1)
 				.input().hash(tx0.hash()).index(0).build()

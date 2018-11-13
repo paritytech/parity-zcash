@@ -1,3 +1,5 @@
+#![allow(non_camel_case_types)]
+
 use std::{fmt, io};
 use hex::ToHex;
 use primitives::hash::H256;

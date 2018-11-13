@@ -1,8 +1,8 @@
 use ser::Reader;
 use {Payload, Error};
 
-pub fn deserialize_payload<T>(buffer: &[u8], version: u32, flags: u32) -> Result<T, Error> where T: Payload {
-	let mut reader = PayloadReader::new(buffer, version, flags);
+pub fn deserialize_payload<T>(buffer: &[u8], version: u32) -> Result<T, Error> where T: Payload {
+	let mut reader = PayloadReader::new(buffer, version);
 	let result = try!(reader.read());
 	if !reader.is_finished() {
 		return Err(Error::Deserialize);
@@ -17,9 +17,9 @@ pub struct PayloadReader<T> {
 }
 
 impl<'a> PayloadReader<&'a [u8]> {
-	pub fn new(buffer: &'a [u8], version: u32, flags: u32) -> Self {
+	pub fn new(buffer: &'a [u8], version: u32) -> Self {
 		PayloadReader {
-			reader: Reader::new(buffer, flags),
+			reader: Reader::new(buffer),
 			version: version,
 		}
 	}

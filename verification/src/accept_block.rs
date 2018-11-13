@@ -1,9 +1,7 @@
 use network::{ConsensusParams, ConsensusFork, TransactionOrdering};
-use crypto::dhash256;
 use storage::{TransactionOutputProvider, BlockHeaderProvider};
 use script;
-use ser::Stream;
-use sigops::{transaction_sigops, transaction_sigops_cost}	;
+use sigops::{transaction_sigops};
 use work::block_reward_satoshi;
 use duplex_store::{transaction_index_for_output_check, DuplexTransactionOutputProvider};
 use deployments::BlockDeployments;
@@ -18,7 +16,6 @@ pub struct BlockAcceptor<'a> {
 	pub sigops: BlockSigops<'a>,
 	pub coinbase_claim: BlockCoinbaseClaim<'a>,
 	pub coinbase_script: BlockCoinbaseScript<'a>,
-	pub witness: BlockWitness<'a>,
 	pub ordering: BlockTransactionOrdering<'a>,
 }
 
@@ -34,11 +31,10 @@ impl<'a> BlockAcceptor<'a> {
 	) -> Self {
 		BlockAcceptor {
 			finality: BlockFinality::new(block, height, deployments, headers),
-			serialized_size: BlockSerializedSize::new(block, consensus, deployments, height, median_time_past),
+			serialized_size: BlockSerializedSize::new(block, consensus, height, median_time_past),
 			coinbase_script: BlockCoinbaseScript::new(block, consensus, height),
 			coinbase_claim: BlockCoinbaseClaim::new(block, consensus, store, height, median_time_past),
 			sigops: BlockSigops::new(block, store, consensus, height, median_time_past),
-			witness: BlockWitness::new(block, deployments),
 			ordering: BlockTransactionOrdering::new(block, consensus, median_time_past),
 		}
 	}
@@ -49,7 +45,6 @@ impl<'a> BlockAcceptor<'a> {
 		self.serialized_size.check()?;
 		self.coinbase_claim.check()?;
 		self.coinbase_script.check()?;
-		self.witness.check()?;
 		self.ordering.check()?;
 		Ok(())
 	}
@@ -94,19 +89,15 @@ pub struct BlockSerializedSize<'a> {
 	consensus: &'a ConsensusParams,
 	height: u32,
 	median_time_past: u32,
-	segwit_active: bool,
 }
 
 impl<'a> BlockSerializedSize<'a> {
-	fn new(block: CanonBlock<'a>, consensus: &'a ConsensusParams, deployments: &'a BlockDeployments<'a>, height: u32, median_time_past: u32) -> Self {
-		let segwit_active = deployments.segwit();
-
+	fn new(block: CanonBlock<'a>, consensus: &'a ConsensusParams, height: u32, median_time_past: u32) -> Self {
 		BlockSerializedSize {
 			block: block,
 			consensus: consensus,
 			height: height,
 			median_time_past: median_time_past,
-			segwit_active: segwit_active,
 		}
 	}
 
@@ -122,14 +113,6 @@ impl<'a> BlockSerializedSize<'a> {
 			return Err(Error::Size(size));
 		}
 
-		// there's no need to define weight for pre-SegWit blocks
-		if self.segwit_active {
-			let size_with_witness = self.block.size_with_witness();
-			let weight = size * (ConsensusFork::witness_scale_factor() - 1) + size_with_witness;
-			if weight > self.consensus.fork.max_block_weight(self.height) {
-				return Err(Error::Weight);
-			}
-		}
 		Ok(())
 	}
 }
@@ -169,32 +152,16 @@ impl<'a> BlockSigops<'a> {
 
 	fn check(&self) -> Result<(), Error> {
 		let store = DuplexTransactionOutputProvider::new(self.store, &*self.block);
-		let (sigops, sigops_cost) = self.block.transactions.iter()
-			.map(|tx| {
-				let tx_sigops = transaction_sigops(&tx.raw, &store, self.bip16_active, self.checkdatasig_active);
-				let tx_sigops_cost = transaction_sigops_cost(&tx.raw, &store, tx_sigops);
-				(tx_sigops, tx_sigops_cost)
-			})
-			.fold((0, 0), |acc, (tx_sigops, tx_sigops_cost)| (acc.0 + tx_sigops, acc.1 + tx_sigops_cost));
+		let sigops = self.block.transactions.iter()
+			.map(|tx| transaction_sigops(&tx.raw, &store, self.bip16_active, self.checkdatasig_active))
+			.fold(0, |acc, tx_sigops| (acc + tx_sigops));
 
-		// sigops check is valid for all forks:
-		// before SegWit: 20_000
-		// after SegWit: cost of sigops is sigops * 4 and max cost is 80_000 => max sigops is still 20_000
-		// after BitcoinCash fork: 20_000 sigops for each full/partial 1_000_000 bytes of block
 		let size = self.block.size();
 		if sigops > self.consensus.fork.max_block_sigops(self.height, size) {
 			return Err(Error::MaximumSigops);
 		}
 
-		// sigops check is valid for all forks:
-		// before SegWit: no witnesses => cost is sigops * 4 and max cost is 80_000
-		// after SegWit: it is main check for sigops
-		// after BitcoinCash fork: no witnesses => cost is sigops * 4 and max cost depends on block size
-		if sigops_cost > self.consensus.fork.max_block_sigops_cost(self.height, size) {
-			Err(Error::MaximumSigopsCost)
-		} else {
-			Ok(())
-		}
+		Ok(())
 	}
 }
 
@@ -306,60 +273,6 @@ impl<'a> BlockCoinbaseScript<'a> {
 		} else {
 			Err(Error::CoinbaseScript)
 		}
-	}
-}
-
-pub struct BlockWitness<'a> {
-	block: CanonBlock<'a>,
-	segwit_active: bool,
-}
-
-impl<'a> BlockWitness<'a> {
-	fn new(block: CanonBlock<'a>, deployments: &'a BlockDeployments<'a>) -> Self {
-		let segwit_active = deployments.segwit();
-
-		BlockWitness {
-			block: block,
-			segwit_active: segwit_active,
-		}
-	}
-
-	fn check(&self) -> Result<(), Error> {
-		if !self.segwit_active {
-			return Ok(());
-		}
-
-		// check witness from coinbase transaction
-		let mut has_witness = false;
-		if let Some(coinbase) = self.block.transactions.first() {
-			let commitment = coinbase.raw.outputs.iter().rev()
-				.find(|output| script::is_witness_commitment_script(&output.script_pubkey));
-			if let Some(commitment) = commitment {
-				let witness_merkle_root = self.block.raw().witness_merkle_root();
-				if coinbase.raw.inputs.get(0).map(|i| i.script_witness.len()).unwrap_or_default() != 1 ||
-					coinbase.raw.inputs[0].script_witness[0].len() != 32 {
-					return Err(Error::WitnessInvalidNonceSize);
-				}
-
-				let mut stream = Stream::new();
-				stream.append(&witness_merkle_root);
-				stream.append_slice(&coinbase.raw.inputs[0].script_witness[0]);
-				let hash_witness = dhash256(&stream.out());
-
-				if hash_witness != commitment.script_pubkey[6..].into() {
-					return Err(Error::WitnessMerkleCommitmentMismatch);
-				}
-
-				has_witness = true;
-			}
-		}
-
-		// witness commitment is required when block contains transactions with witness
-		if !has_witness && self.block.transactions.iter().any(|tx| tx.raw.has_witness()) {
-			return Err(Error::UnexpectedWitness);
-		}
-
-		Ok(())
 	}
 }
 

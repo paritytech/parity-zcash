@@ -1,7 +1,6 @@
 use std::io;
-use hex::{ToHex, FromHex};
 use hash::{H256, H512};
-use ser::{Error, Serializable, Deserializable, Stream, Reader, FixedArray_H256_2,
+use ser::{Error, Stream, Reader, FixedArray_H256_2,
 	FixedArray_u8_296, FixedArray_u8_601_2};
 
 #[derive(Debug, PartialEq, Default, Clone)]

@@ -19,6 +19,5 @@ pub struct PeerInfo {
 	pub version: u32,
 	pub version_message: types::Version,
 	pub magic: Magic,
-	pub flags: u32,
 }
 

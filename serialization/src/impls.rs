@@ -261,7 +261,7 @@ mod tests {
 			4, 0, 0, 0, 0, 0, 0, 0
 		];
 
-		let mut reader = Reader::new(&buffer, 0);
+		let mut reader = Reader::new(&buffer);
 		assert!(!reader.is_finished());
 		assert_eq!(1u8, reader.read().unwrap());
 		assert_eq!(2u16, reader.read().unwrap());

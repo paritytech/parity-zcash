@@ -164,7 +164,6 @@ impl TransactionInputSigner {
 			previous_output: unsigned_input.previous_output.clone(),
 			sequence: unsigned_input.sequence,
 			script_sig: script_sig.to_bytes(),
-			script_witness: vec![],
 		}
 	}
 
@@ -185,7 +184,6 @@ impl TransactionInputSigner {
 				previous_output: input.previous_output.clone(),
 				script_sig: script_pubkey.to_bytes(),
 				sequence: input.sequence,
-				script_witness: vec![],
 			}]
 		} else {
 			self.inputs.iter()
@@ -201,7 +199,6 @@ impl TransactionInputSigner {
 						SighashBase::Single | SighashBase::None if n != input_index => 0,
 						_ => input.sequence,
 					},
-					script_witness: vec![],
 				})
 				.collect()
 		};
@@ -384,6 +381,7 @@ mod tests {
 
 	// These test vectors were stolen from libbtc, which is Copyright 2014 Jonas Schnelli MIT
 	// https://github.com/libbtc/libbtc/blob/998badcdac95a226a8f8c00c8f6abbd8a77917c1/test/tx_tests.c
+	#[ignore("TODO: use ZCash-specific transaction format")]
 	#[test]
 	fn test_signature_hash_libbtc() {
 		run_test_sighash("907c2bc503ade11cc3b04eb2918b6f547b0630ab569273824748c87ea14b0696526c66ba740200000004ab65ababfd1f9bdd4ef073c7afc4ae00da8a66f429c917a0081ad1e1dabce28d373eab81d8628de802000000096aab5253ab52000052ad042b5f25efb33beec9f3364e8a9139e8439d9d7e26529c3c30b6c3fd89f8684cfd68ea0200000009ab53526500636a52ab599ac2fe02a526ed040000000008535300516352515164370e010000000003006300ab2ec229", "", 2, 1864164639, "31af167a6cf3f9d5f6875caa4d31704ceb0eba078d132b78dab52c3b8997317e");

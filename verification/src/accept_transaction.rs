@@ -15,7 +15,6 @@ use VerificationLevel;
 
 pub struct TransactionAcceptor<'a> {
 	pub size: TransactionSize<'a>,
-	pub premature_witness: TransactionPrematureWitness<'a>,
 	pub bip30: TransactionBip30<'a>,
 	pub missing_inputs: TransactionMissingInputs<'a>,
 	pub maturity: TransactionMaturity<'a>,
@@ -47,7 +46,6 @@ impl<'a> TransactionAcceptor<'a> {
 		let missing_input_tx_index = transaction_index_for_output_check(tx_ordering,transaction_index);
 		TransactionAcceptor {
 			size: TransactionSize::new(transaction, consensus, median_time_past),
-			premature_witness: TransactionPrematureWitness::new(transaction, deployments),
 			bip30: TransactionBip30::new_for_sync(transaction, meta_store, consensus, block_hash, height),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, missing_input_tx_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
@@ -60,7 +58,6 @@ impl<'a> TransactionAcceptor<'a> {
 
 	pub fn check(&self) -> Result<(), TransactionError> {
 		try!(self.size.check());
-		try!(self.premature_witness.check());
 		try!(self.bip30.check());
 		try!(self.missing_inputs.check());
 		try!(self.maturity.check());
@@ -304,7 +301,6 @@ pub struct TransactionEval<'a> {
 	verify_locktime: bool,
 	verify_checksequence: bool,
 	verify_dersig: bool,
-	verify_witness: bool,
 	verify_nulldummy: bool,
 	verify_monolith_opcodes: bool,
 	verify_magnetic_anomaly_opcodes: bool,
@@ -345,8 +341,6 @@ impl<'a> TransactionEval<'a> {
 		};
 
 		let verify_checksequence = deployments.csv();
-		let verify_witness = deployments.segwit();
-		let verify_nulldummy = verify_witness;
 		let verify_sigpushonly = verify_magnetic_anomaly_opcodes;
 		let verify_cleanstack = verify_magnetic_anomaly_opcodes;
 
@@ -359,8 +353,7 @@ impl<'a> TransactionEval<'a> {
 			verify_locktime: verify_locktime,
 			verify_checksequence: verify_checksequence,
 			verify_dersig: verify_dersig,
-			verify_witness: verify_witness,
-			verify_nulldummy: verify_nulldummy,
+			verify_nulldummy: false,
 			verify_monolith_opcodes: verify_monolith_opcodes,
 			verify_magnetic_anomaly_opcodes: verify_magnetic_anomaly_opcodes,
 			verify_sigpushonly: verify_sigpushonly,
@@ -394,7 +387,6 @@ impl<'a> TransactionEval<'a> {
 			checker.input_index = index;
 			checker.input_amount = output.value;
 
-			let script_witness = &input.script_witness;
 			let input: Script = input.script_sig.clone().into();
 			let output: Script = output.script_pubkey.into();
 
@@ -405,7 +397,6 @@ impl<'a> TransactionEval<'a> {
 				.verify_checksequence(self.verify_checksequence)
 				.verify_dersig(self.verify_dersig)
 				.verify_nulldummy(self.verify_nulldummy)
-				.verify_witness(self.verify_witness)
 				.verify_concat(self.verify_monolith_opcodes)
 				.verify_split(self.verify_monolith_opcodes)
 				.verify_and(self.verify_monolith_opcodes)
@@ -419,7 +410,7 @@ impl<'a> TransactionEval<'a> {
 				.verify_sigpushonly(self.verify_sigpushonly)
 				.verify_cleanstack(self.verify_cleanstack);
 
-			try!(verify_script(&input, &output, &script_witness, &flags, &checker, self.signature_version)
+			try!(verify_script(&input, &output, &Default::default(), &flags, &checker, self.signature_version)
 				.map_err(|e| TransactionError::Signature(index, e)));
 		}
 
@@ -486,30 +477,6 @@ impl<'a> TransactionReturnReplayProtection<'a> {
 		}
 
 		Ok(())
-	}
-}
-
-pub struct TransactionPrematureWitness<'a> {
-	transaction: CanonTransaction<'a>,
-	segwit_active: bool,
-}
-
-impl<'a> TransactionPrematureWitness<'a> {
-	fn new(transaction: CanonTransaction<'a>, deployments: &'a BlockDeployments<'a>) -> Self {
-		let segwit_active = deployments.segwit();
-
-		TransactionPrematureWitness {
-			transaction: transaction,
-			segwit_active: segwit_active,
-		}
-	}
-
-	fn check(&self) -> Result<(), TransactionError> {
-		if !self.segwit_active && (*self.transaction).raw.has_witness() {
-			Err(TransactionError::PrematureWitness)
-		} else {
-			Ok(())
-		}
 	}
 }
 

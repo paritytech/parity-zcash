@@ -58,7 +58,6 @@ impl Connections {
 			version: connection.version,
 			version_message: connection.version_message,
 			magic: connection.magic,
-			flags: context.serialization_flags(),
 		};
 
 		let session = T::new_session(context, peer_info.clone(), SYNCHRONOUS_RESPONSES);

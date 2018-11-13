@@ -43,7 +43,7 @@ pub fn main(benchmark: &mut Benchmark) {
 				.build()
 			.merkled_header()
 				.parent(rolling_hash.clone())
-				.nonce(x as u32)
+				.nonce((x as u8).into())
 				.build()
 			.build();
 		rolling_hash = next_block.hash();

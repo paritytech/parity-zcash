@@ -19,7 +19,6 @@ pub fn connect(address: &SocketAddr, handle: &Handle, config: &Config) -> Deadli
 		magic: config.magic,
 		address: *address,
 		protocol_minimum: config.protocol_minimum,
-		flags: config.serialization_flags,
 	};
 
 	deadline(Duration::new(5, 0), handle, connect).expect("Failed to create timeout")
@@ -39,7 +38,6 @@ pub struct Connect {
 	magic: Magic,
 	address: SocketAddr,
 	protocol_minimum: u32,
-	flags: u32,
 }
 
 impl Future for Connect {
@@ -51,7 +49,7 @@ impl Future for Connect {
 			ConnectState::TcpConnect { ref mut future, ref mut version } => {
 				let stream = try_ready!(future.poll());
 				let version = version.take().expect("state TcpConnect must have version");
-				let handshake = handshake(stream, self.flags, self.magic, version, self.protocol_minimum);
+				let handshake = handshake(stream, self.magic, version, self.protocol_minimum);
 				(ConnectState::Handshake(handshake), Async::NotReady)
 			},
 			ConnectState::Handshake(ref mut future) => {

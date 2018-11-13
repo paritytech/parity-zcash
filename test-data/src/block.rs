@@ -194,7 +194,7 @@ pub struct BlockHeaderBuilder<F=Identity> {
 	callback: F,
 	time: u32,
 	parent: H256,
-	nonce: u32,
+	nonce: H256,
 	bits: Compact,
 	version: u32,
 	merkle_root: H256,
@@ -205,7 +205,7 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 		BlockHeaderBuilder {
 			callback: callback,
 			time: TIMESTAMP_COUNTER.with(|counter| { let val = counter.get(); counter.set(val+1); val }),
-			nonce: 0,
+			nonce: Default::default(),
 			merkle_root: 0.into(),
 			parent: 0.into(),
 			bits: Compact::max_value(),
@@ -234,7 +234,7 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 		self
 	}
 
-	pub fn nonce(mut self, nonce: u32) -> Self {
+	pub fn nonce(mut self, nonce: H256) -> Self {
 		self.nonce = nonce;
 		self
 	}
@@ -248,8 +248,8 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 				nonce: self.nonce.into(),
 				merkle_root_hash: self.merkle_root,
 				version: self.version,
-				hash_final_sapling_root: None,
-				equihash_solution: None,
+				reserved_hash: Default::default(),
+				solution: chain::EquihashSolution::default(),
 			}
 		)
 	}
@@ -443,7 +443,6 @@ impl<F> TransactionInputBuilder<F> where F: Invoke<chain::TransactionInput> {
 				previous_output: self.output.expect("Building input without previous output"),
 				script_sig: self.signature,
 				sequence: self.sequence,
-				script_witness: vec![],
 			}
 		)
 	}
@@ -512,7 +511,7 @@ pub fn build_n_empty_blocks_from(n: u32, start_nonce: u32, previous: &chain::Blo
 	let mut previous_hash = previous.hash();
 	let end_nonce = start_nonce + n;
 	for i in start_nonce..end_nonce {
-		let block = block_builder().header().nonce(i).parent(previous_hash).build().build();
+		let block = block_builder().header().nonce((i as u8).into()).parent(previous_hash).build().build();
 		previous_hash = block.hash();
 		result.push(block);
 	}
@@ -525,7 +524,7 @@ pub fn build_n_empty_blocks_from_genesis(n: u32, start_nonce: u32) -> Vec<chain:
 
 pub fn build_n_empty_blocks(n: u32, start_nonce: u32) -> Vec<chain::Block> {
 	assert!(n != 0);
-	let previous = block_builder().header().nonce(start_nonce).build().build();
+	let previous = block_builder().header().nonce((start_nonce as u8).into()).build().build();
 	let mut result = vec![previous];
 	let children = build_n_empty_blocks_from(n, start_nonce + 1, &result[0].block_header);
 	result.extend(children);

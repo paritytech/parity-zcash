@@ -1,10 +1,10 @@
 // https://github.com/zcash/zcash/commit/fdda3c5085199d2c2170887aa064fc42afdb0360
 
 use blake2_rfc::blake2b::Blake2b;
-use byteorder::{BigEndian, LittleEndian, ByteOrder, WriteBytesExt};
+use byteorder::{BigEndian, LittleEndian, ByteOrder};
 use chain::BlockHeader;
-//use hex::ToHex;
 
+#[allow(non_snake_case)]
 pub struct EquihashParams {
 	pub N: u32,
 	pub K: u32,
@@ -41,13 +41,9 @@ impl EquihashParams {
 }
 
 pub fn verify_block_equihash_solution(params: &EquihashParams, header: &BlockHeader) -> bool {
-	let equihash_solution = match header.equihash_solution.as_ref() {
-		Some(equihash_solution) => equihash_solution,
-		None => return false,
-	};
-
+	let equihash_solution = header.solution.as_ref();
 	let input = header.equihash_input();
-	verify_equihash_solution(params, &input, &equihash_solution.0)
+	verify_equihash_solution(params, &input, equihash_solution)
 }
 
 pub fn verify_equihash_solution(params: &EquihashParams, input: &[u8], solution: &[u8]) -> bool {
@@ -185,23 +181,6 @@ fn get_indices_from_minimal(solution: &[u8], collision_bit_length: usize) -> Vec
 	ret
 }
 
-fn get_minimal_from_indices(indices: &[u32], collision_bit_length: usize) -> Vec<u8> {
-	let indices_len = indices.len() * 4;
-	let min_len = (collision_bit_length + 1) * indices_len / (8 * 4);
-	let byte_pad = 4 - ((collision_bit_length + 1) + 7) / 8;
-
-	let mut array = Vec::new();
-	for i in 0..indices.len() {
-		let mut be_index = Vec::new();
-		be_index.write_u32::<BigEndian>(indices[i]).unwrap();
-		array.extend(be_index);
-	}
-
-	let mut ret = vec![0u8; min_len];
-	compress_array(&array, &mut ret, collision_bit_length + 1, byte_pad);
-	ret
-}
-
 fn array_to_eh_index(data: &[u8]) -> u32 {
 	BigEndian::read_u32(data)
 }
@@ -216,7 +195,6 @@ fn expand_array(data: &[u8], bit_len: usize, byte_pad: usize) -> Vec<u8> {
 	let mut acc_bits = 0usize;
 	let mut acc_value = 0u32;
 
-	let mut j = 0usize;
 	for i in 0usize..data.len() {
 		acc_value = (acc_value << 8) | (data[i] as u32);
 		acc_bits += 8;
@@ -225,7 +203,7 @@ fn expand_array(data: &[u8], bit_len: usize, byte_pad: usize) -> Vec<u8> {
 		// output element.
 		if acc_bits >= bit_len {
 			acc_bits -= bit_len;
-			for x in 0usize..byte_pad {
+			for _ in 0usize..byte_pad {
 				array.push(0);
 			}
 			for x in byte_pad..out_width {
@@ -237,40 +215,10 @@ fn expand_array(data: &[u8], bit_len: usize, byte_pad: usize) -> Vec<u8> {
 					((bit_len_mask >> (8 * (out_width - x - 1))) & 0xFF) as u8
 				));
 			}
-			j += out_width;
 		}
 	}
 
 	array
-}
-
-fn compress_array(data: &[u8], array: &mut Vec<u8>, bit_len: usize, byte_pad: usize) {
-	let in_width = (bit_len + 7) / 8 + byte_pad;
-	let bit_len_mask = (1u32 << bit_len) - 1;
-
-	// The acc_bits least-significant bits of acc_value represent a bit sequence
-	// in big-endian order.
-	let mut acc_bits = 0usize;
-	let mut acc_value = 0u32;
-
-    let mut j = 0usize;
-	for i in 0usize..array.len() {
-		// When we have fewer than 8 bits left in the accumulator, read the next
-		// input element.
-		if acc_bits < 8 {
-			acc_value = acc_value << bit_len;
-			for x in byte_pad..in_width {
-				acc_value = acc_value | ((
-					data[j + x] & (((bit_len_mask >> (8 * (in_width - x - 1))) & 0xFF) as u8)
-				) as u32) << (8 * (in_width - x - 1));
-			}
-			j += in_width;
-			acc_bits += bit_len;
-		}
-
-		acc_bits -= 8;
-		array[i] = ((acc_value >> acc_bits) & 0xFF) as u8;
-	}
 }
 
 fn new_blake2(params: &EquihashParams) -> Blake2b {
@@ -295,21 +243,57 @@ fn to_big_endian(num: u32) -> [u8; 4] {
 
 #[cfg(test)]
 mod tests {
-	use primitives::bigint::{Uint, U256};
-	use super::*;
+/*
+	fn get_minimal_from_indices(indices: &[u32], collision_bit_length: usize) -> Vec<u8> {
+		let indices_len = indices.len() * 4;
+		let min_len = (collision_bit_length + 1) * indices_len / (8 * 4);
+		let byte_pad = 4 - ((collision_bit_length + 1) + 7) / 8;
+
+		let mut array = Vec::new();
+		for i in 0..indices.len() {
+			let mut be_index = Vec::new();
+			be_index.write_u32::<BigEndian>(indices[i]).unwrap();
+			array.extend(be_index);
+		}
+
+		let mut ret = vec![0u8; min_len];
+		compress_array(&array, &mut ret, collision_bit_length + 1, byte_pad);
+		ret
+	}
+
+	fn compress_array(data: &[u8], array: &mut Vec<u8>, bit_len: usize, byte_pad: usize) {
+		let in_width = (bit_len + 7) / 8 + byte_pad;
+		let bit_len_mask = (1u32 << bit_len) - 1;
+
+		// The acc_bits least-significant bits of acc_value represent a bit sequence
+		// in big-endian order.
+		let mut acc_bits = 0usize;
+		let mut acc_value = 0u32;
+
+		let mut j = 0usize;
+		for i in 0usize..array.len() {
+			// When we have fewer than 8 bits left in the accumulator, read the next
+			// input element.
+			if acc_bits < 8 {
+				acc_value = acc_value << bit_len;
+				for x in byte_pad..in_width {
+					acc_value = acc_value | ((
+						data[j + x] & (((bit_len_mask >> (8 * (in_width - x - 1))) & 0xFF) as u8)
+					) as u32) << (8 * (in_width - x - 1));
+				}
+				j += in_width;
+				acc_bits += bit_len;
+			}
+
+			acc_bits -= 8;
+			array[i] = ((acc_value >> acc_bits) & 0xFF) as u8;
+		}
+	}
+
+
 
 	fn test_equihash_verifier(n: u32, k: u32, input: &[u8], nonce: U256, solution: &[u32]) -> bool {
 		let solution = get_minimal_from_indices(solution, (n / (k + 1)) as usize);
-/*
-
-	ZCash (reset && BOOST_TEST_LOG_LEVEL=message ./src/test/test_bitcoin --run_test=equihash_tests/validator_testvectors):
-
-
-	pbtc:
-
-
-
-*/
 
 		let mut le_nonce = vec![0; 32];
 		nonce.to_little_endian(&mut le_nonce);
@@ -329,5 +313,5 @@ mod tests {
 				2261, 15185, 36112, 104243, 23779, 118390, 118332, 130041, 32642, 69878, 76925, 80080, 45858, 116805, 92842, 111026, 15972, 115059, 85191, 90330, 68190, 122819, 81830, 91132, 23460, 49807, 52426, 80391, 69567, 114474, 104973, 122568,
 			],
 		));
-	}
+	}*/
 }

@@ -225,7 +225,6 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		trace!(target: "sync", "Got `sendcmpct` message from peer#{}", peer_index);
 
 		// The second integer SHALL be interpreted as a little-endian version number. Nodes sending a sendcmpct message MUST currently set this value to 1.
-		// TODO: version 2 supports segregated witness transactions
 		if message.second != 1 {
 			return;
 		}

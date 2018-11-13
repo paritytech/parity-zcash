@@ -205,7 +205,7 @@ mod tests {
 
 		assert!(blocks_target.append_block(test_data::genesis().into()).is_ok());
 		assert_eq!(db.best_block().number, 0);
-
+println!("=== XXX: {:?}", blocks_target.append_block(test_data::block_h1().into()));
 		assert!(blocks_target.append_block(test_data::block_h1().into()).is_ok());
 		assert_eq!(db.best_block().number, 1);
 	}

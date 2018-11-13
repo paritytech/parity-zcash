@@ -107,7 +107,6 @@ impl TransactionBuilder {
 			},
 			script_sig: Bytes::new_with_len(0),
 			sequence: 0xffffffff,
-			script_witness: vec![],
 		});
 		self
 	}
@@ -124,7 +123,6 @@ impl TransactionBuilder {
 			},
 			script_sig: Bytes::new_with_len(0),
 			sequence: 0xffffffff,
-			script_witness: vec![],
 		}];
 		self
 	}

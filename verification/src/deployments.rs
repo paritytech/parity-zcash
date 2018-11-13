@@ -293,9 +293,9 @@ mod tests {
 					merkle_root_hash: Default::default(),
 					time: time,
 					bits: 0.into(),
-					nonce: height.into(),
-					hash_final_sapling_root: None,
-					equihash_solution: None,
+					nonce: (height as u8).into(),
+					reserved_hash: Default::default(),
+					solution: Default::default(),
 				};
 				previous_header_hash = header.hash();
 

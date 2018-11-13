@@ -273,16 +273,6 @@ impl<TExecutor> ServerTaskExecutor<TExecutor> where TExecutor: TaskExecutor {
 					notfound.inventory.push(next_item);
 				}
 			},
-			common::InventoryType::MessageWitnessTx => {
-				// only transaction from memory pool can be requested
-				if let Some(transaction) = self.memory_pool.read().read_by_hash(&next_item.hash) {
-					trace!(target: "sync", "'getblocks' response to peer#{} is ready with witness-tx {}", peer_index, next_item.hash.to_reversed_str());
-					let transaction = IndexedTransaction::new(next_item.hash, transaction.clone());
-					self.executor.execute(Task::WitnessTransaction(peer_index, transaction));
-				} else {
-					notfound.inventory.push(next_item);
-				}
-			},
 			common::InventoryType::MessageBlock => {
 				if let Some(block) = self.storage.block(next_item.hash.clone().into()) {
 					trace!(target: "sync", "'getblocks' response to peer#{} is ready with block {}", peer_index, next_item.hash.to_reversed_str());
@@ -322,15 +312,7 @@ impl<TExecutor> ServerTaskExecutor<TExecutor> where TExecutor: TaskExecutor {
 					notfound.inventory.push(next_item);
 				}
 			},
-			common::InventoryType::MessageWitnessBlock => {
-				if let Some(block) = self.storage.block(next_item.hash.clone().into()) {
-					trace!(target: "sync", "'getblocks' response to peer#{} is ready with witness-block {}", peer_index, next_item.hash.to_reversed_str());
-					self.executor.execute(Task::WitnessBlock(peer_index, block.into()));
-				} else {
-					notfound.inventory.push(next_item);
-				}
-			},
-			common::InventoryType::Error | common::InventoryType::MessageWitnessFilteredBlock => (),
+			common::InventoryType::Error => (),
 		}
 
 		Some(ServerTask::ReversedGetData(peer_index, message, notfound))

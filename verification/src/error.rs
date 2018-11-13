@@ -51,12 +51,6 @@ pub enum Error {
 	TransactionFeesOverflow,
 	/// Sum of all referenced outputs in block transactions resulted in the overflow
 	ReferencedInputsSumOverflow,
-	/// SegWit: bad witess nonce size
-	WitnessInvalidNonceSize,
-	/// SegWit: witness merkle mismatch
-	WitnessMerkleCommitmentMismatch,
-	/// SegWit: unexpected witness
-	UnexpectedWitness,
 	/// Non-canonical tranasctions ordering within block
 	NonCanonicalTransactionOrdering,
 	/// Database error
@@ -111,7 +105,5 @@ pub enum TransactionError {
 	UsingSpentOutput(H256, u32),
 	/// Transaction, protected using BitcoinCash OP_RETURN replay protection (REQ-6-1).
 	ReturnReplayProtection,
-	/// Transaction with witness is received before SegWit is activated.
-	PrematureWitness,
 }
 

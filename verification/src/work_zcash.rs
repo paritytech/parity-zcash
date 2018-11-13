@@ -1,11 +1,9 @@
 use primitives::compact::Compact;
-use primitives::hash::H256;
-use primitives::bigint::{Uint, U256};
-use chain::{IndexedBlockHeader, BlockHeader};
-use network::{Network, ConsensusParams, ZCashConsensusParams};
+use primitives::bigint::U256;
+use chain::IndexedBlockHeader;
+use network::ZCashConsensusParams;
 use storage::BlockHeaderProvider;
 use timestamp::median_timestamp_inclusive;
-use work::{is_retarget_height, work_required_testnet, work_required_retarget};
 
 /// Returns work required for given header for the ZCash block
 pub fn work_required_zcash(parent_header: IndexedBlockHeader, store: &BlockHeaderProvider, fork: &ZCashConsensusParams, max_bits: Compact) -> Compact {
@@ -13,7 +11,7 @@ pub fn work_required_zcash(parent_header: IndexedBlockHeader, store: &BlockHeade
 	let parent_hash = parent_header.hash.clone();
 	let mut oldest_hash = parent_header.raw.previous_header_hash;
 	let mut bits_total: U256 = parent_header.raw.bits.into();
-	for i in 1..fork.pow_averaging_window {
+	for _ in 1..fork.pow_averaging_window {
 		let previous_header = match store.block_header(oldest_hash.into()) {
 			Some(previous_header) => previous_header,
 			None => return max_bits,
@@ -59,16 +57,11 @@ fn calculate_work_required(bits_avg: U256, parent_mtp: u32, oldest_mtp: u32, for
 
 #[cfg(test)]
 mod tests {
-	use std::collections::HashMap;
-	use primitives::bytes::Bytes;
 	use primitives::compact::Compact;
-	use primitives::hash::H256;
 	use primitives::bigint::U256;
 	use network::{Network, ZCashConsensusParams, ConsensusFork};
-	use storage::{BlockHeaderProvider, BlockRef};
 	use chain::BlockHeader;
 	use timestamp::median_timestamp_inclusive;
-	use work::work_required;
 	use work_bch::tests::MemoryBlockHeaderProvider;
 	use super::{work_required_zcash, calculate_work_required};
 
@@ -91,8 +84,8 @@ mod tests {
 			previous_header_hash: 0.into(),
 			merkle_root_hash: 0.into(),
 			nonce: 0.into(),
-			hash_final_sapling_root: None,
-			equihash_solution: None,
+			reserved_hash: Default::default(),
+			solution: Default::default(),
 		});
 
 		// Start with blocks evenly-spaced and equal difficulty
@@ -104,8 +97,8 @@ mod tests {
 				previous_header_hash: header_provider.by_height[i as usize - 1].hash(),
 				merkle_root_hash: 0.into(),
 				nonce: 0.into(),
-				hash_final_sapling_root: None,
-				equihash_solution: None,
+				reserved_hash: Default::default(),
+				solution: Default::default(),
 			};
 			header_provider.insert(header);
 		}
@@ -172,5 +165,6 @@ mod tests {
 			&fork, max_bits.into());
 		let actual = work_required_zcash(header_provider.last().clone().into(),
 			&header_provider, &fork, max_bits.into());
+		assert_eq!(actual, expected);
 	}
 }

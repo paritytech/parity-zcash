@@ -25,12 +25,12 @@ impl MessageHeader {
 }
 
 impl MessageHeader {
-	pub fn deserialize(data: &[u8], flags: u32, expected: Magic) -> Result<Self, Error> {
+	pub fn deserialize(data: &[u8], expected: Magic) -> Result<Self, Error> {
 		if data.len() != 24 {
 			return Err(Error::Deserialize);
 		}
 
-		let mut reader = Reader::new(data, flags);
+		let mut reader = Reader::new(data);
 		let magic: u32 = try!(reader.read());
 		let magic = Magic::from(magic);
 		if expected != magic {
@@ -88,6 +88,6 @@ mod tests {
 			checksum: "ed52399b".into(),
 		};
 
-		assert_eq!(expected, MessageHeader::deserialize(&raw, 0, Network::Mainnet.magic(&ConsensusFork::BitcoinCore)).unwrap());
+		assert_eq!(expected, MessageHeader::deserialize(&raw, Network::Mainnet.magic(&ConsensusFork::BitcoinCore)).unwrap());
 	}
 }

@@ -3,21 +3,9 @@ use std::io::{self, Write};
 use std::borrow::Borrow;
 use compact_integer::CompactInteger;
 use bytes::Bytes;
-use flags::get_default_flags;
-
-/// Serialize transaction witness data.
-pub const SERIALIZE_TRANSACTION_WITNESS: u32 = 0x40000000;
-/// Serialize everything in ZCash format.
-pub const SERIALIZE_ZCASH: u32 = 0x80000000;
 
 pub fn serialize<T>(t: &T) -> Bytes where T: Serializable{
 	let mut stream = Stream::new();
-	stream.append(t);
-	stream.out()
-}
-
-pub fn serialize_with_flags<T>(t: &T, flags: u32) -> Bytes where T: Serializable{
-	let mut stream = Stream::with_flags(flags);
 	stream.append(t);
 	stream.out()
 }
@@ -33,11 +21,6 @@ pub fn serialized_list_size<T, K>(t: &[K]) -> usize where T: Serializable, K: Bo
 		t.iter().map(Borrow::borrow).map(Serializable::serialized_size).sum::<usize>()
 }
 
-pub fn serialized_list_size_with_flags<T, K>(t: &[K], flags: u32) -> usize where T: Serializable, K: Borrow<T> {
-	CompactInteger::from(t.len()).serialized_size() +
-		t.iter().map(Borrow::borrow).map(|i| Serializable::serialized_size_with_flags(i, flags)).sum::<usize>()
-}
-
 pub trait Serializable {
 	/// Serialize the struct and appends it to the end of stream.
 	fn serialize(&self, s: &mut Stream);
@@ -47,45 +30,18 @@ pub trait Serializable {
 		// fallback implementation
 		serialize(self).len()
 	}
-
-	/// Hint about the size of serialized struct with given flags.
-	fn serialized_size_with_flags(&self, flags: u32) -> usize where Self: Sized {
-		// fallback implementation
-		serialize_with_flags(self, flags).len()
-	}
 }
 
 /// Stream used for serialization of Bitcoin structures
+#[derive(Default)]
 pub struct Stream {
 	buffer: Vec<u8>,
-	flags: u32,
-}
-
-impl Default for Stream {
-	fn default() -> Self {
-		Self::new()
-	}
 }
 
 impl Stream {
 	/// New stream
 	pub fn new() -> Self {
-		Stream { buffer: Vec::new(), flags: get_default_flags() }
-	}
-
-	/// Create stream with given flags,
-	pub fn with_flags(flags: u32) -> Self {
-		Stream { buffer: Vec::new(), flags: flags | get_default_flags() }
-	}
-
-	/// Are transactions written to this stream with witness data?
-	pub fn include_transaction_witness(&self) -> bool {
-		(self.flags & SERIALIZE_TRANSACTION_WITNESS) != 0
-	}
-
-	/// Is data serialized to this stream in ZCash format?
-	pub fn is_zcash_stream(&self) -> bool {
-		(self.flags & SERIALIZE_ZCASH) != 0
+		Stream { buffer: Vec::new() }
 	}
 
 	/// Serializes the struct and appends it to the end of stream.

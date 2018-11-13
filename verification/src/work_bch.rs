@@ -239,8 +239,8 @@ pub mod tests {
 				time: 1269211443,
 				bits: 0x207fffff.into(),
 				nonce: 0.into(),
-				hash_final_sapling_root: None,
-				equihash_solution: None,
+				reserved_hash: Default::default(),
+				solution: Default::default(),
 			});
 
 		// create x100 pre-HF blocks
@@ -301,8 +301,8 @@ pub mod tests {
 				time: 1269211443,
 				bits: initial_bits.into(),
 				nonce: 0.into(),
-				hash_final_sapling_root: None,
-				equihash_solution: None,
+				reserved_hash: Default::default(),
+				solution: Default::default(),
 			});
 
 		// Pile up some blocks every 10 mins to establish some history.

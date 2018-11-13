@@ -226,16 +226,15 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 		}
 
 		// else ask for all unknown transactions and blocks
-		let is_segwit_possible = self.chain.is_segwit_possible();
 		let unknown_inventory: Vec<_> = message.inventory.into_iter()
 			.filter(|item| {
 				match item.inv_type {
 					// check that transaction is unknown to us
-					InventoryType::MessageTx| InventoryType::MessageWitnessTx =>
+					InventoryType::MessageTx =>
 						self.chain.transaction_state(&item.hash) == TransactionState::Unknown
 							&& !self.orphaned_transactions_pool.contains(&item.hash),
 					// check that block is unknown to us
-					InventoryType::MessageBlock | InventoryType::MessageWitnessBlock => match self.chain.block_state(&item.hash) {
+					InventoryType::MessageBlock => match self.chain.block_state(&item.hash) {
 						BlockState::Unknown => !self.orphaned_blocks_pool.contains_unknown_block(&item.hash),
 						BlockState::DeadEnd if !self.config.close_connection_on_bad_block => true,
 						BlockState::DeadEnd if self.config.close_connection_on_bad_block => {
@@ -245,9 +244,7 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 						_ => false,
 					},
 					// we never ask for merkle blocks && we never ask for compact blocks
-					InventoryType::MessageCompactBlock | InventoryType::MessageFilteredBlock
-						| InventoryType::MessageWitnessFilteredBlock
-						 => false,
+					InventoryType::MessageCompactBlock | InventoryType::MessageFilteredBlock => false,
 					// unknown inventory type
 					InventoryType::Error => {
 						self.peers.misbehaving(peer_index, &format!("Provided unknown inventory type {:?}", item.hash.to_reversed_str()));
@@ -255,24 +252,6 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 					}
 				}
 			})
-			// we are not synchronizing =>
-			// 1) either segwit is active and we are connected to segwit-enabled nodes => we could ask for witness
-			// 2) or segwit is inactive => we shall not ask for witness
-			.map(|item| if !is_segwit_possible {
-					item
-				} else {
-					match item.inv_type {
-						InventoryType::MessageTx => InventoryVector {
-							inv_type: InventoryType::MessageWitnessTx,
-							hash: item.hash,
-						},
-						InventoryType::MessageBlock => InventoryVector {
-							inv_type: InventoryType::MessageWitnessBlock,
-							hash: item.hash,
-						},
-						_ => item,
-					}
-				})
 			.collect();
 
 		// if everything is known => ignore this message
@@ -973,8 +952,6 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 		let chunk_size = min(limits.max_blocks_in_request, max(hashes.len() as BlockHeight, limits.min_blocks_in_request));
 		let last_peer_index = peers.len() - 1;
 		let mut tasks: Vec<Task> = Vec::new();
-		let is_segwit_possible = self.chain.is_segwit_possible();
-		let inv_type = if is_segwit_possible { InventoryType::MessageWitnessBlock } else { InventoryType::MessageBlock };
 		for (peer_index, peer) in peers.into_iter().enumerate() {
 			// we have to request all blocks => we will request last peer for all remaining blocks
 			let peer_chunk_size = if peer_index == last_peer_index { hashes.len() } else { min(hashes.len(), chunk_size as usize) };
@@ -988,10 +965,10 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 			// remember that peer is asked for these blocks
 			self.peers_tasks.on_blocks_requested(peer, &chunk_hashes);
 
-			// request blocks. If block is believed to have witness - ask for witness
+			// request blocks
 			let getdata = types::GetData {
 				inventory: chunk_hashes.into_iter().map(|h| InventoryVector {
-					inv_type: inv_type,
+					inv_type: InventoryType::MessageBlock,
 					hash: h,
 				}).collect(),
 			};
@@ -1339,7 +1316,7 @@ pub mod tests {
 
 	fn request_blocks(peer_index: PeerIndex, hashes: Vec<H256>) -> Task {
 		Task::GetData(peer_index, types::GetData {
-			inventory: hashes.into_iter().map(InventoryVector::witness_block).collect(),
+			inventory: hashes.into_iter().map(InventoryVector::block).collect(),
 		})
 	}
 
@@ -1739,13 +1716,13 @@ pub mod tests {
 
 		sync.on_block(1, test_data::block_h2().into());
 		sync.on_inventory(1, types::Inv::with_inventory(vec![
-			InventoryVector::witness_block(test_data::block_h1().hash()),
-			InventoryVector::witness_block(test_data::block_h2().hash()),
+			InventoryVector::block(test_data::block_h1().hash()),
+			InventoryVector::block(test_data::block_h2().hash()),
 		]));
 
 		let tasks = executor.take_tasks();
 		assert_eq!(tasks, vec![Task::GetData(1, types::GetData::with_inventory(vec![
-			InventoryVector::witness_block(test_data::block_h1().hash())
+			InventoryVector::block(test_data::block_h1().hash())
 		]))]);
 	}
 
@@ -1873,11 +1850,11 @@ pub mod tests {
 	fn transaction_is_requested_when_not_synchronizing() {
 		let (executor, core, sync) = create_sync(None, None);
 
-		sync.on_inventory(0, types::Inv::with_inventory(vec![InventoryVector::witness_tx(H256::from(0))]));
+		sync.on_inventory(0, types::Inv::with_inventory(vec![InventoryVector::tx(H256::from(0))]));
 
 		{
 			let tasks = executor.take_tasks();
-			assert_eq!(tasks, vec![Task::GetData(0, types::GetData::with_inventory(vec![InventoryVector::witness_tx(H256::from(0))]))]);
+			assert_eq!(tasks, vec![Task::GetData(0, types::GetData::with_inventory(vec![InventoryVector::tx(H256::from(0))]))]);
 		}
 
 		let b1 = test_data::block_h1();
@@ -1886,28 +1863,28 @@ pub mod tests {
 		assert!(core.lock().information().state.is_nearly_saturated());
 		{ executor.take_tasks(); } // forget tasks
 
-		sync.on_inventory(0, types::Inv::with_inventory(vec![InventoryVector::witness_tx(H256::from(1))]));
+		sync.on_inventory(0, types::Inv::with_inventory(vec![InventoryVector::tx(H256::from(1))]));
 
 		let tasks = executor.take_tasks();
-		assert_eq!(tasks, vec![Task::GetData(0, types::GetData::with_inventory(vec![InventoryVector::witness_tx(H256::from(1))]))]);
+		assert_eq!(tasks, vec![Task::GetData(0, types::GetData::with_inventory(vec![InventoryVector::tx(H256::from(1))]))]);
 	}
 
 	#[test]
 	fn same_transaction_can_be_requested_twice() {
 		let (executor, _, sync) = create_sync(None, None);
 
-		sync.on_inventory(0, types::Inv::with_inventory(vec![InventoryVector::witness_tx(H256::from(0))]));
+		sync.on_inventory(0, types::Inv::with_inventory(vec![InventoryVector::tx(H256::from(0))]));
 
 		let tasks = executor.take_tasks();
 		assert_eq!(tasks, vec![Task::GetData(0, types::GetData::with_inventory(vec![
-			InventoryVector::witness_tx(H256::from(0))
+			InventoryVector::tx(H256::from(0))
 		]))]);
 
-		sync.on_inventory(0, types::Inv::with_inventory(vec![InventoryVector::witness_tx(H256::from(0))]));
+		sync.on_inventory(0, types::Inv::with_inventory(vec![InventoryVector::tx(H256::from(0))]));
 
 		let tasks = executor.take_tasks();
 		assert_eq!(tasks, vec![Task::GetData(0, types::GetData::with_inventory(vec![
-			InventoryVector::witness_tx(H256::from(0))
+			InventoryVector::tx(H256::from(0))
 		]))]);
 	}
 
@@ -1916,11 +1893,11 @@ pub mod tests {
 		let (executor, _, sync) = create_sync(None, None);
 
 		sync.on_inventory(0, types::Inv::with_inventory(vec![
-			InventoryVector::witness_tx(test_data::genesis().transactions[0].hash()),
-			InventoryVector::witness_tx(H256::from(0)),
+			InventoryVector::tx(test_data::genesis().transactions[0].hash()),
+			InventoryVector::tx(H256::from(0)),
 		]));
 		assert_eq!(executor.take_tasks(), vec![Task::GetData(0, types::GetData::with_inventory(vec![
-			InventoryVector::witness_tx(H256::from(0))
+			InventoryVector::tx(H256::from(0))
 		]))]);
 	}
 
@@ -2002,10 +1979,10 @@ pub mod tests {
 		let genesis = test_data::genesis();
 		let b10 = test_data::block_builder().header().parent(genesis.hash()).build().build();
 
-		let b11 = test_data::block_builder().header().nonce(1).parent(b10.hash()).build().build();
+		let b11 = test_data::block_builder().header().nonce(1.into()).parent(b10.hash()).build().build();
 		let b12 = test_data::block_builder().header().parent(b11.hash()).build().build();
 
-		let b21 = test_data::block_builder().header().nonce(2).parent(b10.hash()).build().build();
+		let b21 = test_data::block_builder().header().nonce(2.into()).parent(b10.hash()).build().build();
 		let b22 = test_data::block_builder().header().parent(b21.hash()).build().build();
 		let b23 = test_data::block_builder().header().parent(b22.hash()).build().build();
 

@@ -10,9 +10,6 @@ pub enum InventoryType {
 	MessageBlock = 2,
 	MessageFilteredBlock = 3,
 	MessageCompactBlock = 4,
-	MessageWitnessTx = 0x40000001,
-	MessageWitnessBlock = 0x40000002,
-	MessageWitnessFilteredBlock = 0x40000003,
 }
 
 impl InventoryType {
@@ -23,9 +20,6 @@ impl InventoryType {
 			2 => Some(InventoryType::MessageBlock),
 			3 => Some(InventoryType::MessageFilteredBlock),
 			4 => Some(InventoryType::MessageCompactBlock),
-			0x40000001 => Some(InventoryType::MessageWitnessTx),
-			0x40000002 => Some(InventoryType::MessageWitnessBlock),
-			0x40000003 => Some(InventoryType::MessageWitnessFilteredBlock),
 			_ => None
 		}
 	}
@@ -64,23 +58,9 @@ impl InventoryVector {
 		}
 	}
 
-	pub fn witness_tx(hash: H256) -> Self {
-		InventoryVector {
-			inv_type: InventoryType::MessageWitnessTx,
-			hash: hash,
-		}
-	}
-
 	pub fn block(hash: H256) -> Self {
 		InventoryVector {
 			inv_type: InventoryType::MessageBlock,
-			hash: hash,
-		}
-	}
-
-	pub fn witness_block(hash: H256) -> Self {
-		InventoryVector {
-			inv_type: InventoryType::MessageWitnessBlock,
 			hash: hash,
 		}
 	}
@@ -142,17 +122,11 @@ mod tests {
 		assert_eq!(2u32, InventoryType::MessageBlock.into());
 		assert_eq!(3u32, InventoryType::MessageFilteredBlock.into());
 		assert_eq!(4u32, InventoryType::MessageCompactBlock.into());
-		assert_eq!(0x40000001u32, InventoryType::MessageWitnessTx.into());
-		assert_eq!(0x40000002u32, InventoryType::MessageWitnessBlock.into());
-		assert_eq!(0x40000003u32, InventoryType::MessageWitnessFilteredBlock.into());
 
 		assert_eq!(InventoryType::from_u32(0).unwrap(), InventoryType::Error);
 		assert_eq!(InventoryType::from_u32(1).unwrap(), InventoryType::MessageTx);
 		assert_eq!(InventoryType::from_u32(2).unwrap(), InventoryType::MessageBlock);
 		assert_eq!(InventoryType::from_u32(3).unwrap(), InventoryType::MessageFilteredBlock);
 		assert_eq!(InventoryType::from_u32(4).unwrap(), InventoryType::MessageCompactBlock);
-		assert_eq!(InventoryType::from_u32(0x40000001).unwrap(), InventoryType::MessageWitnessTx);
-		assert_eq!(InventoryType::from_u32(0x40000002).unwrap(), InventoryType::MessageWitnessBlock);
-		assert_eq!(InventoryType::from_u32(0x40000003).unwrap(), InventoryType::MessageWitnessFilteredBlock);
 	}
 }

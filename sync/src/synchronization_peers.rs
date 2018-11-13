@@ -86,8 +86,6 @@ pub trait PeersFilters {
 
 /// Options for peers connections
 pub trait PeersOptions {
-	/// Is node supporting SegWit?
-	fn is_segwit_enabled(&self, peer_index: PeerIndex) -> bool;
 	/// Set up new block announcement type for the connection
 	fn set_block_announcement_type(&self, peer_index: PeerIndex, announcement_type: BlockAnnouncementType);
 	/// Set up new transaction announcement type for the connection
@@ -247,13 +245,6 @@ impl PeersFilters for PeersImpl {
 }
 
 impl PeersOptions for PeersImpl {
-	fn is_segwit_enabled(&self, peer_index: PeerIndex) -> bool {
-		self.peers.read()
-			.get(&peer_index)
-			.map(|peer| peer.services.witness())
-			.unwrap_or_default()
-	}
-
 	fn set_block_announcement_type(&self, peer_index: PeerIndex, announcement_type: BlockAnnouncementType) {
 		if let Some(peer) = self.peers.write().get_mut(&peer_index) {
 			peer.block_announcement_type = announcement_type;

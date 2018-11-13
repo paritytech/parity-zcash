@@ -19,11 +19,7 @@ pub struct Message<T> {
 
 impl<T> Message<T> where T: Payload {
 	pub fn new(magic: Magic, version: u32, payload: &T) -> MessageResult<Self> {
-		Self::with_flags(magic, version, payload, 0)
-	}
-
-	pub fn with_flags(magic: Magic, version: u32, payload: &T, flags: u32) -> MessageResult<Self> {
-		let serialized = try!(serialize_payload(payload, version, flags));
+		let serialized = try!(serialize_payload(payload, version));
 
 		let message = Message {
 			bytes: TaggedBytes::new(to_raw_message(magic, T::command().into(), &serialized)),

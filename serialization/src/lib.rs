@@ -4,7 +4,6 @@ extern crate rustc_hex as hex;
 
 mod compact_integer;
 mod fixed_array;
-mod flags;
 mod impls;
 mod list;
 mod reader;
@@ -12,20 +11,12 @@ mod stream;
 
 pub use primitives::{hash, bytes, compact};
 
-// TODO: use same flags for both serialization && deserialization (they're used this way on network layer)
-
 pub use fixed_array::*;
-pub use flags::{set_default_flags, get_default_flags};
 pub use compact_integer::CompactInteger;
 pub use list::List;
-pub use reader::{Reader, Deserializable, deserialize, deserialize_with_flags, deserialize_iterator,
-	ReadIterator, Error, DESERIALIZE_ZCASH,
+pub use reader::{
+	Reader, Deserializable, deserialize, deserialize_iterator, ReadIterator, Error,
 };
 pub use stream::{
-	Stream, Serializable, serialize, serialize_with_flags, serialize_list, serialized_list_size,
-	serialized_list_size_with_flags, SERIALIZE_TRANSACTION_WITNESS, SERIALIZE_ZCASH,
+	Stream, Serializable, serialize, serialize_list, serialized_list_size,
 };
-
-
-static mut GLOBAL_SERIALIZATION_FLAGS: u32 = SERIALIZE_ZCASH;
-

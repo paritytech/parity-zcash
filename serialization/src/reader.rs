@@ -1,11 +1,5 @@
 use std::{io, marker};
 use compact_integer::CompactInteger;
-use flags::get_default_flags;
-
-/// Deserialize transaction witness data.
-pub const DESERIALIZE_TRANSACTION_WITNESS: u32 = 0x40000000;
-/// Deserialize everything in ZCash format.
-pub const DESERIALIZE_ZCASH: u32 = 0x80000000;
 
 pub fn deserialize<R, T>(buffer: R) -> Result<T, Error> where R: io::Read, T: Deserializable {
 	let mut reader = Reader::from_read(buffer);
@@ -16,18 +10,6 @@ pub fn deserialize<R, T>(buffer: R) -> Result<T, Error> where R: io::Read, T: De
 	} else {
 		Err(Error::UnreadData)
 	}
-}
-
-pub fn deserialize_with_flags<R, T>(buffer: R, flags: u32) -> Result<T, Error> where R: io::Read, T: Deserializable {
-	let mut reader = Reader::from_read_with_flags(buffer, flags);
-	let result = try!(reader.read());
-
-	if reader.is_finished() {
-		Ok(result)
-	} else {
-		Err(Error::UnreadData)
-	}
-
 }
 
 pub fn deserialize_iterator<R, T>(buffer: R) -> ReadIterator<R, T> where R: io::Read, T: Deserializable {
@@ -59,16 +41,14 @@ pub trait Deserializable {
 pub struct Reader<T> {
 	buffer: T,
 	peeked: Option<u8>,
-	flags: u32,
 }
 
 impl<'a> Reader<&'a [u8]> {
 	/// Convenient way of creating for slice of bytes
-	pub fn new(buffer: &'a [u8], flags: u32) -> Self {
+	pub fn new(buffer: &'a [u8]) -> Self {
 		Reader {
 			buffer: buffer,
 			peeked: None,
-			flags: flags | get_default_flags(),
 		}
 	}
 }
@@ -94,25 +74,10 @@ impl<T> io::Read for Reader<T> where T: io::Read {
 
 impl<R> Reader<R> where R: io::Read {
 	pub fn from_read(read: R) -> Self {
-		Self::from_read_with_flags(read, get_default_flags())
-	}
-
-	pub fn from_read_with_flags(read: R, flags: u32) -> Self {
 		Reader {
 			buffer: read,
 			peeked: None,
-			flags: flags,
 		}
-	}
-
-	/// Are transactions read from this stream with witness data?
-	pub fn read_transaction_witness(&self) -> bool {
-		(self.flags & DESERIALIZE_TRANSACTION_WITNESS) != 0
-	}
-
-	/// Is data read from this stream in ZCash format?
-	pub fn is_zcash_reader(&self) -> bool {
-		(self.flags & DESERIALIZE_ZCASH) != 0
 	}
 
 	pub fn read<T>(&mut self) -> Result<T, Error> where T: Deserializable {
@@ -142,6 +107,21 @@ impl<R> Reader<R> where R: io::Read {
 	pub fn read_list_max<T>(&mut self, max: usize) -> Result<Vec<T>, Error> where T: Deserializable {
 		let len: usize = try!(self.read::<CompactInteger>()).into();
 		if len > max {
+			return Err(Error::MalformedData);
+		}
+
+		let mut result = Vec::with_capacity(len);
+
+		for _ in 0..len {
+			result.push(try!(self.read()));
+		}
+
+		Ok(result)
+	}
+
+	pub fn read_list_exact<T>(&mut self, expected_len: usize) -> Result<Vec<T>, Error> where T: Deserializable {
+		let len: usize = try!(self.read::<CompactInteger>()).into();
+		if len != expected_len {
 			return Err(Error::MalformedData);
 		}
 

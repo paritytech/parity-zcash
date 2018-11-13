@@ -8,12 +8,11 @@ use hash::H32;
 use crypto::checksum;
 use message::{Error, MessageResult, Payload, deserialize_payload};
 
-pub fn read_payload<M, A>(a: A, version: u32, flags: u32, len: usize, checksum: H32) -> ReadPayload<M, A>
+pub fn read_payload<M, A>(a: A, version: u32, len: usize, checksum: H32) -> ReadPayload<M, A>
 	where A: AsyncRead, M: Payload {
 	ReadPayload {
 		reader: read_exact(a, Bytes::new_with_len(len)),
 		version: version,
-		flags: flags,
 		checksum: checksum,
 		payload_type: PhantomData,
 	}
@@ -22,7 +21,6 @@ pub fn read_payload<M, A>(a: A, version: u32, flags: u32, len: usize, checksum: 
 pub struct ReadPayload<M, A> {
 	reader: ReadExact<A, Bytes>,
 	version: u32,
-	flags: u32,
 	checksum: H32,
 	payload_type: PhantomData<M>,
 }
@@ -36,7 +34,7 @@ impl<M, A> Future for ReadPayload<M, A> where A: AsyncRead, M: Payload {
 		if checksum(&data) != self.checksum {
 			return Ok((read, Err(Error::InvalidChecksum)).into());
 		}
-		let payload = deserialize_payload(&data, self.version, self.flags);
+		let payload = deserialize_payload(&data, self.version);
 		Ok((read, payload).into())
 	}
 }
@@ -53,18 +51,18 @@ mod tests {
 	fn test_read_payload() {
 		let raw: Bytes = "5845303b6da97786".into();
 		let ping = Ping::new(u64::from_str_radix("8677a96d3b304558", 16).unwrap());
-		assert_eq!(read_payload(raw.as_ref(), 0, 0, 8, "83c00c76".into()).wait().unwrap().1, Ok(ping));
+		assert_eq!(read_payload(raw.as_ref(), 0, 8, "83c00c76".into()).wait().unwrap().1, Ok(ping));
 	}
 
 	#[test]
 	fn test_read_payload_with_invalid_checksum() {
 		let raw: Bytes = "5845303b6da97786".into();
-		assert_eq!(read_payload::<Ping, _>(raw.as_ref(), 0, 0, 8, "83c00c75".into()).wait().unwrap().1, Err(Error::InvalidChecksum));
+		assert_eq!(read_payload::<Ping, _>(raw.as_ref(), 0, 8, "83c00c75".into()).wait().unwrap().1, Err(Error::InvalidChecksum));
 	}
 
 	#[test]
 	fn test_read_too_short_payload() {
 		let raw: Bytes = "5845303b6da977".into();
-		assert!(read_payload::<Ping, _>(raw.as_ref(), 0, 0, 8, "83c00c76".into()).wait().is_err());
+		assert!(read_payload::<Ping, _>(raw.as_ref(), 0, 8, "83c00c76".into()).wait().is_err());
 	}
 }

@@ -23,6 +23,4 @@ pub struct Config {
 	pub preferable_services: Services,
 	/// Internet protocol.
 	pub internet_protocol: InternetProtocol,
-	/// Serialization flags.
-	pub serialization_flags: u32,
 }
