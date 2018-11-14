@@ -13,10 +13,11 @@ pub struct TransactionVerifier<'a> {
 	pub null_non_coinbase: TransactionNullNonCoinbase<'a>,
 	pub oversized_coinbase: TransactionOversizedCoinbase<'a>,
 	pub joint_split_in_coinbase: TransactionJointSplitInCoinbase<'a>,
+	pub size: TransactionAbsoluteSize<'a>,
 }
 
 impl<'a> TransactionVerifier<'a> {
-	pub fn new(transaction: &'a IndexedTransaction) -> Self {
+	pub fn new(transaction: &'a IndexedTransaction, consensus: &'a ConsensusParams) -> Self {
 		trace!(target: "verification", "Tx pre-verification {}", transaction.hash.to_reversed_str());
 		TransactionVerifier {
 			version: TransactionVersion::new(transaction),
@@ -24,6 +25,7 @@ impl<'a> TransactionVerifier<'a> {
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			oversized_coinbase: TransactionOversizedCoinbase::new(transaction, MIN_COINBASE_SIZE..MAX_COINBASE_SIZE),
 			joint_split_in_coinbase: TransactionJointSplitInCoinbase::new(transaction),
+			size: TransactionAbsoluteSize::new(transaction, consensus),
 		}
 	}
 
@@ -33,6 +35,7 @@ impl<'a> TransactionVerifier<'a> {
 		self.null_non_coinbase.check()?;
 		self.oversized_coinbase.check()?;
 		self.joint_split_in_coinbase.check()?;
+		self.size.check()?;
 		Ok(())
 	}
 }
@@ -41,7 +44,7 @@ pub struct MemoryPoolTransactionVerifier<'a> {
 	pub empty: TransactionEmpty<'a>,
 	pub null_non_coinbase: TransactionNullNonCoinbase<'a>,
 	pub is_coinbase: TransactionMemoryPoolCoinbase<'a>,
-	pub size: TransactionSize<'a>,
+	pub size: TransactionAbsoluteSize<'a>,
 	pub sigops: TransactionSigops<'a>,
 }
 
@@ -52,7 +55,7 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 			empty: TransactionEmpty::new(transaction),
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			is_coinbase: TransactionMemoryPoolCoinbase::new(transaction),
-			size: TransactionSize::new(transaction, consensus),
+			size: TransactionAbsoluteSize::new(transaction, consensus),
 			sigops: TransactionSigops::new(transaction, consensus.max_block_sigops()),
 		}
 	}
@@ -166,22 +169,23 @@ impl<'a> TransactionMemoryPoolCoinbase<'a> {
 	}
 }
 
-pub struct TransactionSize<'a> {
+/// The encoded size of the transaction MUST be less than or equal to EVER possible max limit.
+pub struct TransactionAbsoluteSize<'a> {
 	transaction: &'a IndexedTransaction,
-	consensus: &'a ConsensusParams,
+	absoute_max_size: usize,
 }
 
-impl<'a> TransactionSize<'a> {
+impl<'a> TransactionAbsoluteSize<'a> {
 	fn new(transaction: &'a IndexedTransaction, consensus: &'a ConsensusParams) -> Self {
-		TransactionSize {
+		TransactionAbsoluteSize {
 			transaction: transaction,
-			consensus: consensus,
+			absoute_max_size: consensus.absolute_max_transaction_size(),
 		}
 	}
 
 	fn check(&self) -> Result<(), TransactionError> {
 		let size = self.transaction.raw.serialized_size();
-		if size > self.consensus.max_transaction_size() {
+		if size > self.absoute_max_size {
 			Err(TransactionError::MaxSize)
 		} else {
 			Ok(())

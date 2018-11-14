@@ -18,7 +18,7 @@ impl<'a> ChainVerifier<'a> {
 		ChainVerifier {
 			block: BlockVerifier::new(block, consensus),
 			header: HeaderVerifier::new(&block.header, consensus, current_time),
-			transactions: block.transactions.iter().map(TransactionVerifier::new).collect(),
+			transactions: block.transactions.iter().map(|tx| TransactionVerifier::new(tx, consensus)).collect(),
 		}
 	}
 

@@ -1,3 +1,4 @@
+use ser::Serializable;
 use storage::{TransactionMetaProvider, TransactionOutputProvider};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner};
@@ -10,6 +11,7 @@ use error::TransactionError;
 use VerificationLevel;
 
 pub struct TransactionAcceptor<'a> {
+	pub size: TransactionSize<'a>,
 	pub bip30: TransactionBip30<'a>,
 	pub missing_inputs: TransactionMissingInputs<'a>,
 	pub maturity: TransactionMaturity<'a>,
@@ -54,6 +56,7 @@ impl<'a> TransactionAcceptor<'a> {
 
 		trace!(target: "verification", "Tx verification {}", transaction.hash.to_reversed_str());
 		TransactionAcceptor {
+			size: TransactionSize::new(transaction, consensus, height),
 			bip30: TransactionBip30::new_for_sync(transaction, meta_store),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
@@ -64,12 +67,13 @@ impl<'a> TransactionAcceptor<'a> {
 	}
 
 	pub fn check(&self) -> Result<(), TransactionError> {
-		try!(self.bip30.check());
-		try!(self.missing_inputs.check());
-		try!(self.maturity.check());
-		try!(self.overspent.check());
-		try!(self.double_spent.check());
-		try!(self.eval.check());
+		self.size.check()?;
+		self.bip30.check()?;
+		self.missing_inputs.check()?;
+		self.maturity.check()?;
+		self.overspent.check()?;
+		self.double_spent.check()?;
+		self.eval.check()?;
 		Ok(())
 	}
 }
@@ -413,5 +417,29 @@ impl<'a> TransactionDoubleSpend<'a> {
 			}
 		}
 		Ok(())
+	}
+}
+
+/// The encoded size of the transaction MUST be less than or equal to current max limit.
+pub struct TransactionSize<'a> {
+	transaction: CanonTransaction<'a>,
+	max_size: usize,
+}
+
+impl<'a> TransactionSize<'a> {
+	fn new(transaction: CanonTransaction<'a>, consensus: &'a ConsensusParams, height: u32) -> Self {
+		TransactionSize {
+			transaction: transaction,
+			max_size: consensus.max_transaction_size(height),
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		let size = self.transaction.raw.serialized_size();
+		if size > self.max_size {
+			Err(TransactionError::MaxSize)
+		} else {
+			Ok(())
+		}
 	}
 }

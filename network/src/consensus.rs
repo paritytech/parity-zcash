@@ -24,6 +24,14 @@ pub struct ConsensusParams {
 	/// BIP68, BIP112, BIP113 deployment
 	pub csv_deployment: Option<Deployment>,
 
+	/// Height of Overwinter activation.
+	/// Details: https://zcash.readthedocs.io/en/latest/rtd_pages/nu_dev_guide.html#overwinter
+	pub overwinter_height: u32,
+
+	/// Height of Sapling activation.
+	/// Details: https://zcash.readthedocs.io/en/latest/rtd_pages/nu_dev_guide.html#sapling
+	pub sapling_height: u32,
+
 	/// Interval (in blocks) to calculate average work.
 	pub pow_averaging_window: u32,
 	/// % of possible down adjustment of work.
@@ -47,6 +55,9 @@ impl ConsensusParams {
 				miner_confirmation_window: 2016,
 				csv_deployment: None,
 
+				overwinter_height: 347500,
+				sapling_height: 419200,
+
 				pow_averaging_window: 17,
 				pow_max_adjust_down: 32,
 				pow_max_adjust_up: 16,
@@ -62,6 +73,9 @@ impl ConsensusParams {
 				miner_confirmation_window: 2016,
 				csv_deployment: None,
 
+				overwinter_height: 207500,
+				sapling_height: 280000,
+
 				pow_averaging_window: 17,
 				pow_max_adjust_down: 32,
 				pow_max_adjust_up: 16,
@@ -76,6 +90,9 @@ impl ConsensusParams {
 				rule_change_activation_threshold: 108, // 75%
 				miner_confirmation_window: 144,
 				csv_deployment: None,
+
+				overwinter_height: ::std::u32::MAX,
+				sapling_height: ::std::u32::MAX,
 
 				pow_averaging_window: 17,
 				pow_max_adjust_down: 0,
@@ -109,7 +126,15 @@ impl ConsensusParams {
 		20_000
 	}
 
-	pub fn max_transaction_size(&self) -> usize {
-		100_000 // TODO: changed after sapling
+	pub fn absolute_max_transaction_size(&self) -> usize {
+		2_000_000
+	}
+
+	pub fn max_transaction_size(&self, height: u32) -> usize {
+		if height >= self.sapling_height {
+			2_000_000
+		} else {
+			100_000
+		}
 	}
 }
