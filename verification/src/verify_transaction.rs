@@ -8,6 +8,7 @@ use error::TransactionError;
 use constants::{MIN_COINBASE_SIZE, MAX_COINBASE_SIZE};
 
 pub struct TransactionVerifier<'a> {
+	pub version: TransactionVersion<'a>,
 	pub empty: TransactionEmpty<'a>,
 	pub null_non_coinbase: TransactionNullNonCoinbase<'a>,
 	pub oversized_coinbase: TransactionOversizedCoinbase<'a>,
@@ -18,6 +19,7 @@ impl<'a> TransactionVerifier<'a> {
 	pub fn new(transaction: &'a IndexedTransaction) -> Self {
 		trace!(target: "verification", "Tx pre-verification {}", transaction.hash.to_reversed_str());
 		TransactionVerifier {
+			version: TransactionVersion::new(transaction),
 			empty: TransactionEmpty::new(transaction),
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			oversized_coinbase: TransactionOversizedCoinbase::new(transaction, MIN_COINBASE_SIZE..MAX_COINBASE_SIZE),
@@ -26,6 +28,7 @@ impl<'a> TransactionVerifier<'a> {
 	}
 
 	pub fn check(&self) -> Result<(), TransactionError> {
+		self.version.check()?;
 		self.empty.check()?;
 		self.null_non_coinbase.check()?;
 		self.oversized_coinbase.check()?;
@@ -194,6 +197,28 @@ impl<'a> TransactionSigops<'a> {
 	}
 }
 
+/// The transaction version number MUST be greater than or equal to 1.
+pub struct TransactionVersion<'a> {
+	transaction: &'a IndexedTransaction,
+}
+
+impl<'a> TransactionVersion<'a> {
+	fn new(transaction: &'a IndexedTransaction) -> Self {
+		TransactionVersion {
+			transaction,
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		if self.transaction.raw.version < 1 {
+			return Err(TransactionError::InvalidVersion);
+		}
+
+		Ok(())
+	}
+}
+
+/// A coinbase transaction MUST NOT have any JoinSplit descriptions.
 pub struct TransactionJointSplitInCoinbase<'a> {
 	transaction: &'a IndexedTransaction,
 }
@@ -218,7 +243,19 @@ impl<'a> TransactionJointSplitInCoinbase<'a> {
 mod tests {
 	use chain::{Transaction, OutPoint, TransactionInput, IndexedTransaction};
 	use error::TransactionError;
-	use super::TransactionJointSplitInCoinbase;
+	use super::{TransactionVersion, TransactionJointSplitInCoinbase};
+
+	#[test]
+	fn transaction_version_works() {
+		let tx0: IndexedTransaction = Transaction::default().into();
+		assert_eq!(TransactionVersion::new(&tx0).check(), Err(TransactionError::InvalidVersion));
+
+		let tx1: IndexedTransaction = Transaction {
+			version: 1,
+			..Default::default()
+		}.into();
+		assert_eq!(TransactionVersion::new(&tx1).check(), Ok(()));
+	}
 
 	#[test]
 	fn transaction_joint_split_in_coinbase_works() {

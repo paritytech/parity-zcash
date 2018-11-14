@@ -105,5 +105,7 @@ pub enum TransactionError {
 	UsingSpentOutput(H256, u32),
 	/// A coinbase transaction MUST NOT have any joint split descriptions
 	CoinbaseWithJointSplit,
+	/// Invalid transaction version.
+	InvalidVersion,
 }
 
