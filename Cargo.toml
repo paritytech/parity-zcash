@@ -26,13 +26,14 @@ import = { path = "import" }
 logs = { path = "logs" }
 rpc = { path = "rpc" }
 primitives = { path = "primitives" }
-serialization = { path = "serialization" }
 
 [profile.dev]
 debug = true
+panic = 'abort'
 
 [profile.release]
 debug = true
+panic = 'abort'
 
 [profile.test]
 debug = true
