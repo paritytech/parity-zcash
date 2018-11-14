@@ -54,7 +54,6 @@ pub enum Error {
 
 	// Softfork safeness
 	DiscourageUpgradableNops,
-	DiscourageUpgradableWitnessProgram,
 }
 
 impl fmt::Display for Error {
@@ -108,7 +107,6 @@ impl fmt::Display for Error {
 
 			// Softfork safeness
 			Error::DiscourageUpgradableNops => "Discourage Upgradable Nops".fmt(f),
-			Error::DiscourageUpgradableWitnessProgram => "Discourage Upgradable Witness Program".fmt(f),
 		}
 	}
 }

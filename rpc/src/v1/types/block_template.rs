@@ -62,7 +62,7 @@ pub struct BlockTemplateTransaction {
 	pub data: RawTransaction,
 	/// Transaction id encoded in little-endian hexadecimal
 	pub txid: Option<H256>,
-	/// Hash encoded in little-endian hexadecimal (including witness data)
+	/// Hash encoded in little-endian hexadecimal
 	pub hash: Option<H256>,
 	/// Transactions before this one (by 1-based index in 'transactions' list) that must be present in the final block if this one is
 	pub depends: Option<Vec<u64>>,

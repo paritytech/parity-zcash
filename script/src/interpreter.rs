@@ -292,7 +292,7 @@ pub fn verify_script(
 
 	// The CLEANSTACK check is only performed after potential P2SH evaluation,
 	// as the non-P2SH evaluation of a P2SH script will obviously not result in
-	// a clean stack (the P2SH inputs remain). The same holds for witness evaluation.
+	// a clean stack (the P2SH inputs remain).
 	if flags.verify_cleanstack {
 		// Disallow CLEANSTACK without P2SH, as otherwise a switch CLEANSTACK->P2SH+CLEANSTACK
 		// would be possible, which is not a softfork (and P2SH should be one).

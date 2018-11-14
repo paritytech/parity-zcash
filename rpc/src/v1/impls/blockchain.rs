@@ -87,8 +87,6 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 				VerboseBlock {
 					confirmations: confirmations,
 					size: block_size as u32,
-					strippedsize: block_size as u32,
-					weight: block_size as u32,
 					height: height,
 					mediantime: Some(median_time),
 					difficulty: block.header.raw.bits.to_f64(self.network.max_bits().into()),
@@ -286,8 +284,6 @@ pub mod tests {
 				hash: "bddd99ccfda39da1b108ce1a5d70038d0a967bacb68b6b63065f626a00000000".into(),
 				confirmations: 1, // h2
 				size: 215,
-				strippedsize: 215,
-				weight: 215,
 				height: Some(2),
 				version: 1,
 				version_hex: "1".to_owned(),
@@ -458,8 +454,6 @@ pub mod tests {
 			hash: "8392336da29773c56b1649ab555156ceb7e700ad7c230ea7a4571c7e22bc0700".into(),
 			confirmations: 2, // h1 + h2
 			size: 1617,
-			strippedsize: 1617,
-			weight: 1617,
 			height: Some(1),
 			version: 4,
 			version_hex: "4".to_owned(),
@@ -484,8 +478,6 @@ pub mod tests {
 			hash: "ed73e297d7c51cb8dc53fc2213d7e2e3f116eb4f26434496fc1926906ca20200".into(),
 			confirmations: 1, // h2
 			size: 1617,
-			strippedsize: 1617,
-			weight: 1617,
 			height: Some(2),
 			version: 4,
 			version_hex: "4".to_owned(),
@@ -561,7 +553,7 @@ pub mod tests {
 				"id": 1
 			}"#)).unwrap();
 
-		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":{"bits":486604799,"chainwork":"0","confirmations":1,"difficulty":1.0,"hash":"000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd","height":2,"mediantime":null,"merkleroot":"9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5","nextblockhash":null,"nonce":"2a00000000000000000000000000000000000000000000000000000000000000","previousblockhash":"00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048","size":215,"strippedsize":215,"time":1231469744,"tx":["9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5"],"version":1,"versionHex":"1","weight":215},"id":1}"#);
+		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":{"bits":486604799,"chainwork":"0","confirmations":1,"difficulty":1.0,"hash":"000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd","height":2,"mediantime":null,"merkleroot":"9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5","nextblockhash":null,"nonce":"2a00000000000000000000000000000000000000000000000000000000000000","previousblockhash":"00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048","size":215,"time":1231469744,"tx":["9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5"],"version":1,"versionHex":"1"},"id":1}"#);
 	}
 
 	#[test]

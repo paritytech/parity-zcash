@@ -47,7 +47,7 @@ pub struct VerificationFlags {
 	/// "At least one stack element must remain, and when interpreted as a boolean, it must be true" to
 	/// "Exactly one stack element must remain, and when interpreted as a boolean, it must be true".
 	/// (softfork safe, BIP62 rule 6)
-	/// Note: CLEANSTACK should never be used without P2SH or WITNESS.
+	/// Note: CLEANSTACK should never be used without P2SH.
 	pub verify_cleanstack: bool,
 
 	/// Verify CHECKLOCKTIMEVERIFY
@@ -59,12 +59,6 @@ pub struct VerificationFlags {
 	///
 	/// See BIP112 for details
 	pub verify_checksequence: bool,
-
-	/// Support segregated witness
-	pub verify_witness: bool,
-
-	/// Making v1-v16 witness program non-standard
-	pub verify_discourage_upgradable_witness_program: bool,
 
 	/// Support OP_CAT opcode
 	pub verify_concat: bool,
@@ -129,11 +123,6 @@ impl VerificationFlags {
 		self
 	}
 
-	pub fn verify_witness(mut self, value: bool) -> Self {
-		self.verify_witness = value;
-		self
-	}
-
 	pub fn verify_nulldummy(mut self, value: bool) -> Self {
 		self.verify_nulldummy = value;
 		self
@@ -146,11 +135,6 @@ impl VerificationFlags {
 
 	pub fn verify_cleanstack(mut self, value: bool) -> Self {
 		self.verify_cleanstack = value;
-		self
-	}
-
-	pub fn verify_discourage_upgradable_witness_program(mut self, value: bool) -> Self {
-		self.verify_discourage_upgradable_witness_program = value;
 		self
 	}
 
