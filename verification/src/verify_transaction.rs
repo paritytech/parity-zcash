@@ -67,6 +67,9 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 	}
 }
 
+/// If version == 1 or nJointSplit == 0, then tx_in_count MUST NOT be 0.
+/// Transactions containing empty `vin` must have either non-empty `vjoinsplit` or non-empty `vShieldedSpend`.
+/// Transactions containing empty `vout` must have either non-empty `vjoinsplit` or non-empty `vShieldedOutput`.
 pub struct TransactionEmpty<'a> {
 	transaction: &'a IndexedTransaction,
 }
@@ -79,11 +82,23 @@ impl<'a> TransactionEmpty<'a> {
 	}
 
 	fn check(&self) -> Result<(), TransactionError> {
-		if self.transaction.raw.is_empty() {
-			Err(TransactionError::Empty)
-		} else {
-			Ok(())
+		// If version == 1 or nJointSplit == 0, then tx_in_count MUST NOT be 0.
+		if self.transaction.raw.version == 1 || self.transaction.raw.joint_split.is_none() {
+			if self.transaction.raw.inputs.is_empty() {
+				return Err(TransactionError::Empty);
+			}
 		}
+
+		// Transactions containing empty `vin` must have either non-empty `vjoinsplit`.
+		// Transactions containing empty `vout` must have either non-empty `vjoinsplit`.
+		// TODO [Sapling]: ... or non-empty `vShieldedOutput`
+		if self.transaction.raw.is_empty() {
+			if self.transaction.raw.joint_split.is_none() {
+				return Err(TransactionError::Empty);
+			}
+		}
+
+		Ok(())
 	}
 }
 
@@ -243,7 +258,41 @@ impl<'a> TransactionJointSplitInCoinbase<'a> {
 mod tests {
 	use chain::{Transaction, OutPoint, TransactionInput, IndexedTransaction};
 	use error::TransactionError;
-	use super::{TransactionVersion, TransactionJointSplitInCoinbase};
+	use super::{TransactionEmpty, TransactionVersion, TransactionJointSplitInCoinbase};
+
+	#[test]
+	fn transaction_empty_works() {
+		let tx1_with_js_without_inputs: IndexedTransaction = Transaction {
+			version: 1,
+			outputs: vec![Default::default()],
+			joint_split: Some(Default::default()),
+			..Default::default()
+		}.into();
+		assert_eq!(TransactionEmpty::new(&tx1_with_js_without_inputs).check(), Err(TransactionError::Empty));
+
+		let tx2_without_js_without_inputs: IndexedTransaction = Transaction {
+			version: 2,
+			outputs: vec![Default::default()],
+			joint_split: None,
+			..Default::default()
+		}.into();
+		assert_eq!(TransactionEmpty::new(&tx2_without_js_without_inputs).check(), Err(TransactionError::Empty));
+
+		let tx2_with_js_without_inputs: IndexedTransaction = Transaction {
+			version: 2,
+			outputs: vec![Default::default()],
+			joint_split: Some(Default::default()),
+			..Default::default()
+		}.into();
+		assert_eq!(TransactionEmpty::new(&tx2_with_js_without_inputs).check(), Ok(()));
+
+		let tx2_empty_without_js: IndexedTransaction = Transaction {
+			version: 2,
+			joint_split: None,
+			..Default::default()
+		}.into();
+		assert_eq!(TransactionEmpty::new(&tx2_empty_without_js).check(), Err(TransactionError::Empty));
+	}
 
 	#[test]
 	fn transaction_version_works() {
