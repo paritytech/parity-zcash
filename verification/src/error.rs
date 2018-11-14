@@ -103,7 +103,5 @@ pub enum TransactionError {
 	UnspentTransactionWithTheSameHash,
 	/// Using output that is surely spent
 	UsingSpentOutput(H256, u32),
-	/// Transaction, protected using BitcoinCash OP_RETURN replay protection (REQ-6-1).
-	ReturnReplayProtection,
 }
 

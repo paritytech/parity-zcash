@@ -127,7 +127,6 @@ impl Context {
 
 				let needed = context.connection_counter.outbound_connections_needed() as usize;
 				if needed != 0 {
-					// TODO: pass Services::with_bitcoin_cash(true) after HF block
 					let used_addresses = context.connections.addresses();
 					let peers = context.node_table.read().nodes_with_services(&Services::default(), context.config.internet_protocol, &used_addresses, needed);
 					let addresses = peers.into_iter()

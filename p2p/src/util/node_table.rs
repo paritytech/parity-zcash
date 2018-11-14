@@ -607,9 +607,9 @@ mod tests {
 		let s0: SocketAddr = "127.0.0.1:8000".parse().unwrap();
 		let s1: SocketAddr = "127.0.0.1:8001".parse().unwrap();
 
-		let mut table = NodeTable::new(Services::default().with_network(true).with_bitcoin_cash(true));
+		let mut table = NodeTable::new(Services::default().with_network(true).with_xthin(true));
 		table.insert(s0, Services::default().with_network(true));
-		table.insert(s1, Services::default().with_network(true).with_bitcoin_cash(true));
+		table.insert(s1, Services::default().with_network(true).with_xthin(true));
 		assert_eq!(table.nodes_with_services(&Services::default(), InternetProtocol::default(), &HashSet::new(), 1)[0].address(), s1);
 
 		table.note_failure(&s1);
