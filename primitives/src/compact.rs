@@ -84,14 +84,15 @@ impl Compact {
 		Compact(compact | (size << 24) as u32)
 	}
 
-	pub fn to_f64(&self) -> f64 {
+	pub fn to_f64(&self, limit: Compact) -> f64 {
+		let shift_amount = (limit.0 >> 24) & 0xff;
 		let mut shift = (self.0 >> 24) & 0xff;
-		let mut diff = f64::from(0x0000ffffu32) / f64::from(self.0 & 0x00ffffffu32);
-		while shift < 29 {
+		let mut diff = f64::from(limit.0 & 0x00ffffffu32) / f64::from(self.0 & 0x00ffffffu32);
+		while shift < shift_amount {
 			diff *= f64::from(256);
 			shift += 1;
 		}
-		while shift > 29 {
+		while shift > shift_amount {
 			diff /= f64::from(256.0);
 			shift -= 1;
 		}
@@ -142,15 +143,17 @@ mod tests {
 			(v1 - v2).abs() < 0.00001
 		}
 
-		assert!(compare_f64(Compact::new(0x1b0404cb).to_f64(), 16307.42094));
+		let limit = Compact::new(486604799);
+
+		assert!(compare_f64(Compact::new(0x1b0404cb).to_f64(limit), 16307.42094));
 	
 		// tests from original bitcoin client:
 		// https://github.com/bitcoin/bitcoin/blob/1e8f88e071019907785b260477bd359bef6f9a8f/src/test/blockchain_tests.cpp
 
-		assert!(compare_f64(Compact::new(0x1f111111).to_f64(), 0.000001));
-		assert!(compare_f64(Compact::new(0x1ef88f6f).to_f64(), 0.000016));
-		assert!(compare_f64(Compact::new(0x1df88f6f).to_f64(), 0.004023));
-		assert!(compare_f64(Compact::new(0x1cf88f6f).to_f64(), 1.029916));
-		assert!(compare_f64(Compact::new(0x12345678).to_f64(), 5913134931067755359633408.0));
+		assert!(compare_f64(Compact::new(0x1f111111).to_f64(limit), 0.000001));
+		assert!(compare_f64(Compact::new(0x1ef88f6f).to_f64(limit), 0.000016));
+		assert!(compare_f64(Compact::new(0x1df88f6f).to_f64(limit), 0.004023));
+		assert!(compare_f64(Compact::new(0x1cf88f6f).to_f64(limit), 1.029916));
+		assert!(compare_f64(Compact::new(0x12345678).to_f64(limit), 5913134931067755359633408.0));
 	}
 }

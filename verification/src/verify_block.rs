@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use chain::IndexedBlock;
-use network::ConsensusFork;
+use network::ConsensusParams;
 use sigops::transaction_sigops;
 use duplex_store::NoopStore;
 use error::{Error, TransactionError};
@@ -16,14 +16,14 @@ pub struct BlockVerifier<'a> {
 }
 
 impl<'a> BlockVerifier<'a> {
-	pub fn new(block: &'a IndexedBlock) -> Self {
+	pub fn new(block: &'a IndexedBlock, consensus: &'a ConsensusParams) -> Self {
 		BlockVerifier {
 			empty: BlockEmpty::new(block),
 			coinbase: BlockCoinbase::new(block),
-			serialized_size: BlockSerializedSize::new(block, ConsensusFork::absolute_maximum_block_size()),
+			serialized_size: BlockSerializedSize::new(block, consensus),
 			extra_coinbases: BlockExtraCoinbases::new(block),
 			transactions_uniqueness: BlockTransactionsUniqueness::new(block),
-			sigops: BlockSigops::new(block, ConsensusFork::absolute_maximum_block_sigops()),
+			sigops: BlockSigops::new(block, consensus),
 			merkle_root: BlockMerkleRoot::new(block),
 		}
 	}
@@ -66,10 +66,10 @@ pub struct BlockSerializedSize<'a> {
 }
 
 impl<'a> BlockSerializedSize<'a> {
-	fn new(block: &'a IndexedBlock, max_size: usize) -> Self {
+	fn new(block: &'a IndexedBlock, consensus: &'a ConsensusParams) -> Self {
 		BlockSerializedSize {
 			block: block,
-			max_size: max_size,
+			max_size: consensus.max_block_size(),
 		}
 	}
 
@@ -153,10 +153,10 @@ pub struct BlockSigops<'a> {
 }
 
 impl<'a> BlockSigops<'a> {
-	fn new(block: &'a IndexedBlock, max_sigops: usize) -> Self {
+	fn new(block: &'a IndexedBlock, consensus: &'a ConsensusParams) -> Self {
 		BlockSigops {
 			block: block,
-			max_sigops: max_sigops,
+			max_sigops: consensus.max_block_sigops(),
 		}
 	}
 

@@ -3,7 +3,6 @@ use chain::constants::{
 	SEQUENCE_FINAL, SEQUENCE_LOCKTIME_DISABLE_FLAG,
 	SEQUENCE_LOCKTIME_MASK, SEQUENCE_LOCKTIME_TYPE_FLAG, LOCKTIME_THRESHOLD
 };
-use sign::SignatureVersion;
 use {Script, TransactionInputSigner, Num};
 
 /// Checks transaction signature
@@ -21,7 +20,6 @@ pub trait SignatureChecker {
 		public: &Public,
 		script_code: &Script,
 		sighashtype: u32,
-		version: SignatureVersion
 	) -> bool;
 
 	fn check_lock_time(&self, lock_time: Num) -> bool;
@@ -36,7 +34,7 @@ impl SignatureChecker for NoopSignatureChecker {
 		public.verify(hash, signature).unwrap_or(false)
 	}
 
-	fn check_signature(&self, _: &Signature, _: &Public, _: &Script, _: u32, _: SignatureVersion) -> bool {
+	fn check_signature(&self, _: &Signature, _: &Public, _: &Script, _: u32) -> bool {
 		false
 	}
 
@@ -72,9 +70,8 @@ impl SignatureChecker for TransactionSignatureChecker {
 		public: &Public,
 		script_code: &Script,
 		sighashtype: u32,
-		version: SignatureVersion
 	) -> bool {
-		let hash = self.signer.signature_hash(self.input_index, self.input_amount, script_code, version, sighashtype);
+		let hash = self.signer.signature_hash(self.input_index, script_code, sighashtype);
 		self.verify_signature(signature, public, &hash)
 	}
 

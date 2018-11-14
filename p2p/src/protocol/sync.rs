@@ -3,7 +3,6 @@ use bytes::Bytes;
 use message::{Command, Error, Payload, Services, types, deserialize_payload};
 use protocol::Protocol;
 use net::PeerContext;
-use ser::SERIALIZE_TRANSACTION_WITNESS;
 
 pub type InboundSyncConnectionRef = Box<InboundSyncConnection>;
 pub type OutboundSyncConnectionRef = Arc<OutboundSyncConnection>;
@@ -30,10 +29,6 @@ pub trait InboundSyncConnection : Send + Sync {
 	fn on_merkleblock(&self, message: types::MerkleBlock);
 	fn on_sendheaders(&self, message: types::SendHeaders);
 	fn on_feefilter(&self, message: types::FeeFilter);
-	fn on_send_compact(&self, message: types::SendCompact);
-	fn on_compact_block(&self, message: types::CompactBlock);
-	fn on_get_block_txn(&self, message: types::GetBlockTxn);
-	fn on_block_txn(&self, message: types::BlockTxn);
 	fn on_notfound(&self, message: types::NotFound);
 }
 
@@ -44,8 +39,6 @@ pub trait OutboundSyncConnection : Send + Sync {
 	fn send_getheaders(&self, message: &types::GetHeaders);
 	fn send_transaction(&self, message: &types::Tx);
 	fn send_block(&self, message: &types::Block);
-	fn send_witness_transaction(&self, message: &types::Tx);
-	fn send_witness_block(&self, message: &types::Block);
 	fn send_headers(&self, message: &types::Headers);
 	fn respond_headers(&self, message: &types::Headers, id: u32);
 	fn send_mempool(&self, message: &types::MemPool);
@@ -55,10 +48,6 @@ pub trait OutboundSyncConnection : Send + Sync {
 	fn send_merkleblock(&self, message: &types::MerkleBlock);
 	fn send_sendheaders(&self, message: &types::SendHeaders);
 	fn send_feefilter(&self, message: &types::FeeFilter);
-	fn send_send_compact(&self, message: &types::SendCompact);
-	fn send_compact_block(&self, message: &types::CompactBlock);
-	fn send_get_block_txn(&self, message: &types::GetBlockTxn);
-	fn send_block_txn(&self, message: &types::BlockTxn);
 	fn send_notfound(&self, message: &types::NotFound);
 	fn ignored(&self, id: u32);
 	fn close(&self);
@@ -101,14 +90,6 @@ impl OutboundSyncConnection for OutboundSync {
 		self.context.send_request(message);
 	}
 
-	fn send_witness_transaction(&self, message: &types::Tx) {
-		self.context.send_request_with_flags(message, SERIALIZE_TRANSACTION_WITNESS);
-	}
-
-	fn send_witness_block(&self, message: &types::Block) {
-		self.context.send_request_with_flags(message, SERIALIZE_TRANSACTION_WITNESS);
-	}
-
 	fn send_headers(&self, message: &types::Headers) {
 		self.context.send_request(message);
 	}
@@ -142,22 +123,6 @@ impl OutboundSyncConnection for OutboundSync {
 	}
 
 	fn send_feefilter(&self, message: &types::FeeFilter) {
-		self.context.send_request(message);
-	}
-
-	fn send_send_compact(&self, message: &types::SendCompact) {
-		self.context.send_request(message);
-	}
-
-	fn send_compact_block(&self, message: &types::CompactBlock) {
-		self.context.send_request(message);
-	}
-
-	fn send_get_block_txn(&self, message: &types::GetBlockTxn) {
-		self.context.send_request(message);
-	}
-
-	fn send_block_txn(&self, message: &types::BlockTxn) {
 		self.context.send_request(message);
 	}
 
@@ -259,22 +224,6 @@ impl Protocol for SyncProtocol {
 		else if command == &types::FeeFilter::command() {
 			let message: types::FeeFilter = try!(deserialize_payload(payload, version));
 			self.inbound_connection.on_feefilter(message);
-		}
-		else if command == &types::SendCompact::command() {
-			let message: types::SendCompact = try!(deserialize_payload(payload, version));
-			self.inbound_connection.on_send_compact(message);
-		}
-		else if command == &types::CompactBlock::command() {
-			let message: types::CompactBlock = try!(deserialize_payload(payload, version));
-			self.inbound_connection.on_compact_block(message);
-		}
-		else if command == &types::GetBlockTxn::command() {
-			let message: types::GetBlockTxn = try!(deserialize_payload(payload, version));
-			self.inbound_connection.on_get_block_txn(message);
-		}
-		else if command == &types::BlockTxn::command() {
-			let message: types::BlockTxn = try!(deserialize_payload(payload, version));
-			self.inbound_connection.on_block_txn(message);
 		}
 		else if command == &types::NotFound::command() {
 			let message: types::NotFound = try!(deserialize_payload(payload, version));

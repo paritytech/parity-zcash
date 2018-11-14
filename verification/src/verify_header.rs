@@ -1,6 +1,6 @@
 use primitives::compact::Compact;
 use chain::IndexedBlockHeader;
-use network::Network;
+use network::ConsensusParams;
 use work::is_valid_proof_of_work;
 use error::Error;
 use constants::BLOCK_MAX_FUTURE;
@@ -11,9 +11,9 @@ pub struct HeaderVerifier<'a> {
 }
 
 impl<'a> HeaderVerifier<'a> {
-	pub fn new(header: &'a IndexedBlockHeader, network: Network, current_time: u32) -> Self {
+	pub fn new(header: &'a IndexedBlockHeader, consensus: &ConsensusParams, current_time: u32) -> Self {
 		HeaderVerifier {
-			proof_of_work: HeaderProofOfWork::new(header, network),
+			proof_of_work: HeaderProofOfWork::new(header, consensus),
 			timestamp: HeaderTimestamp::new(header, current_time, BLOCK_MAX_FUTURE as u32),
 		}
 	}
@@ -31,10 +31,10 @@ pub struct HeaderProofOfWork<'a> {
 }
 
 impl<'a> HeaderProofOfWork<'a> {
-	fn new(header: &'a IndexedBlockHeader, network: Network) -> Self {
+	fn new(header: &'a IndexedBlockHeader, consensus: &ConsensusParams) -> Self {
 		HeaderProofOfWork {
 			header: header,
-			max_work_bits: network.max_bits().into(),
+			max_work_bits: consensus.network.max_bits().into(),
 		}
 	}
 

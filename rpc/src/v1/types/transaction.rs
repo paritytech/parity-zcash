@@ -91,8 +91,6 @@ pub struct SignedTransactionInput {
 	pub script_sig: TransactionInputScript,
 	/// Sequence number
 	pub sequence: u32,
-	/// Hex-encoded witness data (if any)
-	pub txinwitness: Vec<String>,
 }
 
 /// Signed transaction output
@@ -114,12 +112,10 @@ pub struct Transaction {
 	pub hex: RawTransaction,
 	/// The transaction id (same as provided)
 	pub txid: H256,
-	/// The transaction hash (differs from txid for witness transactions)
+	/// The transaction hash
 	pub hash: H256,
 	/// The serialized transaction size
 	pub size: usize,
-	/// The virtual transaction size (differs from size for witness transactions)
-	pub vsize: usize,
 	/// The version
 	pub version: i32,
 	/// The lock time
@@ -357,9 +353,8 @@ mod tests {
 				hex: Bytes::new(vec![1, 2, 3, 4]),
 			},
 			sequence: 123,
-			txinwitness: vec![],
 		};
-		assert_eq!(serde_json::to_string(&txin).unwrap(), r#"{"txid":"4d00000000000000000000000000000000000000000000000000000000000000","vout":13,"script_sig":{"asm":"Hello, world!!!","hex":"01020304"},"sequence":123,"txinwitness":[]}"#);
+		assert_eq!(serde_json::to_string(&txin).unwrap(), r#"{"txid":"4d00000000000000000000000000000000000000000000000000000000000000","vout":13,"script_sig":{"asm":"Hello, world!!!","hex":"01020304"},"sequence":123}"#);
 	}
 
 	#[test]
@@ -372,10 +367,9 @@ mod tests {
 				hex: Bytes::new(vec![1, 2, 3, 4]),
 			},
 			sequence: 123,
-			txinwitness: vec![],
 		};
 		assert_eq!(
-			serde_json::from_str::<SignedTransactionInput>(r#"{"txid":"4d00000000000000000000000000000000000000000000000000000000000000","vout":13,"script_sig":{"asm":"Hello, world!!!","hex":"01020304"},"sequence":123,"txinwitness":[]}"#).unwrap(),
+			serde_json::from_str::<SignedTransactionInput>(r#"{"txid":"4d00000000000000000000000000000000000000000000000000000000000000","vout":13,"script_sig":{"asm":"Hello, world!!!","hex":"01020304"},"sequence":123}"#).unwrap(),
 			txin);
 	}
 
@@ -420,7 +414,6 @@ mod tests {
 			txid: H256::from(4),
 			hash: H256::from(5),
 			size: 33,
-			vsize: 44,
 			version: 55,
 			locktime: 66,
 			vin: vec![],
@@ -430,7 +423,7 @@ mod tests {
 			time: 88,
 			blocktime: 99,
 		};
-		assert_eq!(serde_json::to_string(&tx).unwrap(), r#"{"hex":"deadbeef","txid":"0400000000000000000000000000000000000000000000000000000000000000","hash":"0500000000000000000000000000000000000000000000000000000000000000","size":33,"vsize":44,"version":55,"locktime":66,"vin":[],"vout":[],"blockhash":"0600000000000000000000000000000000000000000000000000000000000000","confirmations":77,"time":88,"blocktime":99}"#);
+		assert_eq!(serde_json::to_string(&tx).unwrap(), r#"{"hex":"deadbeef","txid":"0400000000000000000000000000000000000000000000000000000000000000","hash":"0500000000000000000000000000000000000000000000000000000000000000","size":33,"version":55,"locktime":66,"vin":[],"vout":[],"blockhash":"0600000000000000000000000000000000000000000000000000000000000000","confirmations":77,"time":88,"blocktime":99}"#);
 	}
 
 	#[test]
@@ -440,7 +433,6 @@ mod tests {
 			txid: H256::from(4),
 			hash: H256::from(5),
 			size: 33,
-			vsize: 44,
 			version: 55,
 			locktime: 66,
 			vin: vec![],
@@ -451,7 +443,7 @@ mod tests {
 			blocktime: 99,
 		};
 		assert_eq!(
-			serde_json::from_str::<Transaction>(r#"{"hex":"deadbeef","txid":"0400000000000000000000000000000000000000000000000000000000000000","hash":"0500000000000000000000000000000000000000000000000000000000000000","size":33,"vsize":44,"version":55,"locktime":66,"vin":[],"vout":[],"blockhash":"0600000000000000000000000000000000000000000000000000000000000000","confirmations":77,"time":88,"blocktime":99}"#).unwrap(),
+			serde_json::from_str::<Transaction>(r#"{"hex":"deadbeef","txid":"0400000000000000000000000000000000000000000000000000000000000000","hash":"0500000000000000000000000000000000000000000000000000000000000000","size":33,"version":55,"locktime":66,"vin":[],"vout":[],"blockhash":"0600000000000000000000000000000000000000000000000000000000000000","confirmations":77,"time":88,"blocktime":99}"#).unwrap(),
 			tx);
 	}
 }

@@ -26,16 +26,8 @@ pub enum Task {
 	Block(PeerIndex, IndexedBlock),
 	/// Send merkleblock
 	MerkleBlock(PeerIndex, types::MerkleBlock),
-	/// Send cmpcmblock
-	CompactBlock(PeerIndex, types::CompactBlock),
-	/// Send block with witness data
-	WitnessBlock(PeerIndex, IndexedBlock),
 	/// Send transaction
 	Transaction(PeerIndex, IndexedTransaction),
-	/// Send transaction with witness data
-	WitnessTransaction(PeerIndex, IndexedTransaction),
-	/// Send block transactions
-	BlockTxn(PeerIndex, types::BlockTxn),
 	/// Send notfound
 	NotFound(PeerIndex, types::NotFound),
 	/// Send inventory
@@ -112,26 +104,6 @@ impl LocalSynchronizationTaskExecutor {
 		}
 	}
 
-	fn execute_compact_block(&self, peer_index: PeerIndex, block: types::CompactBlock) {
-		if let Some(connection) = self.peers.connection(peer_index) {
-			let hash = block.header.header.hash();
-			trace!(target: "sync", "Sending compact block {} to peer#{}", hash.to_reversed_str(), peer_index);
-			self.peers.hash_known_as(peer_index, hash, KnownHashType::CompactBlock);
-			connection.send_compact_block(&block);
-		}
-	}
-
-	fn execute_witness_block(&self, peer_index: PeerIndex, block: IndexedBlock) {
-		if let Some(connection) = self.peers.connection(peer_index) {
-			trace!(target: "sync", "Sending witness block {} to peer#{}", block.hash().to_reversed_str(), peer_index);
-			self.peers.hash_known_as(peer_index, block.hash().clone(), KnownHashType::Block);
-			let block = types::Block {
-				block: block.to_raw_block(),
-			};
-			connection.send_witness_block(&block);
-		}
-	}
-
 	fn execute_transaction(&self, peer_index: PeerIndex, transaction: IndexedTransaction) {
 		if let Some(connection) = self.peers.connection(peer_index) {
 			trace!(target: "sync", "Sending transaction {} to peer#{}", transaction.hash.to_reversed_str(), peer_index);
@@ -140,24 +112,6 @@ impl LocalSynchronizationTaskExecutor {
 				transaction: transaction.raw,
 			};
 			connection.send_transaction(&transaction);
-		}
-	}
-
-	fn execute_witness_transaction(&self, peer_index: PeerIndex, transaction: IndexedTransaction) {
-		if let Some(connection) = self.peers.connection(peer_index) {
-			trace!(target: "sync", "Sending witness transaction {} to peer#{}", transaction.hash.to_reversed_str(), peer_index);
-			self.peers.hash_known_as(peer_index, transaction.hash, KnownHashType::Transaction);
-			let transaction = types::Tx {
-				transaction: transaction.raw,
-			};
-			connection.send_witness_transaction(&transaction);
-		}
-	}
-
-	fn execute_block_txn(&self, peer_index: PeerIndex, blocktxn: types::BlockTxn) {
-		if let Some(connection) = self.peers.connection(peer_index) {
-			trace!(target: "sync", "Sending blocktxn with {} transactions to peer#{}", blocktxn.request.transactions.len(), peer_index);
-			connection.send_block_txn(&blocktxn);
 		}
 	}
 
@@ -198,9 +152,6 @@ impl LocalSynchronizationTaskExecutor {
 						block.header.raw.clone(),
 					]), None);
 				},
-				BlockAnnouncementType::SendCompactBlock => if let Some(compact_block) = self.peers.build_compact_block(peer_index, &block) {
-					self.execute_compact_block(peer_index, compact_block);
-				},
 				BlockAnnouncementType::DoNotAnnounce => (),
 			}
 		}
@@ -227,11 +178,7 @@ impl TaskExecutor for LocalSynchronizationTaskExecutor {
 			Task::MemoryPool(peer_index) => self.execute_memorypool(peer_index),
 			Task::Block(peer_index, block) => self.execute_block(peer_index, block),
 			Task::MerkleBlock(peer_index, block) => self.execute_merkleblock(peer_index, block),
-			Task::CompactBlock(peer_index, block) => self.execute_compact_block(peer_index, block),
-			Task::WitnessBlock(peer_index, block) => self.execute_witness_block(peer_index, block),
 			Task::Transaction(peer_index, transaction) => self.execute_transaction(peer_index, transaction),
-			Task::WitnessTransaction(peer_index, transaction) => self.execute_witness_transaction(peer_index, transaction),
-			Task::BlockTxn(peer_index, blocktxn) => self.execute_block_txn(peer_index, blocktxn),
 			Task::NotFound(peer_index, notfound) => self.execute_notfound(peer_index, notfound),
 			Task::Inventory(peer_index, inventory) => self.execute_inventory(peer_index, inventory),
 			Task::Headers(peer_index, headers, request_id) => self.execute_headers(peer_index, headers, request_id),
@@ -295,22 +242,6 @@ pub mod tests {
 			self.tasks.lock().push(task);
 			self.waiter.notify_one();
 		}
-	}
-
-	#[test]
-	fn relay_new_block_after_sendcmpct() {
-		let peers = Arc::new(PeersImpl::default());
-		let executor = LocalSynchronizationTaskExecutor::new(peers.clone());
-
-		let c1 = DummyOutboundSyncConnection::new();
-		peers.insert(1, Services::default(), c1.clone());
-		let c2 = DummyOutboundSyncConnection::new();
-		peers.insert(2, Services::default(), c2.clone());
-		peers.set_block_announcement_type(2, BlockAnnouncementType::SendCompactBlock);
-
-		executor.execute(Task::RelayNewBlock(test_data::genesis().into()));
-		assert_eq!(*c1.messages.lock().entry("inventory".to_owned()).or_insert(0), 1);
-		assert_eq!(*c2.messages.lock().entry("cmpctblock".to_owned()).or_insert(0), 1);
 	}
 
 	#[test]

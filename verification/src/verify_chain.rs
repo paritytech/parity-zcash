@@ -1,6 +1,6 @@
 use rayon::prelude::{IntoParallelRefIterator, IndexedParallelIterator, ParallelIterator};
 use chain::IndexedBlock;
-use network::Network;
+use network::ConsensusParams;
 use error::Error;
 use verify_block::BlockVerifier;
 use verify_header::HeaderVerifier;
@@ -13,12 +13,12 @@ pub struct ChainVerifier<'a> {
 }
 
 impl<'a> ChainVerifier<'a> {
-	pub fn new(block: &'a IndexedBlock, network: Network, current_time: u32) -> Self {
+	pub fn new(block: &'a IndexedBlock, consensus: &'a ConsensusParams, current_time: u32) -> Self {
 		trace!(target: "verification", "Block pre-verification {}", block.hash().to_reversed_str());
 		ChainVerifier {
-			block: BlockVerifier::new(block),
-			header: HeaderVerifier::new(&block.header, network, current_time),
-			transactions: block.transactions.iter().map(TransactionVerifier::new).collect(),
+			block: BlockVerifier::new(block, consensus),
+			header: HeaderVerifier::new(&block.header, consensus, current_time),
+			transactions: block.transactions.iter().map(|tx| TransactionVerifier::new(tx, consensus)).collect(),
 		}
 	}
 

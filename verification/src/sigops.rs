@@ -1,7 +1,6 @@
-use network::ConsensusFork;
 use chain::Transaction;
 use storage::TransactionOutputProvider;
-use script::{Script, ScriptWitness};
+use script::Script;
 
 /// Counts signature operations in given transaction
 /// bip16_active flag indicates if we should also count signature operations
@@ -40,56 +39,4 @@ pub fn transaction_sigops(
 	}
 
 	input_sigops + output_sigops + bip16_sigops
-}
-
-pub fn transaction_sigops_cost(
-	transaction: &Transaction,
-	store: &TransactionOutputProvider,
-	sigops: usize,
-) -> usize {
-	let sigops_cost = sigops * ConsensusFork::witness_scale_factor();
-	let witness_sigops_cost: usize = transaction.inputs.iter()
-		.map(|input| store.transaction_output(&input.previous_output, usize::max_value())
-			.map(|output| witness_sigops(&Script::new(input.script_sig.clone()), &Script::new(output.script_pubkey.clone()), &input.script_witness,))
-			.unwrap_or(0))
-		.sum();
-	sigops_cost + witness_sigops_cost
-}
-
-fn witness_sigops(
-	script_sig: &Script,
-	script_pubkey: &Script,
-	script_witness: &ScriptWitness,
-) -> usize {
-	if let Some((witness_version, witness_program)) = script_pubkey.parse_witness_program() {
-		return witness_program_sigops(witness_version, witness_program, script_witness);
-	}
-
-	if script_pubkey.is_pay_to_script_hash() && script_sig.is_push_only() {
-		if let Some(Ok(instruction)) = script_sig.iter().last() {
-			if let Some(data) = instruction.data {
-				let subscript = Script::new(data.into());
-				if let Some((witness_version, witness_program)) = subscript.parse_witness_program() {
-					return witness_program_sigops(witness_version, witness_program, script_witness);
-				}
-			}
-		}
-	}
-
-	0
-}
-
-fn witness_program_sigops(
-	witness_version: u8,
-	witness_program: &[u8],
-	script_witness: &ScriptWitness,
-) -> usize {
-	match witness_version {
-		0 if witness_program.len() == 20 => 1,
-		0 if witness_program.len() == 32 => match script_witness.last() {
-			Some(subscript) => Script::new(subscript.clone()).sigops_count(false, true),
-			_ => 0,
-		},
-		_ => 0,
-	}
 }

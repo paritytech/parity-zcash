@@ -127,7 +127,6 @@ impl Context {
 
 				let needed = context.connection_counter.outbound_connections_needed() as usize;
 				if needed != 0 {
-					// TODO: pass Services::with_bitcoin_cash(true) after HF block
 					let used_addresses = context.connections.addresses();
 					let peers = context.node_table.read().nodes_with_services(&Services::default(), context.config.internet_protocol, &used_addresses, needed);
 					let addresses = peers.into_iter()
@@ -167,9 +166,9 @@ impl Context {
 					channel.session().initialize();
 					Context::on_message(context, channel)
 				},
-				Ok(DeadlineStatus::Meet(Err(_))) => {
+				Ok(DeadlineStatus::Meet(Err(err))) => {
 					// protocol error
-					trace!("Handshake with {} failed", socket);
+					trace!("Handshake with {} failed with: {}", socket, err);
 					// TODO: close socket
 					context.node_table.write().note_failure(&socket);
 					context.connection_counter.note_close_outbound_connection();
@@ -316,11 +315,11 @@ impl Context {
 	}
 
 	/// Send message to a channel with given peer id.
-	pub fn send_to_peer<T>(context: Arc<Context>, peer: PeerId, payload: &T, serialization_flags: u32) -> IoFuture<()> where T: Payload {
+	pub fn send_to_peer<T>(context: Arc<Context>, peer: PeerId, payload: &T) -> IoFuture<()> where T: Payload {
 		match context.connections.channel(peer) {
 			Some(channel) => {
 				let info = channel.peer_info();
-				let message = Message::with_flags(info.magic, info.version, payload, serialization_flags).expect("failed to create outgoing message");
+				let message = Message::new(info.magic, info.version, payload).expect("failed to create outgoing message");
 				channel.session().stats().lock().report_send(T::command().into(), message.len());
 				Context::send(context, channel, message)
 			},

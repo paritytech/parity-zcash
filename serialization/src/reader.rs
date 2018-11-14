@@ -119,6 +119,21 @@ impl<R> Reader<R> where R: io::Read {
 		Ok(result)
 	}
 
+	pub fn read_list_exact<T>(&mut self, expected_len: usize) -> Result<Vec<T>, Error> where T: Deserializable {
+		let len: usize = try!(self.read::<CompactInteger>()).into();
+		if len != expected_len {
+			return Err(Error::MalformedData);
+		}
+
+		let mut result = Vec::with_capacity(len);
+
+		for _ in 0..len {
+			result.push(try!(self.read()));
+		}
+
+		Ok(result)
+	}
+
 	#[cfg_attr(feature="cargo-clippy", allow(wrong_self_convention))]
 	pub fn is_finished(&mut self) -> bool {
 		if self.peeked.is_some() {

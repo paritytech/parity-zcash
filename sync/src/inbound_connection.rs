@@ -147,22 +147,6 @@ impl InboundSyncConnection for InboundConnection {
 		self.node.on_feefilter(self.peer_index, message);
 	}
 
-	fn on_send_compact(&self, message: types::SendCompact) {
-		self.node.on_send_compact(self.peer_index, message);
-	}
-
-	fn on_compact_block(&self, message: types::CompactBlock) {
-		self.node.on_compact_block(self.peer_index, message);
-	}
-
-	fn on_get_block_txn(&self, message: types::GetBlockTxn) {
-		self.node.on_get_block_txn(self.peer_index, message);
-	}
-
-	fn on_block_txn(&self, message: types::BlockTxn) {
-		self.node.on_block_txn(self.peer_index, message);
-	}
-
 	fn on_notfound(&self, message: types::NotFound) {
 		self.node.on_notfound(self.peer_index, message);
 	}
@@ -196,8 +180,6 @@ pub mod tests {
 		fn send_getheaders(&self, _message: &types::GetHeaders) { *self.messages.lock().entry("getheaders".to_owned()).or_insert(0) += 1; }
 		fn send_transaction(&self, _message: &types::Tx) { *self.messages.lock().entry("transaction".to_owned()).or_insert(0) += 1; }
 		fn send_block(&self, _message: &types::Block) { *self.messages.lock().entry("block".to_owned()).or_insert(0) += 1; }
-		fn send_witness_transaction(&self, _message: &types::Tx) { *self.messages.lock().entry("witness_transaction".to_owned()).or_insert(0) += 1; }
-		fn send_witness_block(&self, _message: &types::Block) { *self.messages.lock().entry("witness_block".to_owned()).or_insert(0) += 1; }
 		fn send_headers(&self, _message: &types::Headers) { *self.messages.lock().entry("headers".to_owned()).or_insert(0) += 1; }
 		fn respond_headers(&self, _message: &types::Headers, _id: RequestId) { *self.messages.lock().entry("headers".to_owned()).or_insert(0) += 1; }
 		fn send_mempool(&self, _message: &types::MemPool) { *self.messages.lock().entry("mempool".to_owned()).or_insert(0) += 1; }
@@ -207,10 +189,6 @@ pub mod tests {
 		fn send_merkleblock(&self, _message: &types::MerkleBlock) { *self.messages.lock().entry("merkleblock".to_owned()).or_insert(0) += 1; }
 		fn send_sendheaders(&self, _message: &types::SendHeaders) { *self.messages.lock().entry("sendheaders".to_owned()).or_insert(0) += 1; }
 		fn send_feefilter(&self, _message: &types::FeeFilter) { *self.messages.lock().entry("feefilter".to_owned()).or_insert(0) += 1; }
-		fn send_send_compact(&self, _message: &types::SendCompact) { *self.messages.lock().entry("sendcompact".to_owned()).or_insert(0) += 1; }
-		fn send_compact_block(&self, _message: &types::CompactBlock) { *self.messages.lock().entry("cmpctblock".to_owned()).or_insert(0) += 1; }
-		fn send_get_block_txn(&self, _message: &types::GetBlockTxn) { *self.messages.lock().entry("getblocktxn".to_owned()).or_insert(0) += 1; }
-		fn send_block_txn(&self, _message: &types::BlockTxn) { *self.messages.lock().entry("blocktxn".to_owned()).or_insert(0) += 1; }
 		fn send_notfound(&self, _message: &types::NotFound) { *self.messages.lock().entry("notfound".to_owned()).or_insert(0) += 1; }
 		fn ignored(&self, _id: RequestId) {}
 		fn close(&self) {}

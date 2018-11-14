@@ -26,8 +26,6 @@ pub enum ScriptType {
 	ScriptHash,
 	Multisig,
 	NullData,
-	WitnessScript,
-	WitnessKey,
 }
 
 /// Address from Script
@@ -135,34 +133,6 @@ impl Script {
 			self.data[0] == Opcode::OP_HASH160 as u8 &&
 			self.data[1] == Opcode::OP_PUSHBYTES_20 as u8 &&
 			self.data[22] == Opcode::OP_EQUAL as u8
-	}
-
-	/// Extra-fast test for pay-to-witness-key-hash scripts.
-	pub fn is_pay_to_witness_key_hash(&self) -> bool {
-		self.data.len() == 22 &&
-			self.data[0] == Opcode::OP_0 as u8 &&
-			self.data[1] == Opcode::OP_PUSHBYTES_20 as u8
-	}
-
-	/// Parse witness program. Returns Some(witness program version, code) or None if not a witness program.
-	pub fn parse_witness_program(&self) -> Option<(u8, &[u8])> {
-		if self.data.len() < 4 || self.data.len() > 42 || self.data.len() != self.data[1] as usize + 2 {
-			return None;
-		}
-		let witness_version = match Opcode::from_u8(self.data[0]) {
-			Some(Opcode::OP_0) => 0,
-			Some(x) if x >= Opcode::OP_1 && x <= Opcode::OP_16 => (x as u8) - (Opcode::OP_1 as u8) + 1,
-			_ => return None,
-		};
-		let witness_program = &self.data[2..];
-		Some((witness_version, witness_program))
-	}
-
-	/// Extra-fast test for pay-to-witness-script-hash scripts.
-	pub fn is_pay_to_witness_script_hash(&self) -> bool {
-		self.data.len() == 34 &&
-			self.data[0] == Opcode::OP_0 as u8 &&
-			self.data[1] == Opcode::OP_PUSHBYTES_32 as u8
 	}
 
 	/// Extra-fast test for multisig scripts.
@@ -350,10 +320,6 @@ impl Script {
 			ScriptType::Multisig
 		} else if self.is_null_data_script() {
 			ScriptType::NullData
-		} else if self.is_pay_to_witness_key_hash() {
-			ScriptType::WitnessKey
-		} else if self.is_pay_to_witness_script_hash() {
-			ScriptType::WitnessScript
 		} else {
 			ScriptType::NonStandard
 		}
@@ -447,12 +413,6 @@ impl Script {
 			},
 			ScriptType::NullData => {
 				Ok(vec![])
-			},
-			ScriptType::WitnessScript => {
-				Ok(vec![]) // TODO
-			},
-			ScriptType::WitnessKey => {
-				Ok(vec![]) // TODO
 			},
 		}
 	}
@@ -573,20 +533,6 @@ impl fmt::Display for Script {
 	}
 }
 
-pub type ScriptWitness = Vec<Bytes>;
-
-/// Passed bytes array is a commitment script?
-/// https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki#Commitment_structure
-pub fn is_witness_commitment_script(script: &[u8]) -> bool {
-	script.len() >= 38 &&
-		script[0] == Opcode::OP_RETURN as u8 &&
-		script[1] == 0x24 &&
-		script[2] == 0xAA &&
-		script[3] == 0x21 &&
-		script[4] == 0xA9 &&
-		script[5] == 0xED
-}
-
 #[cfg(test)]
 mod tests {
 	use {Builder, Opcode};
@@ -599,22 +545,6 @@ mod tests {
 		let script2: Script = "a9143b80842f4ea32806ce5e723a255ddd6490cfd28d88".into();
 		assert!(script.is_pay_to_script_hash());
 		assert!(!script2.is_pay_to_script_hash());
-	}
-
-	#[test]
-	fn test_is_pay_to_witness_key_hash() {
-		let script: Script = "00140000000000000000000000000000000000000000".into();
-		let script2: Script = "01140000000000000000000000000000000000000000".into();
-		assert!(script.is_pay_to_witness_key_hash());
-		assert!(!script2.is_pay_to_witness_key_hash());
-	}
-
-	#[test]
-	fn test_is_pay_to_witness_script_hash() {
-		let script: Script = "00203b80842f4ea32806ce5e723a255ddd6490cfd28dac38c58bf9254c0577330693".into();
-		let script2: Script = "01203b80842f4ea32806ce5e723a255ddd6490cfd28dac38c58bf9254c0577330693".into();
-		assert!(script.is_pay_to_witness_script_hash());
-		assert!(!script2.is_pay_to_witness_script_hash());
 	}
 
 	#[test]

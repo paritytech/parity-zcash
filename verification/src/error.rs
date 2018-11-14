@@ -51,16 +51,11 @@ pub enum Error {
 	TransactionFeesOverflow,
 	/// Sum of all referenced outputs in block transactions resulted in the overflow
 	ReferencedInputsSumOverflow,
-	/// SegWit: bad witess nonce size
-	WitnessInvalidNonceSize,
-	/// SegWit: witness merkle mismatch
-	WitnessMerkleCommitmentMismatch,
-	/// SegWit: unexpected witness
-	UnexpectedWitness,
 	/// Non-canonical tranasctions ordering within block
 	NonCanonicalTransactionOrdering,
 	/// Database error
 	Database(DBError),
+	InvalidEquihashSolution,
 }
 
 impl From<DBError> for Error {
@@ -108,9 +103,11 @@ pub enum TransactionError {
 	UnspentTransactionWithTheSameHash,
 	/// Using output that is surely spent
 	UsingSpentOutput(H256, u32),
-	/// Transaction, protected using BitcoinCash OP_RETURN replay protection (REQ-6-1).
-	ReturnReplayProtection,
-	/// Transaction with witness is received before SegWit is activated.
-	PrematureWitness,
+	/// A coinbase transaction MUST NOT have any joint split descriptions
+	CoinbaseWithJointSplit,
+	/// Invalid transaction version.
+	InvalidVersion,
+	/// Transaction has too large output value.
+	ValueOverflow,
 }
 

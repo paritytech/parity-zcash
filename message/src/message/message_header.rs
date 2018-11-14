@@ -62,14 +62,14 @@ impl Serializable for MessageHeader {
 mod tests {
 	use bytes::Bytes;
 	use ser::serialize;
-	use network::{Network, ConsensusFork};
+	use network::Network;
 	use super::MessageHeader;
 
 	#[test]
 	fn test_message_header_serialization() {
-		let expected = "f9beb4d96164647200000000000000001f000000ed52399b".into();
+		let expected = "24e927646164647200000000000000001f000000ed52399b".into();
 		let header = MessageHeader {
-			magic: Network::Mainnet.magic(&ConsensusFork::BitcoinCore),
+			magic: Network::Mainnet.magic(),
 			command: "addr".into(),
 			len: 0x1f,
 			checksum: "ed52399b".into(),
@@ -80,14 +80,14 @@ mod tests {
 
 	#[test]
 	fn test_message_header_deserialization() {
-		let raw: Bytes = "f9beb4d96164647200000000000000001f000000ed52399b".into();
+		let raw: Bytes = "24e927646164647200000000000000001f000000ed52399b".into();
 		let expected = MessageHeader {
-			magic: Network::Mainnet.magic(&ConsensusFork::BitcoinCore),
+			magic: Network::Mainnet.magic(),
 			command: "addr".into(),
 			len: 0x1f,
 			checksum: "ed52399b".into(),
 		};
 
-		assert_eq!(expected, MessageHeader::deserialize(&raw, Network::Mainnet.magic(&ConsensusFork::BitcoinCore)).unwrap());
+		assert_eq!(expected, MessageHeader::deserialize(&raw, Network::Mainnet.magic()).unwrap());
 	}
 }

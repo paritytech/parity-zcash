@@ -12,7 +12,6 @@ use synchronization_server::{Server, ServerTask};
 use synchronization_verifier::{TransactionVerificationSink};
 use primitives::hash::H256;
 use miner::BlockTemplate;
-use verification::median_timestamp_inclusive;
 use synchronization_peers::{TransactionAnnouncementType, BlockAnnouncementType};
 use types::{PeerIndex, RequestId, StorageRef, MemoryPoolRef, PeersRef, ExecutorRef,
 	ClientRef, ServerRef, SynchronizationStateRef, SyncListenerRef};
@@ -179,17 +178,6 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		self.server.execute(ServerTask::Mempool(peer_index));
 	}
 
-	/// When peer asks us from specific transactions from specific block
-	pub fn on_get_block_txn(&self, peer_index: PeerIndex, message: types::GetBlockTxn) {
-		if self.state.synchronizing() {
-			trace!(target: "sync", "Ignored `getblocktxn` message from peer#{}", peer_index);
-			return;
-		}
-
-		trace!(target: "sync", "Got `getblocktxn` message from peer#{}", peer_index);
-		self.server.execute(ServerTask::GetBlockTxn(peer_index, message));
-	}
-
 	/// When peer sets bloom filter for connection
 	pub fn on_filterload(&self, peer_index: PeerIndex, message: types::FilterLoad) {
 		trace!(target: "sync", "Got `filterload` message from peer#{}", peer_index);
@@ -220,46 +208,11 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		self.peers.set_block_announcement_type(peer_index, BlockAnnouncementType::SendHeaders);
 	}
 
-	/// When peer asks us to announce new blocks using cpmctblock message
-	pub fn on_send_compact(&self, peer_index: PeerIndex, message: types::SendCompact) {
-		trace!(target: "sync", "Got `sendcmpct` message from peer#{}", peer_index);
-
-		// The second integer SHALL be interpreted as a little-endian version number. Nodes sending a sendcmpct message MUST currently set this value to 1.
-		// TODO: version 2 supports segregated witness transactions
-		if message.second != 1 {
-			return;
-		}
-
-		// Upon receipt of a "sendcmpct" message with the first and second integers set to 1, the node SHOULD announce new blocks by sending a cmpctblock message.
-		if message.first {
-			self.peers.set_block_announcement_type(peer_index, BlockAnnouncementType::SendCompactBlock);
-		}
-
-		// else:
-		// Upon receipt of a "sendcmpct" message with the first integer set to 0, the node SHOULD NOT announce new blocks by sending a cmpctblock message,
-		// but SHOULD announce new blocks by sending invs or headers, as defined by BIP130.
-		// => work as before
-	}
-
 	/// When peer sents us a merkle block
 	pub fn on_merkleblock(&self, peer_index: PeerIndex, _message: types::MerkleBlock) {
 		trace!(target: "sync", "Got `merkleblock` message from peer#{}", peer_index);
 		// we never setup filter on connections => misbehaving
 		self.peers.misbehaving(peer_index, "Got unrequested 'merkleblock' message");
-	}
-
-	/// When peer sents us a compact block
-	pub fn on_compact_block(&self, peer_index: PeerIndex, _message: types::CompactBlock) {
-		trace!(target: "sync", "Got `cmpctblock` message from peer#{}", peer_index);
-		// we never ask compact block from peers => misbehaving
-		self.peers.misbehaving(peer_index, "Got unrequested 'cmpctblock' message");
-	}
-
-	/// When peer sents us specific transactions for specific block
-	pub fn on_block_txn(&self, peer_index: PeerIndex, _message: types::BlockTxn) {
-		trace!(target: "sync", "Got `blocktxn` message from peer#{}", peer_index);
-		// we never ask for this => misbehaving
-		self.peers.misbehaving(peer_index, "Got unrequested 'blocktxn' message");
 	}
 
 	/// Verify and then schedule new transaction
@@ -276,17 +229,14 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 
 	/// Get block template for mining
 	pub fn get_block_template(&self) -> BlockTemplate {
-		let previous_block_height = self.storage.best_block().number;
-		let previous_block_header = self.storage.block_header(previous_block_height.into()).expect("best block is in db; qed");
-		let median_timestamp = median_timestamp_inclusive(previous_block_header.hash(), self.storage.as_block_header_provider());
-		let new_block_height = previous_block_height + 1;
-		let max_block_size = self.consensus.fork.max_block_size(new_block_height, median_timestamp);
+		let max_block_size = self.consensus.max_block_size();
+		let max_block_sigops = self.consensus.max_block_sigops();
 		let block_assembler = BlockAssembler {
 			max_block_size: max_block_size as u32,
-			max_block_sigops: self.consensus.fork.max_block_sigops(new_block_height, max_block_size) as u32,
+			max_block_sigops: max_block_sigops as u32,
 		};
 		let memory_pool = &*self.memory_pool.read();
-		block_assembler.create_new_block(&self.storage, memory_pool, time::get_time().sec as u32, median_timestamp, &self.consensus)
+		block_assembler.create_new_block(&self.storage, memory_pool, time::get_time().sec as u32, &self.consensus)
 	}
 
 	/// Install synchronization events listener
@@ -344,7 +294,7 @@ pub mod tests {
 	use synchronization_chain::Chain;
 	use message::types;
 	use message::common::{InventoryVector, InventoryType};
-	use network::{ConsensusParams, ConsensusFork, Network};
+	use network::{ConsensusParams, Network};
 	use chain::Transaction;
 	use db::{BlockChainDatabase};
 	use miner::MemoryPool;
@@ -378,12 +328,12 @@ pub mod tests {
 		let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let sync_state = SynchronizationStateRef::new(SynchronizationState::with_storage(storage.clone()));
-		let chain = Chain::new(storage.clone(), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore), memory_pool.clone());
+		let chain = Chain::new(storage.clone(), memory_pool.clone());
 		let sync_peers = Arc::new(PeersImpl::default());
 		let executor = DummyTaskExecutor::new();
 		let server = Arc::new(DummyServer::new());
 		let config = Config { close_connection_on_bad_block: true };
-		let chain_verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Mainnet, ConsensusFork::BitcoinCore)));
+		let chain_verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Mainnet)));
 		let client_core = SynchronizationClientCore::new(config, sync_state.clone(), sync_peers.clone(), executor.clone(), chain, chain_verifier);
 		let mut verifier = match verifier {
 			Some(verifier) => verifier,
@@ -391,7 +341,7 @@ pub mod tests {
 		};
 		verifier.set_sink(Arc::new(CoreVerificationSink::new(client_core.clone())));
 		let client = SynchronizationClient::new(sync_state.clone(), client_core, verifier);
-		let local_node = LocalNode::new(ConsensusParams::new(Network::Mainnet, ConsensusFork::BitcoinCore), storage, memory_pool, sync_peers, sync_state, executor.clone(), client, server.clone());
+		let local_node = LocalNode::new(ConsensusParams::new(Network::Mainnet), storage, memory_pool, sync_peers, sync_state, executor.clone(), client, server.clone());
 		(executor, server, local_node)
 	}
 
@@ -430,7 +380,7 @@ pub mod tests {
 		let result = local_node.accept_transaction(transaction.clone());
 		assert_eq!(result, Ok(transaction_hash.clone()));
 
-		assert_eq!(executor.take_tasks(), vec![Task::RelayNewTransaction(transaction.into(), 83333333)]);
+		assert_eq!(executor.take_tasks(), vec![Task::RelayNewTransaction(transaction.into(), 0)]);
 	}
 
 	#[test]

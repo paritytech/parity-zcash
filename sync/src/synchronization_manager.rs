@@ -392,7 +392,7 @@ mod tests {
 	fn manage_orphan_transactions_good() {
 		let config = ManageOrphanTransactionsConfig { removal_time_ms: 1000, max_number: 100 };
 		let mut pool = OrphanTransactionsPool::new();
-		let transaction = test_data::block_h170().transactions[1].clone();
+		let transaction = test_data::block_h522().transactions[3].clone();
 		let unknown_inputs: HashSet<H256> = transaction.inputs.iter().map(|i| i.previous_output.hash.clone()).collect();
 		pool.insert(transaction.into(), unknown_inputs);
 		assert_eq!(manage_orphaned_transactions(&config, &mut pool), None);
@@ -405,7 +405,7 @@ mod tests {
 		use std::time::Duration;
 		let config = ManageOrphanTransactionsConfig { removal_time_ms: 0, max_number: 100 };
 		let mut pool = OrphanTransactionsPool::new();
-		let transaction = test_data::block_h170().transactions[1].clone();
+		let transaction = test_data::block_h522().transactions[3].clone();
 		let unknown_inputs: HashSet<H256> = transaction.inputs.iter().map(|i| i.previous_output.hash.clone()).collect();
 		let transaction_hash = transaction.hash();
 		pool.insert(transaction.into(), unknown_inputs);
@@ -419,10 +419,10 @@ mod tests {
 	fn manage_orphan_transactions_by_max_number() {
 		let config = ManageOrphanTransactionsConfig { removal_time_ms: 100, max_number: 1 };
 		let mut pool = OrphanTransactionsPool::new();
-		let transaction1 = test_data::block_h170().transactions[1].clone();
+		let transaction1 = test_data::block_h522().transactions[3].clone();
 		let unknown_inputs1: HashSet<H256> = transaction1.inputs.iter().map(|i| i.previous_output.hash.clone()).collect();
 		let transaction1_hash = transaction1.hash();
-		let transaction2 = test_data::block_h182().transactions[1].clone();
+		let transaction2 = test_data::block_h567().transactions[1].clone();
 		let unknown_inputs2: HashSet<H256> = transaction2.inputs.iter().map(|i| i.previous_output.hash.clone()).collect();
 		pool.insert(transaction1.into(), unknown_inputs1);
 		pool.insert(transaction2.into(), unknown_inputs2);

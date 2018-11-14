@@ -63,31 +63,31 @@ impl<A> Future for ReadAnyMessage<A> where A: AsyncRead {
 mod tests {
 	use futures::Future;
 	use bytes::Bytes;
-	use network::{Network, ConsensusFork};
+	use network::{Network};
 	use message::Error;
 	use super::read_any_message;
 
 	#[test]
 	fn test_read_any_message() {
-		let raw: Bytes = "f9beb4d970696e6700000000000000000800000083c00c765845303b6da97786".into();
+		let raw: Bytes = "24e9276470696e6700000000000000000800000083c00c765845303b6da97786".into();
 		let name = "ping".into();
 		let nonce = "5845303b6da97786".into();
 		let expected = (name, nonce);
 
-		assert_eq!(read_any_message(raw.as_ref(), Network::Mainnet.magic(&ConsensusFork::BitcoinCore)).wait().unwrap(), Ok(expected));
-		assert_eq!(read_any_message(raw.as_ref(), Network::Testnet.magic(&ConsensusFork::BitcoinCore)).wait().unwrap(), Err(Error::InvalidMagic));
+		assert_eq!(read_any_message(raw.as_ref(), Network::Mainnet.magic()).wait().unwrap(), Ok(expected));
+		assert_eq!(read_any_message(raw.as_ref(), Network::Testnet.magic()).wait().unwrap(), Err(Error::InvalidMagic));
 	}
 
 	#[test]
 	fn test_read_too_short_any_message() {
-		let raw: Bytes = "f9beb4d970696e6700000000000000000800000083c00c765845303b6da977".into();
-		assert!(read_any_message(raw.as_ref(), Network::Mainnet.magic(&ConsensusFork::BitcoinCore)).wait().is_err());
+		let raw: Bytes = "24e9276470696e6700000000000000000800000083c00c765845303b6da977".into();
+		assert!(read_any_message(raw.as_ref(), Network::Mainnet.magic()).wait().is_err());
 	}
 
 
 	#[test]
 	fn test_read_any_message_with_invalid_checksum() {
-		let raw: Bytes = "f9beb4d970696e6700000000000000000800000083c01c765845303b6da97786".into();
-		assert_eq!(read_any_message(raw.as_ref(), Network::Mainnet.magic(&ConsensusFork::BitcoinCore)).wait().unwrap(), Err(Error::InvalidChecksum));
+		let raw: Bytes = "24e9276470696e6700000000000000000800000083c01c765845303b6da97786".into();
+		assert_eq!(read_any_message(raw.as_ref(), Network::Mainnet.magic()).wait().unwrap(), Err(Error::InvalidChecksum));
 	}
 }

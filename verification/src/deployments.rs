@@ -78,17 +78,6 @@ impl Deployments {
 			None => false
 		}
 	}
-
-	/// Returns true if SegWit deployment is active
-	pub fn segwit(&self, number: u32, headers: &BlockHeaderProvider, consensus: &ConsensusParams) -> bool {
-		match consensus.segwit_deployment {
-			Some(segwit) => {
-				let mut cache = self.cache.lock();
-				threshold_state(&mut cache, segwit, number, headers, consensus.miner_confirmation_window, consensus.rule_change_activation_threshold).is_active()
-			},
-			None => false
-		}
-	}
 }
 
 impl<'a> BlockDeployments<'a> {
@@ -103,10 +92,6 @@ impl<'a> BlockDeployments<'a> {
 
 	pub fn csv(&self) -> bool {
 		self.deployments.csv(self.number, self.headers, self.consensus)
-	}
-
-	pub fn segwit(&self) -> bool {
-		self.deployments.segwit(self.number, self.headers, self.consensus)
 	}
 }
 
@@ -293,7 +278,9 @@ mod tests {
 					merkle_root_hash: Default::default(),
 					time: time,
 					bits: 0.into(),
-					nonce: height,
+					nonce: (height as u8).into(),
+					reserved_hash: Default::default(),
+					solution: Default::default(),
 				};
 				previous_header_hash = header.hash();
 

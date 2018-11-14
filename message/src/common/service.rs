@@ -41,30 +41,12 @@ impl Services {
 		self
 	}
 
-	pub fn witness(&self) -> bool {
-		self.bit_at(3)
-	}
-
-	pub fn with_witness(mut self, v: bool) -> Self {
-		self.set_bit(3, v);
-		self
-	}
-
 	pub fn xthin(&self) -> bool {
 		self.bit_at(4)
 	}
 
 	pub fn with_xthin(mut self, v: bool) -> Self {
 		self.set_bit(4, v);
-		self
-	}
-
-	pub fn bitcoin_cash(&self) -> bool {
-		self.bit_at(5)
-	}
-
-	pub fn with_bitcoin_cash(mut self, v: bool) -> Self {
-		self.set_bit(5, v);
 		self
 	}
 
@@ -92,14 +74,10 @@ mod test {
 	#[test]
 	fn test_serivces_includes() {
 		let s1 = Services::default()
-			.with_witness(true)
 			.with_xthin(true);
-		let s2 = Services::default()
-			.with_witness(true);
+		let s2 = Services::default();
 
-		assert!(s1.witness());
 		assert!(s1.xthin());
-		assert!(s2.witness());
 		assert!(!s2.xthin());
 		assert!(s1.includes(&s2));
 		assert!(!s2.includes(&s1));

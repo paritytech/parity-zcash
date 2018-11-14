@@ -26,7 +26,7 @@ pub fn fetch(benchmark: &mut Benchmark) {
 				.lock_time(x as u32)
 				.output().value(5000000000).build()
 				.build()
-			.merkled_header().parent(rolling_hash.clone()).nonce(x as u32).build()
+			.merkled_header().parent(rolling_hash.clone()).nonce((x as u8).into()).build()
 			.build();
 		rolling_hash = next_block.hash();
 		blocks.push(next_block);
@@ -69,7 +69,7 @@ pub fn write(benchmark: &mut Benchmark) {
 				.lock_time(x as u32)
 				.output().value(5000000000).build()
 				.build()
-			.merkled_header().parent(rolling_hash.clone()).nonce(x as u32).build()
+			.merkled_header().parent(rolling_hash.clone()).nonce((x as u8).into()).build()
 			.build();
 		rolling_hash = next_block.hash();
 		blocks.push(next_block.into());
@@ -107,7 +107,7 @@ pub fn reorg_short(benchmark: &mut Benchmark) {
 				.lock_time(x as u32)
 				.output().value(5000000000).build()
 				.build()
-			.merkled_header().parent(rolling_hash.clone()).nonce(x as u32 * 4).build()
+			.merkled_header().parent(rolling_hash.clone()).nonce(((x * 4) as u8).into()).build()
 			.build();
 		rolling_hash = next_block.hash();
 		blocks.push(next_block);
@@ -118,7 +118,7 @@ pub fn reorg_short(benchmark: &mut Benchmark) {
 				.lock_time(x as u32)
 				.output().value(5000000000).build()
 				.build()
-			.merkled_header().parent(base).nonce(x as u32 * 4 + 2).build()
+			.merkled_header().parent(base).nonce(((x * 4 + 2) as u8).into()).build()
 			.build();
 		let next_base = next_block_side.hash();
 		blocks.push(next_block_side);
@@ -129,7 +129,7 @@ pub fn reorg_short(benchmark: &mut Benchmark) {
 				.lock_time(x as u32)
 				.output().value(5000000000).build()
 				.build()
-			.merkled_header().parent(next_base).nonce(x as u32 * 4 + 3).build()
+			.merkled_header().parent(next_base).nonce(((x * 4 + 3) as u8).into()).build()
 			.build();
 		blocks.push(next_block_side_continue);
 
@@ -139,7 +139,7 @@ pub fn reorg_short(benchmark: &mut Benchmark) {
 				.lock_time(x as u32)
 				.output().value(5000000000).build()
 				.build()
-			.merkled_header().parent(rolling_hash.clone()).nonce(x as u32 * 4 + 1).build()
+			.merkled_header().parent(rolling_hash.clone()).nonce(((x * 4 + 1) as u8).into()).build()
 			.build();
 		rolling_hash = next_block_continue.hash();
 		blocks.push(next_block_continue);
@@ -208,7 +208,7 @@ pub fn write_heavy(benchmark: &mut Benchmark) {
 				.lock_time(x as u32)
 				.output().value(5000000000).build()
 				.build()
-			.merkled_header().parent(rolling_hash.clone()).nonce(x as u32).build()
+			.merkled_header().parent(rolling_hash.clone()).nonce((x as u8).into()).build()
 			.build();
 		rolling_hash = next_block.hash();
 		blocks.push(next_block);

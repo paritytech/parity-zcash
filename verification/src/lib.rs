@@ -53,11 +53,14 @@
 
 extern crate time;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate log;
 extern crate parking_lot;
 extern crate rayon;
+extern crate blake2_rfc;
+extern crate byteorder;
+#[cfg(test)]
+extern crate rand;
+extern crate rustc_hex as hex;
 
 extern crate storage;
 extern crate chain;
@@ -73,11 +76,12 @@ pub mod constants;
 mod canon;
 mod deployments;
 mod duplex_store;
+mod equihash;
 mod error;
 mod sigops;
 mod timestamp;
 mod work;
-mod work_bch;
+mod work_zcash;
 
 // pre-verification
 mod verify_block;

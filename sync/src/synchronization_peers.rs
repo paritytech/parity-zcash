@@ -14,8 +14,6 @@ pub enum BlockAnnouncementType {
 	SendInventory,
 	/// Send headers message with block header
 	SendHeaders,
-	/// Send cmpctblock message with this block
-	SendCompactBlock,
 	/// Do not announce blocks at all
 	DoNotAnnounce,
 }
@@ -40,8 +38,6 @@ pub struct MerkleBlockArtefacts {
 
 /// Connected peers
 pub trait Peers : Send + Sync + PeersContainer + PeersFilters + PeersOptions {
-	/// Require peers services.
-	fn require_peer_services(&self, services: Services);
 	/// Get peer connection
 	fn connection(&self, peer_index: PeerIndex) -> Option<OutboundSyncConnectionRef>;
 }
@@ -78,16 +74,12 @@ pub trait PeersFilters {
 	fn hash_known_as(&self, peer_index: PeerIndex, hash: H256, hash_type: KnownHashType);
 	/// Is given hash known by peer as hash of given type
 	fn is_hash_known_as(&self, peer_index: PeerIndex, hash: &H256, hash_type: KnownHashType) -> bool;
-	/// Build compact block using filter for given peer
-	fn build_compact_block(&self, peer_index: PeerIndex, block: &IndexedBlock) -> Option<types::CompactBlock>;
 	/// Build merkle block using filter for given peer
 	fn build_merkle_block(&self, peer_index: PeerIndex, block: &IndexedBlock) -> Option<MerkleBlockArtefacts>;
 }
 
 /// Options for peers connections
 pub trait PeersOptions {
-	/// Is node supporting SegWit?
-	fn is_segwit_enabled(&self, peer_index: PeerIndex) -> bool;
 	/// Set up new block announcement type for the connection
 	fn set_block_announcement_type(&self, peer_index: PeerIndex, announcement_type: BlockAnnouncementType);
 	/// Set up new transaction announcement type for the connection
@@ -129,19 +121,6 @@ impl Peer {
 }
 
 impl Peers for PeersImpl {
-	fn require_peer_services(&self, services: Services) {
-		// possible optimization: force p2p level to establish connections to SegWit-nodes only
-		// without it, all other nodes will be eventually banned (this could take some time, though)
-		let mut peers = self.peers.write();
-		for peer_index in peers.iter().filter(|&(_, p)| p.services.includes(&services)).map(|(p, _)| *p).collect::<Vec<_>>() {
-			let peer = peers.remove(&peer_index).expect("iterating peers keys; qed"); 
-			let expected_services: u64 = services.into();
-			let actual_services: u64 = peer.services.into();
-			warn!(target: "sync", "Disconnecting from peer#{} because of insufficient services. Expected {:x}, actual: {:x}", peer_index, expected_services, actual_services);
-			peer.connection.close();
-		}
-	}
-
 	fn connection(&self, peer_index: PeerIndex) -> Option<OutboundSyncConnectionRef> {
 		self.peers.read().get(&peer_index).map(|peer| peer.connection.clone())
 	}
@@ -235,11 +214,6 @@ impl PeersFilters for PeersImpl {
 			.unwrap_or(false)
 	}
 
-	fn build_compact_block(&self, peer_index: PeerIndex, block: &IndexedBlock) -> Option<types::CompactBlock> {
-		self.peers.read().get(&peer_index)
-			.map(|peer| peer.filter.build_compact_block(block))
-	}
-
 	fn build_merkle_block(&self, peer_index: PeerIndex, block: &IndexedBlock) -> Option<MerkleBlockArtefacts> {
 		self.peers.read().get(&peer_index)
 			.and_then(|peer| peer.filter.build_merkle_block(block))
@@ -247,13 +221,6 @@ impl PeersFilters for PeersImpl {
 }
 
 impl PeersOptions for PeersImpl {
-	fn is_segwit_enabled(&self, peer_index: PeerIndex) -> bool {
-		self.peers.read()
-			.get(&peer_index)
-			.map(|peer| peer.services.witness())
-			.unwrap_or_default()
-	}
-
 	fn set_block_announcement_type(&self, peer_index: PeerIndex, announcement_type: BlockAnnouncementType) {
 		if let Some(peer) = self.peers.write().get_mut(&peer_index) {
 			peer.block_announcement_type = announcement_type;

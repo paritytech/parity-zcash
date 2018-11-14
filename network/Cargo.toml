@@ -7,3 +7,5 @@ authors = ["debris <marek.kotewicz@gmail.com>"]
 lazy_static = "1.0"
 chain = { path = "../chain" }
 primitives = { path = "../primitives" }
+serialization = { path = "../serialization" }
+rustc-hex = "2"

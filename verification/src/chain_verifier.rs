@@ -13,7 +13,6 @@ use verify_transaction::MemoryPoolTransactionVerifier;
 use accept_chain::ChainAcceptor;
 use accept_transaction::MemoryPoolTransactionAcceptor;
 use deployments::{Deployments, BlockDeployments};
-use timestamp::median_timestamp_inclusive;
 use {Verify, VerificationLevel};
 
 pub struct BackwardsCompatibleChainVerifier {
@@ -38,14 +37,13 @@ impl BackwardsCompatibleChainVerifier {
 
 		let current_time = ::time::get_time().sec as u32;
 		// first run pre-verification
-		let chain_verifier = ChainVerifier::new(block, self.consensus.network, current_time);
+		let chain_verifier = ChainVerifier::new(block, &self.consensus, current_time);
 		chain_verifier.check()?;
 
 		assert_eq!(Some(self.store.best_block().hash), self.store.block_hash(self.store.best_block().number));
 		let block_origin = self.store.block_origin(&block.header)?;
 		trace!(target: "verification", "verify_block: {:?} best_block: {:?} block_origin: {:?}", block.hash().reversed(), self.store.best_block(), block_origin);
 
-		let median_time_past = median_timestamp_inclusive(block.header.raw.previous_header_hash.clone(), self.store.as_block_header_provider());
 		match block_origin {
 			BlockOrigin::KnownBlock => {
 				// there should be no known blocks at this point
@@ -56,7 +54,7 @@ impl BackwardsCompatibleChainVerifier {
 				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
 				let canon_block = CanonBlock::new(block);
 				let chain_acceptor = ChainAcceptor::new(self.store.as_store(), &self.consensus, verification_level,
-					canon_block, block_number, median_time_past, &deployments);
+					canon_block, block_number, &deployments);
 				chain_acceptor.check()?;
 			},
 			BlockOrigin::SideChain(origin) => {
@@ -66,7 +64,7 @@ impl BackwardsCompatibleChainVerifier {
 				let fork = self.store.fork(origin)?;
 				let canon_block = CanonBlock::new(block);
 				let chain_acceptor = ChainAcceptor::new(fork.store(), &self.consensus, verification_level, canon_block,
-					block_number, median_time_past, &deployments);
+					block_number, &deployments);
 				chain_acceptor.check()?;
 			},
 			BlockOrigin::SideChainBecomingCanonChain(origin) => {
@@ -76,7 +74,7 @@ impl BackwardsCompatibleChainVerifier {
 				let fork = self.store.fork(origin)?;
 				let canon_block = CanonBlock::new(block);
 				let chain_acceptor = ChainAcceptor::new(fork.store(), &self.consensus, verification_level, canon_block,
-					block_number, median_time_past, &deployments);
+					block_number, &deployments);
 				chain_acceptor.check()?;
 			},
 		}
@@ -95,7 +93,7 @@ impl BackwardsCompatibleChainVerifier {
 		// TODO: full verification
 		let current_time = ::time::get_time().sec as u32;
 		let header = IndexedBlockHeader::new(hash.clone(), header.clone());
-		let header_verifier = HeaderVerifier::new(&header, self.consensus.network, current_time);
+		let header_verifier = HeaderVerifier::new(&header, &self.consensus, current_time);
 		header_verifier.check()
 	}
 
@@ -110,18 +108,13 @@ impl BackwardsCompatibleChainVerifier {
 		let indexed_tx = transaction.clone().into();
 		// let's do preverification first
 		let deployments = BlockDeployments::new(&self.deployments, height, block_header_provider, &self.consensus);
-		let tx_verifier = MemoryPoolTransactionVerifier::new(&indexed_tx, &self.consensus, &deployments);
+		let tx_verifier = MemoryPoolTransactionVerifier::new(&indexed_tx, &self.consensus);
 		try!(tx_verifier.check());
 
 		let canon_tx = CanonTransaction::new(&indexed_tx);
 		// now let's do full verification
 		let noop = NoopStore;
 		let output_store = DuplexTransactionOutputProvider::new(prevout_provider, &noop);
-		let previous_block_number = height.checked_sub(1)
-			.expect("height is the height of future block of new tx; genesis block can't be in the future; qed");
-		let previous_block_header = block_header_provider.block_header(previous_block_number.into())
-			.expect("blocks up to height should be in db; qed");
-		let median_time_past = median_timestamp_inclusive(previous_block_header.hash(), block_header_provider);
 		let tx_acceptor = MemoryPoolTransactionAcceptor::new(
 			self.store.as_transaction_meta_provider(),
 			output_store,
@@ -129,7 +122,6 @@ impl BackwardsCompatibleChainVerifier {
 			canon_tx,
 			height,
 			time,
-			median_time_past,
 			&deployments,
 		);
 		tx_acceptor.check()
@@ -154,12 +146,11 @@ mod tests {
 	extern crate test_data;
 
 	use std::sync::Arc;
-	use chain::{IndexedBlock, Transaction, Block};
+	use chain::{IndexedBlock};
 	use storage::Error as DBError;
 	use db::BlockChainDatabase;
-	use network::{Network, ConsensusParams, ConsensusFork, BitcoinCashConsensusParams};
+	use network::{Network, ConsensusParams};
 	use script;
-	use constants::DOUBLE_SPACING_SECONDS;
 	use super::BackwardsCompatibleChainVerifier as ChainVerifier;
 	use {Verify, Error, TransactionError, VerificationLevel};
 
@@ -167,7 +158,7 @@ mod tests {
 	fn verify_orphan() {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let b2 = test_data::block_h2().into();
-		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
+		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Unitest));
 		assert_eq!(Err(Error::Database(DBError::UnknownParent)), verifier.verify(VerificationLevel::Full, &b2));
 	}
 
@@ -175,8 +166,8 @@ mod tests {
 	fn verify_smoky() {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let b1 = test_data::block_h1();
-		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
-		assert!(verifier.verify(VerificationLevel::Full, &b1.into()).is_ok());
+		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Mainnet));
+		assert_eq!(verifier.verify(VerificationLevel::Full, &b1.into()), Ok(()));
 	}
 
 	#[test]
@@ -187,8 +178,8 @@ mod tests {
 				test_data::block_h1().into(),
 			]);
 		let b1 = test_data::block_h2();
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
-		assert!(verifier.verify(VerificationLevel::Full, &b1.into()).is_ok());
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Mainnet));
+		assert_eq!(verifier.verify(VerificationLevel::Full, &b1.into()), Ok(()));
 	}
 
 	#[test]
@@ -216,7 +207,7 @@ mod tests {
 			.merkled_header().parent(genesis.hash()).build()
 			.build();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 
 		let expected = Err(Error::Transaction(
 			1,
@@ -254,8 +245,8 @@ mod tests {
 			.merkled_header().parent(genesis.hash()).build()
 			.build();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
-		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
+		assert_eq!(verifier.verify(VerificationLevel::Full, &block.into()), Ok(()));
 	}
 
 	#[test]
@@ -290,7 +281,7 @@ mod tests {
 			.merkled_header().parent(genesis.hash()).build()
 			.build();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
 	}
 
@@ -329,74 +320,10 @@ mod tests {
 			.merkled_header().parent(genesis.hash()).build()
 			.build();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 
 		let expected = Err(Error::Transaction(2, TransactionError::Overspend));
 		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
-	}
-
-	#[test]
-	fn transaction_references_same_block_and_goes_before_previous() {
-		let mut blocks = vec![test_data::block_builder()
-			.transaction()
-				.coinbase()
-				.output().value(50).build()
-				.build()
-			.merkled_header().build()
-			.build()];
-		let input_tx = blocks[0].transactions()[0].clone();
-		let mut parent_hash = blocks[0].hash();
-		// waiting 100 blocks for genesis coinbase to become valid
-		for _ in 0..100 {
-			let block: Block = test_data::block_builder()
-				.transaction().coinbase().build()
-				.merkled_header().parent(parent_hash).build()
-				.build()
-				.into();
-			parent_hash = block.hash();
-			blocks.push(block);
-		}
-
-		let storage = Arc::new(BlockChainDatabase::init_test_chain(blocks.into_iter().map(Into::into).collect()));
-
-		let tx1: Transaction = test_data::TransactionBuilder::with_version(4)
-			.add_input(&input_tx, 0)
-			.add_output(10).add_output(10).add_output(10)
-			.add_output(5).add_output(5).add_output(5)
-			.into();
-		let tx2: Transaction = test_data::TransactionBuilder::with_version(1)
-			.add_input(&tx1, 0)
-			.add_output(1).add_output(1).add_output(1)
-			.add_output(2).add_output(2).add_output(2)
-			.into();
-		assert!(tx1.hash() > tx2.hash());
-
-		let block = test_data::block_builder()
-			.transaction()
-				.coinbase()
-				.output().value(2).script_pubkey_with_sigops(100).build()
-				.build()
-			.with_transaction(tx2)
-			.with_transaction(tx1)
-			.merkled_header()
-				.time(DOUBLE_SPACING_SECONDS + 101) // to pass BCH work check
-				.parent(parent_hash)
-				.build()
-			.build();
-
-		// when topological order is required
-		let topological_consensus = ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore);
-		let verifier = ChainVerifier::new(storage.clone(), topological_consensus);
-		let expected = Err(Error::Transaction(1, TransactionError::Overspend));
-		assert_eq!(expected, verifier.verify(VerificationLevel::Header, &block.clone().into()));
-
-		// when canonical order is required
-		let mut canonical_params = BitcoinCashConsensusParams::new(Network::Unitest);
-		canonical_params.magnetic_anomaly_time = 0;
-		let canonical_consensus = ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCash(canonical_params));
-		let verifier = ChainVerifier::new(storage, canonical_consensus);
-		let expected = Ok(());
-		assert_eq!(expected, verifier.verify(VerificationLevel::Header, &block.into()));
 	}
 
 	#[test]
@@ -435,7 +362,7 @@ mod tests {
 			.merkled_header().parent(best_hash).build()
 			.build();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
 	}
 
@@ -482,7 +409,7 @@ mod tests {
 			.build()
 			.into();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 		let expected = Err(Error::MaximumSigops);
 		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
 	}
@@ -504,7 +431,7 @@ mod tests {
 			.build()
 			.into();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
+		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 
 		let expected = Err(Error::CoinbaseOverspend {
 			expected_max: 5000000000,

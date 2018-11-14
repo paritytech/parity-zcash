@@ -13,7 +13,7 @@ pub fn read_message<M, A>(a: A, magic: Magic, version: u32) -> ReadMessage<M, A>
 			version: version,
 			future: read_header(a, magic),
 		},
-		message_type: PhantomData
+		message_type: PhantomData,
 	}
 }
 
@@ -45,6 +45,7 @@ impl<M, A> Future for ReadMessage<M, A> where A: AsyncRead, M: Payload {
 						Ok(header) => header,
 						Err(err) => return Ok((read, Err(err)).into()),
 					};
+
 					if header.command != M::command() {
 						return Ok((read, Err(Error::InvalidCommand)).into());
 					}
@@ -69,30 +70,30 @@ impl<M, A> Future for ReadMessage<M, A> where A: AsyncRead, M: Payload {
 mod tests {
 	use futures::Future;
 	use bytes::Bytes;
-	use network::{Network, ConsensusFork};
+	use network::{Network};
 	use message::Error;
 	use message::types::{Ping, Pong};
 	use super::read_message;
 
 	#[test]
 	fn test_read_message() {
-		let raw: Bytes = "f9beb4d970696e6700000000000000000800000083c00c765845303b6da97786".into();
+		let raw: Bytes = "24e9276470696e6700000000000000000800000083c00c765845303b6da97786".into();
 		let ping = Ping::new(u64::from_str_radix("8677a96d3b304558", 16).unwrap());
-		assert_eq!(read_message(raw.as_ref(), Network::Mainnet.magic(&ConsensusFork::BitcoinCore), 0).wait().unwrap().1, Ok(ping));
-		assert_eq!(read_message::<Ping, _>(raw.as_ref(), Network::Testnet.magic(&ConsensusFork::BitcoinCore), 0).wait().unwrap().1, Err(Error::InvalidMagic));
-		assert_eq!(read_message::<Pong, _>(raw.as_ref(), Network::Mainnet.magic(&ConsensusFork::BitcoinCore), 0).wait().unwrap().1, Err(Error::InvalidCommand));
+		assert_eq!(read_message(raw.as_ref(), Network::Mainnet.magic(), 0).wait().unwrap().1, Ok(ping));
+		assert_eq!(read_message::<Ping, _>(raw.as_ref(), Network::Testnet.magic(), 0).wait().unwrap().1, Err(Error::InvalidMagic));
+		assert_eq!(read_message::<Pong, _>(raw.as_ref(), Network::Mainnet.magic(), 0).wait().unwrap().1, Err(Error::InvalidCommand));
 	}
 
 	#[test]
 	fn test_read_too_short_message() {
-		let raw: Bytes = "f9beb4d970696e6700000000000000000800000083c00c765845303b6da977".into();
-		assert!(read_message::<Ping, _>(raw.as_ref(), Network::Mainnet.magic(&ConsensusFork::BitcoinCore), 0).wait().is_err());
+		let raw: Bytes = "24e9276470696e6700000000000000000800000083c00c765845303b6da977".into();
+		assert!(read_message::<Ping, _>(raw.as_ref(), Network::Mainnet.magic(), 0).wait().is_err());
 	}
 
 
 	#[test]
 	fn test_read_message_with_invalid_checksum() {
-		let raw: Bytes = "f9beb4d970696e6700000000000000000800000083c01c765845303b6da97786".into();
-		assert_eq!(read_message::<Ping, _>(raw.as_ref(), Network::Mainnet.magic(&ConsensusFork::BitcoinCore), 0).wait().unwrap().1, Err(Error::InvalidChecksum));
+		let raw: Bytes = "24e9276470696e6700000000000000000800000083c01c765845303b6da97786".into();
+		assert_eq!(read_message::<Ping, _>(raw.as_ref(), Network::Mainnet.magic(), 0).wait().unwrap().1, Err(Error::InvalidChecksum));
 	}
 }

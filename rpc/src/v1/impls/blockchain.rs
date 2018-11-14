@@ -14,7 +14,7 @@ use global_script::Script;
 use chain::OutPoint;
 use verification;
 use ser::serialize;
-use network::Network;
+use network::{Network};
 use primitives::hash::H256 as GlobalH256;
 
 pub struct BlockChainClient<T: BlockChainClientCoreApi> {
@@ -38,7 +38,6 @@ pub struct BlockChainClientCore {
 
 impl BlockChainClientCore {
 	pub fn new(network: Network, storage: storage::SharedStore) -> Self {
-
 		BlockChainClientCore {
 			network: network,
 			storage: storage,
@@ -60,7 +59,7 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 	}
 
 	fn difficulty(&self) -> f64 {
-		self.storage.difficulty()
+		self.storage.difficulty(self.network.max_bits().into())
 	}
 
 	fn raw_block(&self, hash: GlobalH256) -> Option<RawBlock> {
@@ -88,18 +87,16 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 				VerboseBlock {
 					confirmations: confirmations,
 					size: block_size as u32,
-					strippedsize: block_size as u32, // TODO: segwit
-					weight: block_size as u32, // TODO: segwit
 					height: height,
 					mediantime: Some(median_time),
-					difficulty: block.header.raw.bits.to_f64(),
+					difficulty: block.header.raw.bits.to_f64(self.network.max_bits().into()),
 					chainwork: U256::default(), // TODO: read from storage
 					previousblockhash: Some(block.header.raw.previous_header_hash.clone().into()),
 					nextblockhash: height.and_then(|h| self.storage.block_hash(h + 1).map(|h| h.into())),
 					bits: block.header.raw.bits.into(),
 					hash: block.hash().clone().into(),
 					merkleroot: block.header.raw.merkle_root_hash.clone().into(),
-					nonce: block.header.raw.nonce,
+					nonce: block.header.raw.nonce.clone().into(),
 					time: block.header.raw.time,
 					tx: block.transactions.into_iter().map(|t| t.hash.into()).collect(),
 					version: block.header.raw.version,
@@ -287,8 +284,6 @@ pub mod tests {
 				hash: "bddd99ccfda39da1b108ce1a5d70038d0a967bacb68b6b63065f626a00000000".into(),
 				confirmations: 1, // h2
 				size: 215,
-				strippedsize: 215,
-				weight: 215,
 				height: Some(2),
 				version: 1,
 				version_hex: "1".to_owned(),
@@ -296,7 +291,7 @@ pub mod tests {
 				tx: vec!["d5fdcc541e25de1c7a5addedf24858b8bb665c9f36ef744ee42c316022c90f9b".into()],
 				time: 1231469744,
 				mediantime: None,
-				nonce: 1639830024,
+				nonce: 42.into(),
 				bits: 486604799,
 				difficulty: 1.0,
 				chainwork: 0.into(),
@@ -367,9 +362,7 @@ pub mod tests {
 				"id": 1
 			}"#)).unwrap();
 
-		// direct hash is 6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000
-		// but client expects reverse hash
-		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":"000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f","id":1}"#);
+		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":"00040fe8ec8471911baa1db1266ea15dd06b4a8a5c453883c000b031973dce08","id":1}"#);
 	}
 
 	#[test]
@@ -403,9 +396,7 @@ pub mod tests {
 				"id": 1
 			}"#)).unwrap();
 
-		// direct hash is 6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000
-		// but client expects reverse hash
-		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":"000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f","id":1}"#);
+		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":"00040fe8ec8471911baa1db1266ea15dd06b4a8a5c453883c000b031973dce08","id":1}"#);
 	}
 
 	#[test]
@@ -458,51 +449,47 @@ pub mod tests {
 		// https://blockexplorer.com/block/00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048
 		// https://blockchain.info/block/00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048
 		// https://webbtc.com/block/00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048.json
-		let verbose_block = core.verbose_block("4860eb18bf1b1620e37e9490fc8a427514416fd75159ab86688e9a8300000000".into());
+		let verbose_block = core.verbose_block("8392336da29773c56b1649ab555156ceb7e700ad7c230ea7a4571c7e22bc0700".into());
 		assert_eq!(verbose_block, Some(VerboseBlock {
-			hash: "4860eb18bf1b1620e37e9490fc8a427514416fd75159ab86688e9a8300000000".into(),
+			hash: "8392336da29773c56b1649ab555156ceb7e700ad7c230ea7a4571c7e22bc0700".into(),
 			confirmations: 2, // h1 + h2
-			size: 215,
-			strippedsize: 215,
-			weight: 215,
+			size: 1617,
 			height: Some(1),
-			version: 1,
-			version_hex: "1".to_owned(),
-			merkleroot: "982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e".into(),
-			tx: vec!["982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e".into()],
-			time: 1231469665,
-			mediantime: Some(1231006505),
-			nonce: 2573394689,
-			bits: 486604799,
+			version: 4,
+			version_hex: "4".to_owned(),
+			merkleroot: "0946edb9c083c9942d92305444527765fad789c438c717783276a9f7fbf61b85".into(),
+			tx: vec!["0946edb9c083c9942d92305444527765fad789c438c717783276a9f7fbf61b85".into()],
+			time: 1477671596,
+			mediantime: Some(1477641360),
+			nonce: "7534e8cf161ff2e49d54bdb3bfbcde8cdbf2fc5963c9ec7d86aed4a67e975790".into(),
+			bits: 520617983,
 			difficulty: 1.0,
 			chainwork: 0.into(),
-			previousblockhash: Some("6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000".into()),
-			nextblockhash: Some("bddd99ccfda39da1b108ce1a5d70038d0a967bacb68b6b63065f626a00000000".into()),
+			previousblockhash: Some("08ce3d9731b000c08338455c8a4a6bd05da16e26b11daa1b917184ece80f0400".into()),
+			nextblockhash: Some("ed73e297d7c51cb8dc53fc2213d7e2e3f116eb4f26434496fc1926906ca20200".into()),
 		}));
 
 		// get info on block #2:
 		// https://blockexplorer.com/block/000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd
 		// https://blockchain.info/ru/block/000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd
 		// https://webbtc.com/block/000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd.json
-		let verbose_block = core.verbose_block("bddd99ccfda39da1b108ce1a5d70038d0a967bacb68b6b63065f626a00000000".into());
+		let verbose_block = core.verbose_block("ed73e297d7c51cb8dc53fc2213d7e2e3f116eb4f26434496fc1926906ca20200".into());
 		assert_eq!(verbose_block, Some(VerboseBlock {
-			hash: "bddd99ccfda39da1b108ce1a5d70038d0a967bacb68b6b63065f626a00000000".into(),
+			hash: "ed73e297d7c51cb8dc53fc2213d7e2e3f116eb4f26434496fc1926906ca20200".into(),
 			confirmations: 1, // h2
-			size: 215,
-			strippedsize: 215,
-			weight: 215,
+			size: 1617,
 			height: Some(2),
-			version: 1,
-			version_hex: "1".to_owned(),
-			merkleroot: "d5fdcc541e25de1c7a5addedf24858b8bb665c9f36ef744ee42c316022c90f9b".into(),
-			tx: vec!["d5fdcc541e25de1c7a5addedf24858b8bb665c9f36ef744ee42c316022c90f9b".into()],
-			time: 1231469744,
-			mediantime: Some(1231469665),
-			nonce: 1639830024,
-			bits: 486604799,
+			version: 4,
+			version_hex: "4".to_owned(),
+			merkleroot: "f4b084a7c2fc5a5aa2985f2bcb1d4a9a65562a589d628b0d869c5f1c8dd07489".into(),
+			tx: vec!["f4b084a7c2fc5a5aa2985f2bcb1d4a9a65562a589d628b0d869c5f1c8dd07489".into()],
+			time: 1477671626,
+			mediantime: Some(1477671596),
+			nonce: "a5556cd346010000000000000000000000000000000000000000000000000002".into(),
+			bits: 520617983,
 			difficulty: 1.0,
 			chainwork: 0.into(),
-			previousblockhash: Some("4860eb18bf1b1620e37e9490fc8a427514416fd75159ab86688e9a8300000000".into()),
+			previousblockhash: Some("8392336da29773c56b1649ab555156ceb7e700ad7c230ea7a4571c7e22bc0700".into()),
 			nextblockhash: None,
 		}));
 	}
@@ -566,7 +553,7 @@ pub mod tests {
 				"id": 1
 			}"#)).unwrap();
 
-		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":{"bits":486604799,"chainwork":"0","confirmations":1,"difficulty":1.0,"hash":"000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd","height":2,"mediantime":null,"merkleroot":"9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5","nextblockhash":null,"nonce":1639830024,"previousblockhash":"00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048","size":215,"strippedsize":215,"time":1231469744,"tx":["9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5"],"version":1,"versionHex":"1","weight":215},"id":1}"#);
+		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":{"bits":486604799,"chainwork":"0","confirmations":1,"difficulty":1.0,"hash":"000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd","height":2,"mediantime":null,"merkleroot":"9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5","nextblockhash":null,"nonce":"2a00000000000000000000000000000000000000000000000000000000000000","previousblockhash":"00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048","size":215,"time":1231469744,"tx":["9b0fc92260312ce44e74ef369f5c66bbb85848f2eddd5a7a1cde251e54ccfdd5"],"version":1,"versionHex":"1"},"id":1}"#);
 	}
 
 	#[test]
@@ -586,23 +573,24 @@ pub mod tests {
 		assert_eq!(&sample, r#"{"jsonrpc":"2.0","error":{"code":-32099,"message":"Block with given hash is not found","data":"000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd"},"id":1}"#);
 	}
 
+	#[ignore("TODO: Needs ZCash address")]
 	#[test]
 	fn verbose_transaction_out_contents() {
-		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
+		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into(), test_data::block_h1().into()]));
 		let core = BlockChainClientCore::new(Network::Mainnet, storage);
 
-		// get info on tx from genesis block:
-		// https://blockchain.info/ru/tx/4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
+		// get info on tx from block#1:
+		// https://zcash.blockexplorer.com/tx/851bf6fbf7a976327817c738c489d7fa657752445430922d94c983c0b9ed4609
 		let verbose_transaction_out = core.verbose_transaction_out(OutPoint {
-			hash: "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a".into(),
+			hash: "0946edb9c083c9942d92305444527765fad789c438c717783276a9f7fbf61b85".into(),
 			index: 0,
 		});
 		assert_eq!(verbose_transaction_out, Ok(GetTxOutResponse {
-				bestblock: "6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000".into(),
+				bestblock: "8392336da29773c56b1649ab555156ceb7e700ad7c230ea7a4571c7e22bc0700".into(),
 				confirmations: 1,
-				value: 50.0,
+				value: 0.0005,
 				script: TransactionOutputScript {
-					asm: "OP_PUSHBYTES_65 0x04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f\nOP_CHECKSIG\n".to_owned(),
+					asm: "OP_PUSHBYTES_33 0x027a46eb513588b01b37ea24303f4b628afd12cc20df789fede0921e43cad3e875\nOP_CHECKSIG\n".to_owned(),
 					hex: Bytes::from("4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac"),
 					req_sigs: 1,
 					script_type: ScriptType::PubKey,

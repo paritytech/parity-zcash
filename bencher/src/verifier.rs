@@ -2,7 +2,7 @@ use std::sync::Arc;
 use db::BlockChainDatabase;
 use chain::IndexedBlock;
 use verification::{BackwardsCompatibleChainVerifier as ChainVerifier, Verify, VerificationLevel};
-use network::{Network, ConsensusParams, ConsensusFork};
+use network::{Network, ConsensusParams};
 use test_data;
 use byteorder::{LittleEndian, ByteOrder};
 
@@ -43,7 +43,7 @@ pub fn main(benchmark: &mut Benchmark) {
 				.build()
 			.merkled_header()
 				.parent(rolling_hash.clone())
-				.nonce(x as u32)
+				.nonce((x as u8).into())
 				.build()
 			.build();
 		rolling_hash = next_block.hash();
@@ -96,7 +96,7 @@ pub fn main(benchmark: &mut Benchmark) {
 
 	assert_eq!(store.best_block().hash, rolling_hash);
 
-	let chain_verifier = ChainVerifier::new(store.clone(), ConsensusParams::new(Network::Unitest, ConsensusFork::BitcoinCore));
+	let chain_verifier = ChainVerifier::new(store.clone(), ConsensusParams::new(Network::Unitest));
 
 	// bench
 	benchmark.start();

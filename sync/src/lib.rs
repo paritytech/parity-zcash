@@ -42,7 +42,6 @@ pub use types::PeersRef;
 
 use std::sync::Arc;
 use parking_lot::RwLock;
-use message::Services;
 use network::{Network, ConsensusParams};
 use primitives::hash::H256;
 use verification::BackwardsCompatibleChainVerifier as ChainVerifier;
@@ -109,10 +108,7 @@ pub fn create_local_sync_node(consensus: ConsensusParams, db: storage::SharedSto
 
 	let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
 	let sync_state = SynchronizationStateRef::new(SynchronizationState::with_storage(db.clone()));
-	let sync_chain = SyncChain::new(db.clone(), consensus.clone(), memory_pool.clone());
-	if sync_chain.is_segwit_possible() {
-		peers.require_peer_services(Services::default().with_witness(true));
-	}
+	let sync_chain = SyncChain::new(db.clone(), memory_pool.clone());
 
 	let chain_verifier = Arc::new(ChainVerifier::new(db.clone(), consensus.clone()));
 	let sync_executor = SyncExecutor::new(peers.clone());

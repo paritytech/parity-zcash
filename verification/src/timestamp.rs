@@ -23,5 +23,6 @@ pub fn median_timestamp_inclusive(previous_header_hash: H256, store: &BlockHeade
 	}
 
 	timestamps.sort();
+
 	timestamps[timestamps.len() / 2]
 }
