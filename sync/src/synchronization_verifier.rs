@@ -264,14 +264,13 @@ pub mod tests {
 	use std::collections::{HashSet, HashMap};
 	use db::BlockChainDatabase;
 	use network::{Network, ConsensusParams};
-	use verification::{VerificationLevel, BackwardsCompatibleChainVerifier as ChainVerifier, Error as VerificationError, TransactionError};
+	use verification::{VerificationLevel, BackwardsCompatibleChainVerifier as ChainVerifier, Error as VerificationError};
 	use synchronization_client_core::CoreVerificationSink;
 	use synchronization_executor::tests::DummyTaskExecutor;
 	use primitives::hash::H256;
 	use chain::{IndexedBlock, IndexedTransaction};
 	use super::{Verifier, BlockVerificationSink, TransactionVerificationSink, AsyncVerifier, VerificationTask, ChainVerifierWrapper};
 	use types::{BlockHeight, StorageRef, MemoryPoolRef};
-	use script::Error as ScriptError;
 	use VerificationParameters;
 
 	#[derive(Default)]

@@ -210,7 +210,7 @@ mod tests {
 	use tokio_io::{AsyncRead, AsyncWrite};
 	use bytes::Bytes;
 	use ser::Stream;
-	use network::{Network, ConsensusParams};
+	use network::Network;
 	use message::{Message, Error};
 	use message::types::Verack;
 	use message::types::version::{Version, V0, V106, V70001};

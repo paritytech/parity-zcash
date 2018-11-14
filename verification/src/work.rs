@@ -1,24 +1,10 @@
-use std::cmp;
 use primitives::compact::Compact;
 use primitives::hash::H256;
 use primitives::bigint::U256;
-use chain::{IndexedBlockHeader, BlockHeader};
-use network::{Network, ConsensusParams};
-use storage::{BlockHeaderProvider, BlockRef};
+use chain::IndexedBlockHeader;
+use network::ConsensusParams;
+use storage::BlockHeaderProvider;
 use work_zcash::work_required_zcash;
-
-use constants::{
-	DOUBLE_SPACING_SECONDS, TARGET_TIMESPAN_SECONDS,
-	MIN_TIMESPAN, MAX_TIMESPAN, RETARGETING_INTERVAL
-};
-
-pub fn is_retarget_height(height: u32) -> bool {
-	height % RETARGETING_INTERVAL == 0
-}
-
-fn range_constrain(value: i64, min: i64, max: i64) -> i64 {
-	cmp::min(cmp::max(value, min), max)
-}
 
 /// Returns true if hash is lower or equal than target represented by compact bits
 pub fn is_valid_proof_of_work_hash(bits: Compact, hash: &H256) -> bool {
@@ -48,16 +34,8 @@ pub fn is_valid_proof_of_work(max_work_bits: Compact, bits: Compact, hash: &H256
 	target <= maximum && value <= target
 }
 
-/// Returns constrained number of seconds since last retarget
-pub fn retarget_timespan(retarget_timestamp: u32, last_timestamp: u32) -> u32 {
-	// subtract unsigned 32 bit numbers in signed 64 bit space in
-	// order to prevent underflow before applying the range constraint.
-	let timespan = last_timestamp as i64 - retarget_timestamp as i64;
-	range_constrain(timespan, MIN_TIMESPAN as i64, MAX_TIMESPAN as i64) as u32
-}
-
 /// Returns work required for given header
-pub fn work_required(parent_hash: H256, time: u32, height: u32, store: &BlockHeaderProvider, consensus: &ConsensusParams) -> Compact {
+pub fn work_required(parent_hash: H256, height: u32, store: &BlockHeaderProvider, consensus: &ConsensusParams) -> Compact {
 	let max_bits = consensus.network.max_bits().into();
 	if height == 0 {
 		return max_bits;
@@ -79,15 +57,7 @@ pub fn block_reward_satoshi(block_height: u32) -> u64 {
 
 #[cfg(test)]
 mod tests {
-	use primitives::hash::H256;
-	use primitives::compact::Compact;
-	use network::{Network};
-	use super::{is_valid_proof_of_work_hash, is_valid_proof_of_work, block_reward_satoshi};
-
-	fn is_valid_pow(max: Compact, bits: u32, hash: &'static str) -> bool {
-		is_valid_proof_of_work_hash(bits.into(), &H256::from_reversed_str(hash)) &&
-		is_valid_proof_of_work(max.into(), bits.into(), &H256::from_reversed_str(hash))
-	}
+	use super::{block_reward_satoshi};
 
 	#[test]
 	fn reward() {

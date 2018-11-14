@@ -4,7 +4,6 @@ use linked_hash_map::LinkedHashMap;
 use chain::{BlockHeader, Transaction, IndexedBlockHeader, IndexedBlock, IndexedTransaction};
 use storage;
 use miner::{MemoryPoolOrderingStrategy, MemoryPoolInformation};
-use network::ConsensusParams;
 use primitives::bytes::Bytes;
 use primitives::hash::H256;
 use utils::{BestHeadersChain, BestHeadersChainInformation, HashQueueChain, HashPosition};
@@ -139,7 +138,7 @@ impl BlockState {
 
 impl Chain {
 	/// Create new `Chain` with given storage
-	pub fn new(storage: StorageRef, consensus: ConsensusParams, memory_pool: MemoryPoolRef) -> Self {
+	pub fn new(storage: StorageRef, memory_pool: MemoryPoolRef) -> Self {
 		// we only work with storages with genesis block
 		let genesis_block_hash = storage.block_hash(0)
 			.expect("storage with genesis block is required");
@@ -724,7 +723,6 @@ mod tests {
 	use chain::{Transaction, IndexedBlockHeader};
 	use db::BlockChainDatabase;
 	use miner::MemoryPool;
-	use network::{Network, ConsensusParams};
 	use primitives::hash::H256;
 	use super::{Chain, BlockState, TransactionState, BlockInsertionResult};
 	use utils::HashPosition;
@@ -733,7 +731,7 @@ mod tests {
 	fn chain_empty() {
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let db_best_block = db.best_block();
-		let chain = Chain::new(db.clone(), ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let chain = Chain::new(db.clone(), Arc::new(RwLock::new(MemoryPool::new())));
 		assert_eq!(chain.information().scheduled, 0);
 		assert_eq!(chain.information().requested, 0);
 		assert_eq!(chain.information().verifying, 0);
@@ -750,7 +748,7 @@ mod tests {
 	#[test]
 	fn chain_block_path() {
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let mut chain = Chain::new(db.clone(), ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db.clone(), Arc::new(RwLock::new(MemoryPool::new())));
 
 		// add 6 blocks to scheduled queue
 		let blocks = test_data::build_n_empty_blocks_from_genesis(6, 0);
@@ -802,7 +800,7 @@ mod tests {
 	#[test]
 	fn chain_block_locator_hashes() {
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 		let genesis_hash = chain.best_block().hash;
 		assert_eq!(chain.block_locator_hashes(), vec![genesis_hash.clone()]);
 
@@ -887,7 +885,7 @@ mod tests {
 	#[test]
 	fn chain_transaction_state() {
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 		let genesis_block = test_data::genesis();
 		let block1 = test_data::block_h1();
 		let tx1: Transaction = test_data::TransactionBuilder::with_version(1).into();
@@ -924,7 +922,7 @@ mod tests {
 		let tx2_hash = tx2.hash();
 
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![b0.into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 		chain.verify_transaction(tx1.into());
 		chain.insert_verified_transaction(tx2.into());
 
@@ -948,7 +946,7 @@ mod tests {
 			.set_default_input(0).set_output(400).store(test_chain);		// t4
 
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 		chain.verify_transaction(test_chain.at(0).into());
 		chain.verify_transaction(test_chain.at(1).into());
 		chain.verify_transaction(test_chain.at(2).into());
@@ -970,7 +968,7 @@ mod tests {
 			.set_default_input(0).set_output(400).store(test_chain);		// t4
 
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 		chain.insert_verified_transaction(test_chain.at(0).into());
 		chain.insert_verified_transaction(test_chain.at(1).into());
 		chain.insert_verified_transaction(test_chain.at(2).into());
@@ -996,7 +994,7 @@ mod tests {
 		let tx2_hash = tx2.hash();
 
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![b0.into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 		chain.verify_transaction(tx1.into());
 		chain.insert_verified_transaction(tx2.into());
 
@@ -1044,7 +1042,7 @@ mod tests {
 		let tx5 = b5.transactions[0].clone();
 
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![genesis.into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 
 		chain.insert_verified_transaction(tx3.into());
 		chain.insert_verified_transaction(tx4.into());
@@ -1088,7 +1086,7 @@ mod tests {
 
 		// insert tx2 to memory pool
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 		chain.insert_verified_transaction(tx2.clone().into());
 		chain.insert_verified_transaction(tx3.clone().into());
 		// insert verified block with tx1
@@ -1107,7 +1105,7 @@ mod tests {
 			.reset().set_input(&data_chain.at(0), 0).add_output(30).store(data_chain);			// transaction0 -> transaction2
 
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let mut chain = Chain::new(db, ConsensusParams::new(Network::Unitest), Arc::new(RwLock::new(MemoryPool::new())));
+		let mut chain = Chain::new(db, Arc::new(RwLock::new(MemoryPool::new())));
 		chain.insert_verified_transaction(data_chain.at(1).into());
 		assert_eq!(chain.information().transactions.transactions_count, 1);
 		chain.insert_verified_transaction(data_chain.at(2).into());

@@ -119,8 +119,7 @@ impl<'a> HeaderWork<'a> {
 
 	fn check(&self) -> Result<(), Error> {
 		let previous_header_hash = self.header.raw.previous_header_hash.clone();
-		let time = self.header.raw.time;
-		let work = work_required(previous_header_hash, time, self.height, self.store, self.consensus);
+		let work = work_required(previous_header_hash, self.height, self.store, self.consensus);
 		if work == self.header.raw.bits {
 			Ok(())
 		} else {

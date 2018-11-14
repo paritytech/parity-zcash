@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, HashMap, HashSet};
+use std::collections::{VecDeque, HashMap};
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,7 +9,6 @@ use message::{types, common};
 use primitives::hash::H256;
 use synchronization_executor::{Task, TaskExecutor};
 use types::{PeerIndex, RequestId, BlockHeight, StorageRef, ExecutorRef, MemoryPoolRef, PeersRef};
-use utils::KnownHashType;
 
 /// Synchronization server task
 #[derive(Debug, PartialEq)]
@@ -397,7 +396,7 @@ pub mod tests {
 	use parking_lot::{Mutex, RwLock};
 	use db::{BlockChainDatabase};
 	use message::types;
-	use message::common::{self, Services, InventoryVector, InventoryType};
+	use message::common::{Services, InventoryVector, InventoryType};
 	use primitives::hash::H256;
 	use chain::Transaction;
 	use inbound_connection::tests::DummyOutboundSyncConnection;
@@ -407,7 +406,6 @@ pub mod tests {
 	use synchronization_executor::tests::DummyTaskExecutor;
 	use synchronization_peers::{PeersContainer, PeersFilters, PeersImpl};
 	use types::{PeerIndex, StorageRef, MemoryPoolRef, PeersRef, ExecutorRef};
-	use utils::KnownHashType;
 	use super::{Server, ServerTask, ServerImpl, ServerTaskExecutor};
 
 	pub struct DummyServer {

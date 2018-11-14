@@ -12,7 +12,6 @@ use synchronization_server::{Server, ServerTask};
 use synchronization_verifier::{TransactionVerificationSink};
 use primitives::hash::H256;
 use miner::BlockTemplate;
-use verification::median_timestamp_inclusive;
 use synchronization_peers::{TransactionAnnouncementType, BlockAnnouncementType};
 use types::{PeerIndex, RequestId, StorageRef, MemoryPoolRef, PeersRef, ExecutorRef,
 	ClientRef, ServerRef, SynchronizationStateRef, SyncListenerRef};
@@ -230,17 +229,13 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 
 	/// Get block template for mining
 	pub fn get_block_template(&self) -> BlockTemplate {
-		let previous_block_height = self.storage.best_block().number;
-		let previous_block_header = self.storage.block_header(previous_block_height.into()).expect("best block is in db; qed");
-		let median_timestamp = median_timestamp_inclusive(previous_block_header.hash(), self.storage.as_block_header_provider());
-		let new_block_height = previous_block_height + 1;
 		let max_block_size = 2_000_000;
 		let block_assembler = BlockAssembler {
 			max_block_size: max_block_size as u32,
 			max_block_sigops: 20_000,
 		};
 		let memory_pool = &*self.memory_pool.read();
-		block_assembler.create_new_block(&self.storage, memory_pool, time::get_time().sec as u32, median_timestamp, &self.consensus)
+		block_assembler.create_new_block(&self.storage, memory_pool, time::get_time().sec as u32, &self.consensus)
 	}
 
 	/// Install synchronization events listener
@@ -332,7 +327,7 @@ pub mod tests {
 		let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let sync_state = SynchronizationStateRef::new(SynchronizationState::with_storage(storage.clone()));
-		let chain = Chain::new(storage.clone(), ConsensusParams::new(Network::Unitest), memory_pool.clone());
+		let chain = Chain::new(storage.clone(), memory_pool.clone());
 		let sync_peers = Arc::new(PeersImpl::default());
 		let executor = DummyTaskExecutor::new();
 		let server = Arc::new(DummyServer::new());

@@ -1286,7 +1286,7 @@ pub mod tests {
 		};
 		let sync_state = SynchronizationStateRef::new(SynchronizationState::with_storage(storage.clone()));
 		let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
-		let chain = Chain::new(storage.clone(), ConsensusParams::new(Network::Unitest), memory_pool.clone());
+		let chain = Chain::new(storage.clone(), memory_pool.clone());
 		let executor = DummyTaskExecutor::new();
 		let config = Config { close_connection_on_bad_block: true };
 

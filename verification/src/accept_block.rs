@@ -24,16 +24,15 @@ impl<'a> BlockAcceptor<'a> {
 		consensus: &'a ConsensusParams,
 		block: CanonBlock<'a>,
 		height: u32,
-		median_time_past: u32,
 		deployments: &'a BlockDeployments<'a>,
 		headers: &'a BlockHeaderProvider,
 	) -> Self {
 		BlockAcceptor {
 			finality: BlockFinality::new(block, height, deployments, headers),
-			serialized_size: BlockSerializedSize::new(block, consensus, height, median_time_past),
+			serialized_size: BlockSerializedSize::new(block),
 			coinbase_script: BlockCoinbaseScript::new(block, consensus, height),
-			coinbase_claim: BlockCoinbaseClaim::new(block, consensus, store, height, median_time_past),
-			sigops: BlockSigops::new(block, store, consensus, height, median_time_past),
+			coinbase_claim: BlockCoinbaseClaim::new(block, store, height),
+			sigops: BlockSigops::new(block, store, consensus),
 		}
 	}
 
@@ -83,18 +82,12 @@ impl<'a> BlockFinality<'a> {
 
 pub struct BlockSerializedSize<'a> {
 	block: CanonBlock<'a>,
-	consensus: &'a ConsensusParams,
-	height: u32,
-	median_time_past: u32,
 }
 
 impl<'a> BlockSerializedSize<'a> {
-	fn new(block: CanonBlock<'a>, consensus: &'a ConsensusParams, height: u32, median_time_past: u32) -> Self {
+	fn new(block: CanonBlock<'a>) -> Self {
 		BlockSerializedSize {
 			block: block,
-			consensus: consensus,
-			height: height,
-			median_time_past: median_time_past,
 		}
 	}
 
@@ -112,8 +105,6 @@ impl<'a> BlockSerializedSize<'a> {
 pub struct BlockSigops<'a> {
 	block: CanonBlock<'a>,
 	store: &'a TransactionOutputProvider,
-	consensus: &'a ConsensusParams,
-	height: u32,
 	bip16_active: bool,
 	checkdatasig_active: bool,
 }
@@ -123,8 +114,6 @@ impl<'a> BlockSigops<'a> {
 		block: CanonBlock<'a>,
 		store: &'a TransactionOutputProvider,
 		consensus: &'a ConsensusParams,
-		height: u32,
-		median_time_past: u32,
 	) -> Self {
 		let bip16_active = block.header.raw.time >= consensus.bip16_time;
 		let checkdatasig_active = false;
@@ -132,8 +121,6 @@ impl<'a> BlockSigops<'a> {
 		BlockSigops {
 			block: block,
 			store: store,
-			consensus: consensus,
-			height: height,
 			bip16_active,
 			checkdatasig_active,
 		}
@@ -145,7 +132,6 @@ impl<'a> BlockSigops<'a> {
 			.map(|tx| transaction_sigops(&tx.raw, &store, self.bip16_active, self.checkdatasig_active))
 			.fold(0, |acc, tx_sigops| (acc + tx_sigops));
 
-		let size = self.block.size();
 		if sigops > 20_000 {
 			return Err(Error::MaximumSigops);
 		}
@@ -163,10 +149,8 @@ pub struct BlockCoinbaseClaim<'a> {
 impl<'a> BlockCoinbaseClaim<'a> {
 	fn new(
 		block: CanonBlock<'a>,
-		consensus_params: &ConsensusParams,
 		store: &'a TransactionOutputProvider,
 		height: u32,
-		median_time_past: u32
 	) -> Self {
 		BlockCoinbaseClaim {
 			block: block,
@@ -266,8 +250,6 @@ impl<'a> BlockCoinbaseScript<'a> {
 mod tests {
 	extern crate test_data;
 
-	use chain::{IndexedBlock, Transaction};
-	use network::{Network, ConsensusParams};
 	use {Error, CanonBlock};
 	use super::{BlockCoinbaseScript};
 

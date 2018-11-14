@@ -5,7 +5,7 @@ use chain::{OutPoint, TransactionOutput, IndexedTransaction};
 use storage::{SharedStore, TransactionOutputProvider};
 use network::ConsensusParams;
 use memory_pool::{MemoryPool, OrderingStrategy, Entry};
-use verification::{work_required, block_reward_satoshi, transaction_sigops, median_timestamp_inclusive};
+use verification::{work_required, block_reward_satoshi, transaction_sigops};
 
 const BLOCK_VERSION: u32 = 0x20000000;
 const BLOCK_HEADER_SIZE: u32 = 4 + 32 + 32 + 4 + 4 + 4;
@@ -246,13 +246,13 @@ impl<'a, T> Iterator for FittingTransactionsIterator<'a, T> where T: Iterator<It
 }
 
 impl BlockAssembler {
-	pub fn create_new_block(&self, store: &SharedStore, mempool: &MemoryPool, time: u32, median_timestamp: u32, consensus: &ConsensusParams) -> BlockTemplate {
+	pub fn create_new_block(&self, store: &SharedStore, mempool: &MemoryPool, time: u32, consensus: &ConsensusParams) -> BlockTemplate {
 		// get best block
 		// take it's hash && height
 		let best_block = store.best_block();
 		let previous_header_hash = best_block.hash;
 		let height = best_block.number + 1;
-		let bits = work_required(previous_header_hash.clone(), time, height, store.as_block_header_provider(), consensus);
+		let bits = work_required(previous_header_hash.clone(), height, store.as_block_header_provider(), consensus);
 		let version = BLOCK_VERSION;
 
 		let mut coinbase_value = block_reward_satoshi(height);
@@ -364,7 +364,7 @@ mod tests {
 			(BlockAssembler {
 				max_block_size: 0xffffffff,
 				max_block_sigops: 0xffffffff,
-			}.create_new_block(&storage, &pool, 0, 0, &consensus), hash0, hash1)
+			}.create_new_block(&storage, &pool, 0, &consensus), hash0, hash1)
 		}
 
 		// when topological consensus is used

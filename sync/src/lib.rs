@@ -108,7 +108,7 @@ pub fn create_local_sync_node(consensus: ConsensusParams, db: storage::SharedSto
 
 	let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
 	let sync_state = SynchronizationStateRef::new(SynchronizationState::with_storage(db.clone()));
-	let sync_chain = SyncChain::new(db.clone(), consensus.clone(), memory_pool.clone());
+	let sync_chain = SyncChain::new(db.clone(), memory_pool.clone());
 
 	let chain_verifier = Arc::new(ChainVerifier::new(db.clone(), consensus.clone()));
 	let sync_executor = SyncExecutor::new(peers.clone());

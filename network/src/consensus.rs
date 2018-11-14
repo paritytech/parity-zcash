@@ -1,4 +1,3 @@
-use hash::H256;
 use {Network, Magic, Deployment};
 
 #[derive(Debug, Clone)]

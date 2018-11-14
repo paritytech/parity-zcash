@@ -1,12 +1,8 @@
-use primitives::hash::H256;
-use primitives::bytes::Bytes;
-use ser::Serializable;
 use storage::{TransactionMetaProvider, TransactionOutputProvider};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, SignatureVersion};
 use duplex_store::DuplexTransactionOutputProvider;
 use deployments::BlockDeployments;
-use script::Builder;
 use sigops::transaction_sigops;
 use canon::CanonTransaction;
 use constants::{COINBASE_MATURITY};
@@ -32,21 +28,19 @@ impl<'a> TransactionAcceptor<'a> {
 		consensus: &'a ConsensusParams,
 		transaction: CanonTransaction<'a>,
 		verification_level: VerificationLevel,
-		block_hash: &'a H256,
 		height: u32,
 		time: u32,
-		median_time_past: u32,
 		transaction_index: usize,
 		deployments: &'a BlockDeployments<'a>,
 	) -> Self {
 		trace!(target: "verification", "Tx verification {}", transaction.hash.to_reversed_str());
 		TransactionAcceptor {
-			bip30: TransactionBip30::new_for_sync(transaction, meta_store, consensus, block_hash, height),
+			bip30: TransactionBip30::new_for_sync(transaction, meta_store),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
 			overspent: TransactionOverspent::new(transaction, output_store),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
-			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, median_time_past, deployments),
+			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, deployments),
 		}
 	}
 
@@ -80,7 +74,6 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 		transaction: CanonTransaction<'a>,
 		height: u32,
 		time: u32,
-		median_time_past: u32,
 		deployments: &'a BlockDeployments<'a>,
 	) -> Self {
 		trace!(target: "verification", "Mempool-Tx verification {}", transaction.hash.to_reversed_str());
@@ -92,7 +85,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 			overspent: TransactionOverspent::new(transaction, output_store),
 			sigops: TransactionSigops::new(transaction, output_store, consensus, max_block_sigops, time),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
-			eval: TransactionEval::new(transaction, output_store, consensus, VerificationLevel::Full, height, time, median_time_past, deployments),
+			eval: TransactionEval::new(transaction, output_store, consensus, VerificationLevel::Full, height, time, deployments),
 		}
 	}
 
@@ -127,9 +120,6 @@ impl<'a> TransactionBip30<'a> {
 	fn new_for_sync(
 		transaction: CanonTransaction<'a>,
 		store: &'a TransactionMetaProvider,
-		consensus_params: &'a ConsensusParams,
-		block_hash: &'a H256,
-		height: u32
 	) -> Self {
 		TransactionBip30 {
 			transaction: transaction,
@@ -296,7 +286,6 @@ impl<'a> TransactionEval<'a> {
 		verification_level: VerificationLevel,
 		height: u32,
 		time: u32,
-		median_timestamp: u32,
 		deployments: &'a BlockDeployments,
 	) -> Self {
 		let verify_p2sh = time >= params.bip16_time;
