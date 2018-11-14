@@ -11,6 +11,7 @@ pub struct TransactionVerifier<'a> {
 	pub empty: TransactionEmpty<'a>,
 	pub null_non_coinbase: TransactionNullNonCoinbase<'a>,
 	pub oversized_coinbase: TransactionOversizedCoinbase<'a>,
+	pub joint_split_in_coinbase: TransactionJointSplitInCoinbase<'a>,
 }
 
 impl<'a> TransactionVerifier<'a> {
@@ -20,13 +21,15 @@ impl<'a> TransactionVerifier<'a> {
 			empty: TransactionEmpty::new(transaction),
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			oversized_coinbase: TransactionOversizedCoinbase::new(transaction, MIN_COINBASE_SIZE..MAX_COINBASE_SIZE),
+			joint_split_in_coinbase: TransactionJointSplitInCoinbase::new(transaction),
 		}
 	}
 
 	pub fn check(&self) -> Result<(), TransactionError> {
-		try!(self.empty.check());
-		try!(self.null_non_coinbase.check());
-		try!(self.oversized_coinbase.check());
+		self.empty.check()?;
+		self.null_non_coinbase.check()?;
+		self.oversized_coinbase.check()?;
+		self.joint_split_in_coinbase.check()?;
 		Ok(())
 	}
 }
@@ -188,5 +191,74 @@ impl<'a> TransactionSigops<'a> {
 		} else {
 			Ok(())
 		}
+	}
+}
+
+pub struct TransactionJointSplitInCoinbase<'a> {
+	transaction: &'a IndexedTransaction,
+}
+
+impl<'a> TransactionJointSplitInCoinbase<'a> {
+	fn new(transaction: &'a IndexedTransaction) -> Self {
+		TransactionJointSplitInCoinbase {
+			transaction,
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		if self.transaction.raw.is_coinbase() && self.transaction.raw.joint_split.is_some() {
+			return Err(TransactionError::CoinbaseWithJointSplit);
+		}
+
+		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use chain::{Transaction, OutPoint, TransactionInput, IndexedTransaction};
+	use error::TransactionError;
+	use super::TransactionJointSplitInCoinbase;
+
+	#[test]
+	fn transaction_joint_split_in_coinbase_works() {
+		let coinbase_with_joint_split: IndexedTransaction = Transaction {
+			inputs: vec![TransactionInput {
+				previous_output: OutPoint::null(),
+				..Default::default()
+			}],
+			joint_split: Some(Default::default()),
+			..Default::default()
+		}.into();
+		assert_eq!(
+			TransactionJointSplitInCoinbase::new(&coinbase_with_joint_split).check(),
+			Err(TransactionError::CoinbaseWithJointSplit)
+		);
+
+		let coinbase_without_joint_split: IndexedTransaction = Transaction {
+			inputs: vec![Default::default()],
+			..Default::default()
+		}.into();
+		assert_eq!(
+			TransactionJointSplitInCoinbase::new(&coinbase_without_joint_split).check(),
+			Ok(())
+		);
+
+		let non_coinbase_with_joint_split: IndexedTransaction = Transaction {
+			joint_split: Some(Default::default()),
+			..Default::default()
+		}.into();
+		assert_eq!(
+			TransactionJointSplitInCoinbase::new(&non_coinbase_with_joint_split).check(),
+			Ok(())
+		);
+
+		let non_coinbase_without_joint_split: IndexedTransaction = Transaction {
+			..Default::default()
+		}.into();
+		assert_eq!(
+			TransactionJointSplitInCoinbase::new(&non_coinbase_without_joint_split).check(),
+			Ok(())
+		);
 	}
 }
