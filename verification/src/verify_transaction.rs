@@ -14,6 +14,7 @@ pub struct TransactionVerifier<'a> {
 	pub oversized_coinbase: TransactionOversizedCoinbase<'a>,
 	pub joint_split_in_coinbase: TransactionJointSplitInCoinbase<'a>,
 	pub size: TransactionAbsoluteSize<'a>,
+	pub value_overflow: TransactionValueOverflow<'a>,
 }
 
 impl<'a> TransactionVerifier<'a> {
@@ -26,6 +27,7 @@ impl<'a> TransactionVerifier<'a> {
 			oversized_coinbase: TransactionOversizedCoinbase::new(transaction, MIN_COINBASE_SIZE..MAX_COINBASE_SIZE),
 			joint_split_in_coinbase: TransactionJointSplitInCoinbase::new(transaction),
 			size: TransactionAbsoluteSize::new(transaction, consensus),
+			value_overflow: TransactionValueOverflow::new(transaction, consensus),
 		}
 	}
 
@@ -36,6 +38,7 @@ impl<'a> TransactionVerifier<'a> {
 		self.oversized_coinbase.check()?;
 		self.joint_split_in_coinbase.check()?;
 		self.size.check()?;
+		self.value_overflow.check()?;
 		Ok(())
 	}
 }
@@ -46,6 +49,7 @@ pub struct MemoryPoolTransactionVerifier<'a> {
 	pub is_coinbase: TransactionMemoryPoolCoinbase<'a>,
 	pub size: TransactionAbsoluteSize<'a>,
 	pub sigops: TransactionSigops<'a>,
+	pub value_overflow: TransactionValueOverflow<'a>,
 }
 
 impl<'a> MemoryPoolTransactionVerifier<'a> {
@@ -57,15 +61,17 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 			is_coinbase: TransactionMemoryPoolCoinbase::new(transaction),
 			size: TransactionAbsoluteSize::new(transaction, consensus),
 			sigops: TransactionSigops::new(transaction, consensus.max_block_sigops()),
+			value_overflow: TransactionValueOverflow::new(transaction, consensus),
 		}
 	}
 
 	pub fn check(&self) -> Result<(), TransactionError> {
-		try!(self.empty.check());
-		try!(self.null_non_coinbase.check());
-		try!(self.is_coinbase.check());
-		try!(self.size.check());
-		try!(self.sigops.check());
+		self.empty.check()?;
+		self.null_non_coinbase.check()?;
+		self.is_coinbase.check()?;
+		self.size.check()?;
+		self.sigops.check()?;
+		self.value_overflow.check()?;
 		Ok(())
 	}
 }
@@ -258,97 +264,101 @@ impl<'a> TransactionJointSplitInCoinbase<'a> {
 	}
 }
 
+/// Check for overflow of output values.
+pub struct TransactionValueOverflow<'a> {
+	transaction: &'a IndexedTransaction,
+	max_value: u64,
+}
+
+impl<'a> TransactionValueOverflow<'a> {
+	fn new(transaction: &'a IndexedTransaction, consensus: &'a ConsensusParams) -> Self {
+		TransactionValueOverflow {
+			transaction,
+			max_value: consensus.max_transaction_value(),
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		let mut total_output = 0u64;
+		for output in &self.transaction.raw.outputs {
+			if output.value > self.max_value {
+				return Err(TransactionError::ValueOverflow)
+			}
+
+			total_output = match total_output.checked_add(output.value) {
+				Some(total_output) if total_output <= self.max_value => total_output,
+				_ => return Err(TransactionError::ValueOverflow),
+			};
+		}
+
+		Ok(())
+	}
+}
+
 #[cfg(test)]
 mod tests {
-	use chain::{Transaction, OutPoint, TransactionInput, IndexedTransaction};
+	extern crate test_data;
+
+	use network::{Network, ConsensusParams};
 	use error::TransactionError;
-	use super::{TransactionEmpty, TransactionVersion, TransactionJointSplitInCoinbase};
+	use super::{TransactionEmpty, TransactionVersion, TransactionJointSplitInCoinbase, TransactionValueOverflow};
 
 	#[test]
 	fn transaction_empty_works() {
-		let tx1_with_js_without_inputs: IndexedTransaction = Transaction {
-			version: 1,
-			outputs: vec![Default::default()],
-			joint_split: Some(Default::default()),
-			..Default::default()
-		}.into();
-		assert_eq!(TransactionEmpty::new(&tx1_with_js_without_inputs).check(), Err(TransactionError::Empty));
+		assert_eq!(TransactionEmpty::new(&test_data::TransactionBuilder::with_version(1)
+			.add_output(0)
+			.add_default_joint_split()
+			.into()).check(), Err(TransactionError::Empty));
 
-		let tx2_without_js_without_inputs: IndexedTransaction = Transaction {
-			version: 2,
-			outputs: vec![Default::default()],
-			joint_split: None,
-			..Default::default()
-		}.into();
-		assert_eq!(TransactionEmpty::new(&tx2_without_js_without_inputs).check(), Err(TransactionError::Empty));
+		assert_eq!(TransactionEmpty::new(&test_data::TransactionBuilder::with_version(2)
+			.add_output(0)
+			.into()).check(), Err(TransactionError::Empty));
 
-		let tx2_with_js_without_inputs: IndexedTransaction = Transaction {
-			version: 2,
-			outputs: vec![Default::default()],
-			joint_split: Some(Default::default()),
-			..Default::default()
-		}.into();
-		assert_eq!(TransactionEmpty::new(&tx2_with_js_without_inputs).check(), Ok(()));
+		assert_eq!(TransactionEmpty::new(&test_data::TransactionBuilder::with_version(2)
+			.add_output(0)
+			.add_default_joint_split()
+			.into()).check(), Ok(()));
 
-		let tx2_empty_without_js: IndexedTransaction = Transaction {
-			version: 2,
-			joint_split: None,
-			..Default::default()
-		}.into();
-		assert_eq!(TransactionEmpty::new(&tx2_empty_without_js).check(), Err(TransactionError::Empty));
+		assert_eq!(TransactionEmpty::new(&test_data::TransactionBuilder::with_version(2)
+			.into()).check(), Err(TransactionError::Empty));
 	}
 
 	#[test]
 	fn transaction_version_works() {
-		let tx0: IndexedTransaction = Transaction::default().into();
-		assert_eq!(TransactionVersion::new(&tx0).check(), Err(TransactionError::InvalidVersion));
+		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::with_version(0)
+			.into()).check(), Err(TransactionError::InvalidVersion));
 
-		let tx1: IndexedTransaction = Transaction {
-			version: 1,
-			..Default::default()
-		}.into();
-		assert_eq!(TransactionVersion::new(&tx1).check(), Ok(()));
+		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::with_version(1)
+			.into()).check(), Ok(()));
 	}
 
 	#[test]
 	fn transaction_joint_split_in_coinbase_works() {
-		let coinbase_with_joint_split: IndexedTransaction = Transaction {
-			inputs: vec![TransactionInput {
-				previous_output: OutPoint::null(),
-				..Default::default()
-			}],
-			joint_split: Some(Default::default()),
-			..Default::default()
-		}.into();
-		assert_eq!(
-			TransactionJointSplitInCoinbase::new(&coinbase_with_joint_split).check(),
-			Err(TransactionError::CoinbaseWithJointSplit)
-		);
+		assert_eq!(TransactionJointSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.add_default_joint_split().into()).check(), Err(TransactionError::CoinbaseWithJointSplit));
 
-		let coinbase_without_joint_split: IndexedTransaction = Transaction {
-			inputs: vec![Default::default()],
-			..Default::default()
-		}.into();
-		assert_eq!(
-			TransactionJointSplitInCoinbase::new(&coinbase_without_joint_split).check(),
-			Ok(())
-		);
+		assert_eq!(TransactionJointSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.into()).check(), Ok(()));
 
-		let non_coinbase_with_joint_split: IndexedTransaction = Transaction {
-			joint_split: Some(Default::default()),
-			..Default::default()
-		}.into();
-		assert_eq!(
-			TransactionJointSplitInCoinbase::new(&non_coinbase_with_joint_split).check(),
-			Ok(())
-		);
+		assert_eq!(TransactionJointSplitInCoinbase::new(&test_data::TransactionBuilder::default()
+			.add_default_joint_split().into()).check(), Ok(()));
 
-		let non_coinbase_without_joint_split: IndexedTransaction = Transaction {
-			..Default::default()
-		}.into();
-		assert_eq!(
-			TransactionJointSplitInCoinbase::new(&non_coinbase_without_joint_split).check(),
-			Ok(())
-		);
+		assert_eq!(TransactionJointSplitInCoinbase::new(&test_data::TransactionBuilder::default()
+			.into()).check(), Ok(()));
+	}
+
+	#[test]
+	fn transaction_value_overflow_works() {
+		let consensus = ConsensusParams::new(Network::Mainnet);
+
+		assert_eq!(TransactionValueOverflow::new(&test_data::TransactionBuilder::with_output(consensus.max_transaction_value() + 1)
+			.into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+
+		assert_eq!(TransactionValueOverflow::new(&test_data::TransactionBuilder::with_output(consensus.max_transaction_value() / 2)
+			.add_output(consensus.max_transaction_value() / 2 + 1)
+			.into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+
+		assert_eq!(TransactionValueOverflow::new(&test_data::TransactionBuilder::with_output(consensus.max_transaction_value())
+			.into(), &consensus).check(), Ok(()));
 	}
 }

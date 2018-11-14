@@ -49,6 +49,12 @@ impl Into<IndexedTransaction> for TransactionBuilder {
 }
 
 impl TransactionBuilder {
+	pub fn coinbase() -> TransactionBuilder {
+		let mut builder = TransactionBuilder::default();
+		builder.transaction.inputs.push(TransactionInput::coinbase(Default::default()));
+		builder
+	}
+
 	pub fn with_version(version: i32) -> TransactionBuilder {
 		let builder = TransactionBuilder::default();
 		builder.set_version(version)
@@ -98,7 +104,6 @@ impl TransactionBuilder {
 		self.add_input(&Transaction::default(), output_index)
 	}
 
-
 	pub fn add_input(mut self, transaction: &Transaction, output_index: u32) -> TransactionBuilder {
 		self.transaction.inputs.push(TransactionInput {
 			previous_output: OutPoint {
@@ -140,5 +145,10 @@ impl TransactionBuilder {
 
 	pub fn hash(self) -> H256 {
 		self.transaction.hash()
+	}
+
+	pub fn add_default_joint_split(mut self) -> Self {
+		self.transaction.joint_split = Some(Default::default());
+		self
 	}
 }

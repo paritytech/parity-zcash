@@ -107,5 +107,7 @@ pub enum TransactionError {
 	CoinbaseWithJointSplit,
 	/// Invalid transaction version.
 	InvalidVersion,
+	/// Transaction has too large output value.
+	ValueOverflow,
 }
 

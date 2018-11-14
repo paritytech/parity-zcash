@@ -27,7 +27,6 @@ pub struct ConsensusParams {
 	/// Height of Overwinter activation.
 	/// Details: https://zcash.readthedocs.io/en/latest/rtd_pages/nu_dev_guide.html#overwinter
 	pub overwinter_height: u32,
-
 	/// Height of Sapling activation.
 	/// Details: https://zcash.readthedocs.io/en/latest/rtd_pages/nu_dev_guide.html#sapling
 	pub sapling_height: u32,
@@ -136,5 +135,9 @@ impl ConsensusParams {
 		} else {
 			100_000
 		}
+	}
+
+	pub fn max_transaction_value(&self) -> u64 {
+		21_000_000 * 100_000_000 // No amount larger than this (in satoshi) is valid
 	}
 }
