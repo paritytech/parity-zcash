@@ -30,6 +30,7 @@ impl BlockHeader {
 		stream.append(&self.version)
 			.append(&self.previous_header_hash)
 			.append(&self.merkle_root_hash)
+			.append(&self.reserved_hash)
 			.append(&self.time)
 			.append(&self.bits)
 			.append(&self.nonce);

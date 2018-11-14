@@ -1,10 +1,12 @@
 // https://github.com/zcash/zcash/commit/fdda3c5085199d2c2170887aa064fc42afdb0360
 
 use blake2_rfc::blake2b::Blake2b;
+use hex::ToHex;
 use byteorder::{BigEndian, LittleEndian, ByteOrder};
 use chain::BlockHeader;
 
 #[allow(non_snake_case)]
+#[derive(Debug)]
 pub struct EquihashParams {
 	pub N: u32,
 	pub K: u32,

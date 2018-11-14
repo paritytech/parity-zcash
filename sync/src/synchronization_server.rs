@@ -24,8 +24,6 @@ pub enum ServerTask {
 	GetHeaders(PeerIndex, types::GetHeaders, RequestId),
 	/// Serve 'mempool' request
 	Mempool(PeerIndex),
-	/// Serve 'getblocktxn' request
-	GetBlockTxn(PeerIndex, types::GetBlockTxn),
 }
 
 /// Synchronization server
@@ -80,8 +78,7 @@ impl ServerTask {
 				| ServerTask::ReversedGetData(peer_index, _, _)
 				| ServerTask::GetBlocks(peer_index, _)
 				| ServerTask::GetHeaders(peer_index, _, _)
-				| ServerTask::Mempool(peer_index)
-				| ServerTask::GetBlockTxn(peer_index, _) => peer_index,
+				| ServerTask::Mempool(peer_index) => peer_index,
 		}
 	}
 }
@@ -234,7 +231,6 @@ impl<TExecutor> ServerTaskExecutor<TExecutor> where TExecutor: TaskExecutor {
 			ServerTask::GetBlocks(peer_index, message) => self.serve_get_blocks(peer_index, message),
 			ServerTask::GetHeaders(peer_index, message, request_id) => self.serve_get_headers(peer_index, message, request_id),
 			ServerTask::Mempool(peer_index) => self.serve_mempool(peer_index),
-			ServerTask::GetBlockTxn(peer_index, message) => self.serve_get_block_txn(peer_index, message),
 		}
 
 		None
@@ -301,17 +297,6 @@ impl<TExecutor> ServerTaskExecutor<TExecutor> where TExecutor: TaskExecutor {
 					notfound.inventory.push(next_item);
 				}
 			},
-			common::InventoryType::MessageCompactBlock => {
-				if let Some(block) = self.storage.block(next_item.hash.clone().into()) {
-					let message = self.peers.build_compact_block(peer_index, &block.into());
-					if let Some(message) = message {
-						trace!(target: "sync", "'getblocks' response to peer#{} is ready with compactblock {}", peer_index, next_item.hash.to_reversed_str());
-						self.executor.execute(Task::CompactBlock(peer_index, message));
-					}
-				} else {
-					notfound.inventory.push(next_item);
-				}
-			},
 			common::InventoryType::Error => (),
 		}
 
@@ -373,58 +358,6 @@ impl<TExecutor> ServerTaskExecutor<TExecutor> where TExecutor: TaskExecutor {
 		} else {
 			trace!(target: "sync", "'mempool' request from peer#{} is ignored as pool is empty", peer_index);
 		}
-	}
-
-	fn serve_get_block_txn(&self, peer_index: PeerIndex, message: types::GetBlockTxn) {
-		// according to protocol documentation, we only should only respond
-		// if requested block has been recently sent in 'cmpctblock'
-		if !self.peers.is_hash_known_as(peer_index, &message.request.blockhash, KnownHashType::CompactBlock) {
-			self.peers.misbehaving(peer_index, &format!("Got 'getblocktxn' message for non-sent block: {}", message.request.blockhash.to_reversed_str()));
-			return;
-		}
-
-		let block_transactions = self.storage.block_transaction_hashes(message.request.blockhash.clone().into());
-		let block_transactions_len = block_transactions.len();
-		let requested_len = message.request.indexes.len();
-		if requested_len > block_transactions_len {
-			// peer has requested more transactions, than there are
-			self.peers.misbehaving(peer_index, &format!("Got 'getblocktxn' message with {} transactions, when there are: {}", requested_len, block_transactions_len));
-			return;
-		}
-
-		let mut requested_indexes = HashSet::new();
-		let mut transactions = Vec::with_capacity(message.request.indexes.len());
-		for transaction_index in message.request.indexes {
-			if transaction_index >= block_transactions_len {
-				// peer has requested index, larger than index of last transaction
-				self.peers.misbehaving(peer_index, &format!("Got 'getblocktxn' message with index {}, larger than index of last transaction {}", transaction_index, block_transactions_len - 1));
-				return;
-			}
-			if !requested_indexes.insert(transaction_index) {
-				// peer has requested same index several times
-				self.peers.misbehaving(peer_index, &format!("Got 'getblocktxn' message where same index {} has been requested several times", transaction_index));
-				return;
-			}
-
-			if let Some(transaction) = self.storage.transaction(&block_transactions[transaction_index]) {
-				transactions.push(transaction);
-			} else {
-				// we have just got this hash using block_transactions_hashes
-				// => this is either some db error, or db has been pruned
-				// => we can not skip transactions, according to protocol description
-				// => ignore
-				warn!(target: "sync", "'getblocktxn' request from peer#{} is ignored as we have failed to find transaction {} in storage", peer_index, block_transactions[transaction_index].to_reversed_str());
-				return;
-			}
-		}
-
-		trace!(target: "sync", "'getblocktxn' response to peer#{} is ready with {} transactions", peer_index, transactions.len());
-		self.executor.execute(Task::BlockTxn(peer_index, types::BlockTxn {
-			request: common::BlockTransactions {
-				blockhash: message.request.blockhash,
-				transactions: transactions,
-			}
-		}));
 	}
 
 	fn locate_best_common_block(&self, hash_stop: &H256, locator: &[H256]) -> Option<BlockHeight> {
@@ -643,53 +576,6 @@ pub mod tests {
 	}
 
 	#[test]
-	fn server_get_block_txn_responds_when_good_request() {
-		let (_, _, executor, peers, server) = create_synchronization_server();
-
-		peers.insert(0, Services::default(), DummyOutboundSyncConnection::new());
-		peers.hash_known_as(0, test_data::genesis().hash(), KnownHashType::CompactBlock);
-
-		// when asking for block_txns
-		server.execute(ServerTask::GetBlockTxn(0, types::GetBlockTxn {
-			request: common::BlockTransactionsRequest {
-				blockhash: test_data::genesis().hash(),
-				indexes: vec![0],
-			}
-		}));
-
-		// server responds with transactions
-		let tasks = DummyTaskExecutor::wait_tasks(executor);
-		assert_eq!(tasks, vec![Task::BlockTxn(0, types::BlockTxn {
-			request: common::BlockTransactions {
-				blockhash: test_data::genesis().hash(),
-				transactions: vec![test_data::genesis().transactions[0].clone()],
-			}
-		})]);
-	}
-
-	#[test]
-	fn server_get_block_txn_do_not_responds_when_bad_request() {
-		let (_, _, _, peers, server) = create_synchronization_server();
-
-		peers.insert(0, Services::default(), DummyOutboundSyncConnection::new());
-		assert!(peers.enumerate().contains(&0));
-
-		// when asking for block_txns
-		server.execute(ServerTask::GetBlockTxn(0, types::GetBlockTxn {
-			request: common::BlockTransactionsRequest {
-				blockhash: test_data::genesis().hash(),
-				indexes: vec![1],
-			}
-		}));
-
-		// server closes connection
-		use std::thread;
-		use std::time::Duration;
-		thread::park_timeout(Duration::from_millis(100)); // TODO: get rid of timeout
-		assert!(!peers.enumerate().contains(&0));
-	}
-
-	#[test]
 	fn server_getdata_responds_notfound_when_transaction_is_inaccessible() {
 		let (_, _, executor, _, server) = create_synchronization_server();
 		// when asking for unknown transaction or transaction that is already in the storage
@@ -882,43 +768,6 @@ pub mod tests {
 				},
 				_ => panic!("unexpected"),
 			}
-		}
-	}
-
-	#[test]
-	fn server_serves_compactblock() {
-		let peers = Arc::new(PeersImpl::default());
-		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let memory_pool = Arc::new(RwLock::new(MemoryPool::new()));
-		let sync_executor = DummyTaskExecutor::new();
-		let executor = ServerTaskExecutor::new(peers.clone(), storage.clone(), memory_pool.clone(), sync_executor.clone());
-
-		let genesis = test_data::genesis();
-		let b1 = test_data::block_builder().header().parent(genesis.hash()).build()
-			.transaction().output().value(10).build().build()
-			.build(); // genesis -> b1
-		let b1_hash = b1.hash();
-
-		// This peer will provide blocks
-		storage.insert(b1.clone().into()).expect("no error");
-		storage.canonize(&b1.hash()).unwrap();
-
-		// This peer will receive compact block
-		let peer_index2 = 1; peers.insert(peer_index2, Services::default(), DummyOutboundSyncConnection::new());
-
-		// ask for data
-		let mut loop_task = ServerTask::GetData(peer_index2, types::GetData {inventory: vec![
-			InventoryVector { inv_type: InventoryType::MessageCompactBlock, hash: b1_hash.clone() },
-		]});
-		while let Some(new_task) = executor.execute(loop_task) {
-			loop_task = new_task;
-		}
-
-		let tasks = sync_executor.take_tasks();
-		assert_eq!(tasks.len(), 1);
-		match tasks[0] {
-			Task::CompactBlock(_, _) => (),
-			_ => panic!("unexpected"),
 		}
 	}
 }

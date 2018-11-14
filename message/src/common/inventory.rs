@@ -9,7 +9,6 @@ pub enum InventoryType {
 	MessageTx = 1,
 	MessageBlock = 2,
 	MessageFilteredBlock = 3,
-	MessageCompactBlock = 4,
 }
 
 impl InventoryType {
@@ -19,7 +18,6 @@ impl InventoryType {
 			1 => Some(InventoryType::MessageTx),
 			2 => Some(InventoryType::MessageBlock),
 			3 => Some(InventoryType::MessageFilteredBlock),
-			4 => Some(InventoryType::MessageCompactBlock),
 			_ => None
 		}
 	}
@@ -121,12 +119,10 @@ mod tests {
 		assert_eq!(1u32, InventoryType::MessageTx.into());
 		assert_eq!(2u32, InventoryType::MessageBlock.into());
 		assert_eq!(3u32, InventoryType::MessageFilteredBlock.into());
-		assert_eq!(4u32, InventoryType::MessageCompactBlock.into());
 
 		assert_eq!(InventoryType::from_u32(0).unwrap(), InventoryType::Error);
 		assert_eq!(InventoryType::from_u32(1).unwrap(), InventoryType::MessageTx);
 		assert_eq!(InventoryType::from_u32(2).unwrap(), InventoryType::MessageBlock);
 		assert_eq!(InventoryType::from_u32(3).unwrap(), InventoryType::MessageFilteredBlock);
-		assert_eq!(InventoryType::from_u32(4).unwrap(), InventoryType::MessageCompactBlock);
 	}
 }

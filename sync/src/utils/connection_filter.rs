@@ -4,7 +4,7 @@ use message::types;
 use primitives::bytes::Bytes;
 use primitives::hash::H256;
 use synchronization_peers::MerkleBlockArtefacts;
-use utils::{KnownHashFilter, KnownHashType, BloomFilter, FeeRateFilter, build_compact_block, build_partial_merkle_tree};
+use utils::{KnownHashFilter, KnownHashType, BloomFilter, FeeRateFilter, build_partial_merkle_tree};
 
 /// Filter, which controls data relayed over connection.
 #[derive(Debug, Default)]
@@ -58,17 +58,6 @@ impl ConnectionFilter {
 	/// Limit transaction announcing by transaction fee
 	pub fn set_fee_rate(&mut self, message: types::FeeFilter) {
 		self.fee_rate_filter.set_min_fee_rate(message);
-	}
-
-	/// Convert block to compact block using this filter
-	pub fn build_compact_block(&self, block: &IndexedBlock) -> types::CompactBlock {
-		let unknown_transaction_indexes = block.transactions.iter().enumerate()
-			.filter(|&(_, tx)| self.known_hash_filter.contains(&tx.hash, KnownHashType::Transaction))
-			.map(|(idx, _)| idx)
-			.collect();
-		types::CompactBlock {
-			header: build_compact_block(block, unknown_transaction_indexes),
-		}
 	}
 
 	/// Convert `Block` to `MerkleBlock` using this filter
@@ -146,7 +135,7 @@ pub mod tests {
 	fn filter_rejects_block_known() {
 		let mut filter = ConnectionFilter::default();
 		filter.hash_known_as(test_data::block_h1().hash(), KnownHashType::Block);
-		filter.hash_known_as(test_data::block_h2().hash(), KnownHashType::CompactBlock);
+		filter.hash_known_as(test_data::block_h2().hash(), KnownHashType::Block);
 		assert!(!filter.filter_block(&test_data::block_h1().hash()));
 		assert!(!filter.filter_block(&test_data::block_h2().hash()));
 		assert!(filter.filter_block(&test_data::genesis().hash()));

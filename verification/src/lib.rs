@@ -62,6 +62,7 @@ extern crate blake2_rfc;
 extern crate byteorder;
 #[cfg(test)]
 extern crate rand;
+extern crate rustc_hex as hex;
 
 extern crate storage;
 extern crate chain;

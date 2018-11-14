@@ -11,8 +11,6 @@ pub enum KnownHashType {
 	Transaction,
 	/// Peer knows block with this hash
 	Block,
-	/// Peer knows compact block with this hash
-	CompactBlock,
 }
 
 /// Known-hashes filter
@@ -50,8 +48,7 @@ impl KnownHashFilter {
 	/// Filter block using its hash
 	pub fn filter_block(&self, hash: &H256) -> bool {
 		self.known_hashes.get(hash)
-			.map(|stored_hash_type| *stored_hash_type != KnownHashType::Block
-				&& *stored_hash_type != KnownHashType::CompactBlock)
+			.map(|stored_hash_type| *stored_hash_type != KnownHashType::Block)
 			.unwrap_or(true)
 	}
 
@@ -78,7 +75,7 @@ mod tests {
 	fn known_hash_filter_block() {
 		let mut filter = KnownHashFilter::default();
 		filter.insert(H256::from(0), KnownHashType::Block);
-		filter.insert(H256::from(1), KnownHashType::CompactBlock);
+		filter.insert(H256::from(1), KnownHashType::Block);
 		filter.insert(H256::from(2), KnownHashType::Transaction);
 		assert!(!filter.filter_block(&H256::from(0)));
 		assert!(!filter.filter_block(&H256::from(1)));
@@ -90,7 +87,7 @@ mod tests {
 	fn known_hash_filter_transaction() {
 		let mut filter = KnownHashFilter::default();
 		filter.insert(H256::from(0), KnownHashType::Block);
-		filter.insert(H256::from(1), KnownHashType::CompactBlock);
+		filter.insert(H256::from(1), KnownHashType::Block);
 		filter.insert(H256::from(2), KnownHashType::Transaction);
 		assert!(filter.filter_transaction(&H256::from(0)));
 		assert!(filter.filter_transaction(&H256::from(1)));
@@ -102,16 +99,14 @@ mod tests {
 	fn known_hash_filter_contains() {
 		let mut filter = KnownHashFilter::default();
 		filter.insert(H256::from(0), KnownHashType::Block);
-		filter.insert(H256::from(1), KnownHashType::CompactBlock);
+		filter.insert(H256::from(1), KnownHashType::Block);
 		filter.insert(H256::from(2), KnownHashType::Transaction);
 		assert!(filter.contains(&H256::from(0), KnownHashType::Block));
-		assert!(!filter.contains(&H256::from(0), KnownHashType::CompactBlock));
-		assert!(filter.contains(&H256::from(1), KnownHashType::CompactBlock));
-		assert!(!filter.contains(&H256::from(1), KnownHashType::Block));
+		assert!(filter.contains(&H256::from(1), KnownHashType::Block));
 		assert!(filter.contains(&H256::from(2), KnownHashType::Transaction));
 		assert!(!filter.contains(&H256::from(2), KnownHashType::Block));
 		assert!(!filter.contains(&H256::from(3), KnownHashType::Block));
-		assert!(!filter.contains(&H256::from(3), KnownHashType::CompactBlock));
+		assert!(!filter.contains(&H256::from(3), KnownHashType::Block));
 		assert!(!filter.contains(&H256::from(3), KnownHashType::Transaction));
 	}
 

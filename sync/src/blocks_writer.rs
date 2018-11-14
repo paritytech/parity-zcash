@@ -163,7 +163,7 @@ mod tests {
 	#[test]
 	fn blocks_writer_appends_blocks() {
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-		let mut blocks_target = BlocksWriter::new(db.clone(), ConsensusParams::new(Network::Testnet), default_verification_params());
+		let mut blocks_target = BlocksWriter::new(db.clone(), ConsensusParams::new(Network::Mainnet), default_verification_params());
 		blocks_target.append_block(test_data::block_h1().into()).expect("Expecting no error");
 		assert_eq!(db.best_block().number, 1);
 	}

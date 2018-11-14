@@ -244,7 +244,7 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 						_ => false,
 					},
 					// we never ask for merkle blocks && we never ask for compact blocks
-					InventoryType::MessageCompactBlock | InventoryType::MessageFilteredBlock => false,
+					InventoryType::MessageFilteredBlock => false,
 					// unknown inventory type
 					InventoryType::Error => {
 						self.peers.misbehaving(peer_index, &format!("Provided unknown inventory type {:?}", item.hash.to_reversed_str()));

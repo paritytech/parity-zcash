@@ -179,17 +179,6 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		self.server.execute(ServerTask::Mempool(peer_index));
 	}
 
-	/// When peer asks us from specific transactions from specific block
-	pub fn on_get_block_txn(&self, peer_index: PeerIndex, message: types::GetBlockTxn) {
-		if self.state.synchronizing() {
-			trace!(target: "sync", "Ignored `getblocktxn` message from peer#{}", peer_index);
-			return;
-		}
-
-		trace!(target: "sync", "Got `getblocktxn` message from peer#{}", peer_index);
-		self.server.execute(ServerTask::GetBlockTxn(peer_index, message));
-	}
-
 	/// When peer sets bloom filter for connection
 	pub fn on_filterload(&self, peer_index: PeerIndex, message: types::FilterLoad) {
 		trace!(target: "sync", "Got `filterload` message from peer#{}", peer_index);
@@ -220,45 +209,11 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		self.peers.set_block_announcement_type(peer_index, BlockAnnouncementType::SendHeaders);
 	}
 
-	/// When peer asks us to announce new blocks using cpmctblock message
-	pub fn on_send_compact(&self, peer_index: PeerIndex, message: types::SendCompact) {
-		trace!(target: "sync", "Got `sendcmpct` message from peer#{}", peer_index);
-
-		// The second integer SHALL be interpreted as a little-endian version number. Nodes sending a sendcmpct message MUST currently set this value to 1.
-		if message.second != 1 {
-			return;
-		}
-
-		// Upon receipt of a "sendcmpct" message with the first and second integers set to 1, the node SHOULD announce new blocks by sending a cmpctblock message.
-		if message.first {
-			self.peers.set_block_announcement_type(peer_index, BlockAnnouncementType::SendCompactBlock);
-		}
-
-		// else:
-		// Upon receipt of a "sendcmpct" message with the first integer set to 0, the node SHOULD NOT announce new blocks by sending a cmpctblock message,
-		// but SHOULD announce new blocks by sending invs or headers, as defined by BIP130.
-		// => work as before
-	}
-
 	/// When peer sents us a merkle block
 	pub fn on_merkleblock(&self, peer_index: PeerIndex, _message: types::MerkleBlock) {
 		trace!(target: "sync", "Got `merkleblock` message from peer#{}", peer_index);
 		// we never setup filter on connections => misbehaving
 		self.peers.misbehaving(peer_index, "Got unrequested 'merkleblock' message");
-	}
-
-	/// When peer sents us a compact block
-	pub fn on_compact_block(&self, peer_index: PeerIndex, _message: types::CompactBlock) {
-		trace!(target: "sync", "Got `cmpctblock` message from peer#{}", peer_index);
-		// we never ask compact block from peers => misbehaving
-		self.peers.misbehaving(peer_index, "Got unrequested 'cmpctblock' message");
-	}
-
-	/// When peer sents us specific transactions for specific block
-	pub fn on_block_txn(&self, peer_index: PeerIndex, _message: types::BlockTxn) {
-		trace!(target: "sync", "Got `blocktxn` message from peer#{}", peer_index);
-		// we never ask for this => misbehaving
-		self.peers.misbehaving(peer_index, "Got unrequested 'blocktxn' message");
 	}
 
 	/// Verify and then schedule new transaction
@@ -429,7 +384,7 @@ pub mod tests {
 		let result = local_node.accept_transaction(transaction.clone());
 		assert_eq!(result, Ok(transaction_hash.clone()));
 
-		assert_eq!(executor.take_tasks(), vec![Task::RelayNewTransaction(transaction.into(), 83333333)]);
+		assert_eq!(executor.take_tasks(), vec![Task::RelayNewTransaction(transaction.into(), 0)]);
 	}
 
 	#[test]
