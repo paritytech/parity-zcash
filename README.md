@@ -1,4 +1,4 @@
-# The Parity Bitcoin client.
+# The Parity ZCash client.
 
 [![Build Status][travis-image]][travis-url] [![Snap Status](https://build.snapcraft.io/badge/paritytech/parity-bitcoin.svg)](https://build.snapcraft.io/user/paritytech/parity-bitcoin)
 
