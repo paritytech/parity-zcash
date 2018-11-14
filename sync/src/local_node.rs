@@ -229,10 +229,11 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 
 	/// Get block template for mining
 	pub fn get_block_template(&self) -> BlockTemplate {
-		let max_block_size = 2_000_000;
+		let max_block_size = self.consensus.max_block_size();
+		let max_block_sigops = self.consensus.max_block_sigops();
 		let block_assembler = BlockAssembler {
 			max_block_size: max_block_size as u32,
-			max_block_sigops: 20_000,
+			max_block_sigops: max_block_sigops as u32,
 		};
 		let memory_pool = &*self.memory_pool.read();
 		block_assembler.create_new_block(&self.storage, memory_pool, time::get_time().sec as u32, &self.consensus)

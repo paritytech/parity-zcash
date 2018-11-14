@@ -78,7 +78,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 	) -> Self {
 		trace!(target: "verification", "Mempool-Tx verification {}", transaction.hash.to_reversed_str());
 		let transaction_index = 0;
-		let max_block_sigops = 20_000;
+		let max_block_sigops = consensus.max_block_sigops();
 		MemoryPoolTransactionAcceptor {
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),

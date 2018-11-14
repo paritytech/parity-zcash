@@ -4,7 +4,7 @@ use storage;
 use message::Services;
 use network::{Network, ConsensusParams};
 use p2p::InternetProtocol;
-use seednodes::zcash_seednodes;
+use seednodes::{zcash_seednodes, zcash_testnet_seednodes};
 use rpc_apis::ApiSet;
 use {USER_AGENT, REGTEST_USER_AGENT};
 use primitives::hash::H256;
@@ -96,7 +96,8 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 		Some(s) => vec![s.parse().map_err(|_| "Invalid seednode".to_owned())?],
 		None => match network {
 			Network::Mainnet => zcash_seednodes().into_iter().map(Into::into).collect(),
-			Network::Other(_) | Network::Testnet | Network::Regtest | Network::Unitest => Vec::new(),
+			Network::Testnet => zcash_testnet_seednodes().into_iter().map(Into::into).collect(),
+			Network::Other(_) | Network::Regtest | Network::Unitest => Vec::new(),
 		},
 	};
 

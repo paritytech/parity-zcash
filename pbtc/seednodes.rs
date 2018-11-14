@@ -5,3 +5,9 @@ pub fn zcash_seednodes() -> Vec<&'static str> {
 		"dnsseed.znodes.org:8233",
 	]
 }
+
+pub fn zcash_testnet_seednodes() -> Vec<&'static str> {
+	vec![
+		"dnsseed.testnet.z.cash:18233",
+	]
+}

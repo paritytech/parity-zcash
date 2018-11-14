@@ -29,7 +29,7 @@ impl<'a> BlockAcceptor<'a> {
 	) -> Self {
 		BlockAcceptor {
 			finality: BlockFinality::new(block, height, deployments, headers),
-			serialized_size: BlockSerializedSize::new(block),
+			serialized_size: BlockSerializedSize::new(block, consensus),
 			coinbase_script: BlockCoinbaseScript::new(block, consensus, height),
 			coinbase_claim: BlockCoinbaseClaim::new(block, store, height),
 			sigops: BlockSigops::new(block, store, consensus),
@@ -82,19 +82,21 @@ impl<'a> BlockFinality<'a> {
 
 pub struct BlockSerializedSize<'a> {
 	block: CanonBlock<'a>,
+	max_block_size: usize,
 }
 
 impl<'a> BlockSerializedSize<'a> {
-	fn new(block: CanonBlock<'a>) -> Self {
+	fn new(block: CanonBlock<'a>, consensus: &'a ConsensusParams) -> Self {
 		BlockSerializedSize {
 			block: block,
+			max_block_size: consensus.max_block_size(),
 		}
 	}
 
 	fn check(&self) -> Result<(), Error> {
 		let size = self.block.size();
 
-		if size > 2_000_000 {
+		if size > self.max_block_size {
 			return Err(Error::Size(size));
 		}
 
@@ -107,6 +109,7 @@ pub struct BlockSigops<'a> {
 	store: &'a TransactionOutputProvider,
 	bip16_active: bool,
 	checkdatasig_active: bool,
+	max_block_sigops: usize,
 }
 
 impl<'a> BlockSigops<'a> {
@@ -123,6 +126,7 @@ impl<'a> BlockSigops<'a> {
 			store: store,
 			bip16_active,
 			checkdatasig_active,
+			max_block_sigops: consensus.max_block_sigops(),
 		}
 	}
 
@@ -132,7 +136,7 @@ impl<'a> BlockSigops<'a> {
 			.map(|tx| transaction_sigops(&tx.raw, &store, self.bip16_active, self.checkdatasig_active))
 			.fold(0, |acc, tx_sigops| (acc + tx_sigops));
 
-		if sigops > 20_000 {
+		if sigops > self.max_block_sigops {
 			return Err(Error::MaximumSigops);
 		}
 

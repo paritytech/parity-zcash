@@ -13,10 +13,10 @@ pub struct ChainVerifier<'a> {
 }
 
 impl<'a> ChainVerifier<'a> {
-	pub fn new(block: &'a IndexedBlock, consensus: &ConsensusParams, current_time: u32) -> Self {
+	pub fn new(block: &'a IndexedBlock, consensus: &'a ConsensusParams, current_time: u32) -> Self {
 		trace!(target: "verification", "Block pre-verification {}", block.hash().to_reversed_str());
 		ChainVerifier {
-			block: BlockVerifier::new(block),
+			block: BlockVerifier::new(block, consensus),
 			header: HeaderVerifier::new(&block.header, consensus, current_time),
 			transactions: block.transactions.iter().map(TransactionVerifier::new).collect(),
 		}

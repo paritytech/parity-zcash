@@ -26,9 +26,13 @@ pub struct ConsensusParams {
 	/// BIP141, BIP143, BIP147 deployment
 	pub segwit_deployment: Option<Deployment>,
 
+	/// Interval (in blocks) to calculate average work.
 	pub pow_averaging_window: u32,
+	/// % of possible down adjustment of work.
 	pub pow_max_adjust_down: u32,
+	/// % of possible up adjustment of work.
 	pub pow_max_adjust_up: u32,
+	/// Optimal blocks interval (in seconds).
 	pub pow_target_spacing: u32,
 }
 
@@ -100,6 +104,14 @@ impl ConsensusParams {
 
 	pub fn max_actual_timespan(&self) -> u32 {
 		(self.averaging_window_timespan() * (100 + self.pow_max_adjust_down)) / 100
+	}
+
+	pub fn max_block_size(&self) -> usize {
+		2_000_000
+	}
+
+	pub fn max_block_sigops(&self) -> usize {
+		20_000
 	}
 
 	pub fn max_transaction_size(&self) -> usize {

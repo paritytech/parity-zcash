@@ -47,7 +47,7 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			is_coinbase: TransactionMemoryPoolCoinbase::new(transaction),
 			size: TransactionSize::new(transaction, consensus),
-			sigops: TransactionSigops::new(transaction, 20_000),
+			sigops: TransactionSigops::new(transaction, consensus.max_block_sigops()),
 		}
 	}
 
