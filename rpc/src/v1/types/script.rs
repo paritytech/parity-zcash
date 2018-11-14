@@ -11,8 +11,6 @@ pub enum ScriptType {
 	ScriptHash,
 	Multisig,
 	NullData,
-	WitnessScript,
-	WitnessKey,
 }
 
 impl From<GlobalScriptType> for ScriptType {
@@ -24,8 +22,6 @@ impl From<GlobalScriptType> for ScriptType {
 			GlobalScriptType::ScriptHash => ScriptType::ScriptHash,
 			GlobalScriptType::Multisig => ScriptType::Multisig,
 			GlobalScriptType::NullData => ScriptType::NullData,
-			GlobalScriptType::WitnessScript => ScriptType::WitnessScript,
-			GlobalScriptType::WitnessKey => ScriptType::WitnessKey,
 		}
 	}
 }
@@ -39,8 +35,6 @@ impl Serialize for ScriptType {
 			ScriptType::ScriptHash => "scripthash".serialize(serializer),
 			ScriptType::Multisig => "multisig".serialize(serializer),
 			ScriptType::NullData => "nulldata".serialize(serializer),
-			ScriptType::WitnessScript => "witness_v0_scripthash".serialize(serializer),
-			ScriptType::WitnessKey => "witness_v0_keyhash".serialize(serializer),
 		}
 	}
 }
@@ -66,8 +60,6 @@ impl<'a> Deserialize<'a> for ScriptType {
 					"scripthash" => Ok(ScriptType::ScriptHash),
 					"multisig" => Ok(ScriptType::Multisig),
 					"nulldata" => Ok(ScriptType::NullData),
-					"witness_v0_scripthash" => Ok(ScriptType::WitnessScript),
-					"witness_v0_keyhash" => Ok(ScriptType::WitnessKey),
 					_ => Err(E::invalid_value(Unexpected::Str(value), &self)),
 				}
 			}
@@ -90,8 +82,6 @@ mod tests {
 		assert_eq!(serde_json::to_string(&ScriptType::ScriptHash).unwrap(), r#""scripthash""#);
 		assert_eq!(serde_json::to_string(&ScriptType::Multisig).unwrap(), r#""multisig""#);
 		assert_eq!(serde_json::to_string(&ScriptType::NullData).unwrap(), r#""nulldata""#);
-		assert_eq!(serde_json::to_string(&ScriptType::WitnessScript).unwrap(), r#""witness_v0_scripthash""#);
-		assert_eq!(serde_json::to_string(&ScriptType::WitnessKey).unwrap(), r#""witness_v0_keyhash""#);
 	}
 
 	#[test]
@@ -102,7 +92,5 @@ mod tests {
 		assert_eq!(serde_json::from_str::<ScriptType>(r#""scripthash""#).unwrap(), ScriptType::ScriptHash);
 		assert_eq!(serde_json::from_str::<ScriptType>(r#""multisig""#).unwrap(), ScriptType::Multisig);
 		assert_eq!(serde_json::from_str::<ScriptType>(r#""nulldata""#).unwrap(), ScriptType::NullData);
-		assert_eq!(serde_json::from_str::<ScriptType>(r#""witness_v0_scripthash""#).unwrap(), ScriptType::WitnessScript);
-		assert_eq!(serde_json::from_str::<ScriptType>(r#""witness_v0_keyhash""#).unwrap(), ScriptType::WitnessKey);
 	}
 }

@@ -38,8 +38,6 @@ pub struct MerkleBlockArtefacts {
 
 /// Connected peers
 pub trait Peers : Send + Sync + PeersContainer + PeersFilters + PeersOptions {
-	/// Require peers services.
-	fn require_peer_services(&self, services: Services);
 	/// Get peer connection
 	fn connection(&self, peer_index: PeerIndex) -> Option<OutboundSyncConnectionRef>;
 }
@@ -123,19 +121,6 @@ impl Peer {
 }
 
 impl Peers for PeersImpl {
-	fn require_peer_services(&self, services: Services) {
-		// possible optimization: force p2p level to establish connections to SegWit-nodes only
-		// without it, all other nodes will be eventually banned (this could take some time, though)
-		let mut peers = self.peers.write();
-		for peer_index in peers.iter().filter(|&(_, p)| p.services.includes(&services)).map(|(p, _)| *p).collect::<Vec<_>>() {
-			let peer = peers.remove(&peer_index).expect("iterating peers keys; qed"); 
-			let expected_services: u64 = services.into();
-			let actual_services: u64 = peer.services.into();
-			warn!(target: "sync", "Disconnecting from peer#{} because of insufficient services. Expected {:x}, actual: {:x}", peer_index, expected_services, actual_services);
-			peer.connection.close();
-		}
-	}
-
 	fn connection(&self, peer_index: PeerIndex) -> Option<OutboundSyncConnectionRef> {
 		self.peers.read().get(&peer_index).map(|peer| peer.connection.clone())
 	}

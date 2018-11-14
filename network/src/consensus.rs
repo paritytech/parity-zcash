@@ -23,8 +23,6 @@ pub struct ConsensusParams {
 	pub miner_confirmation_window: u32,
 	/// BIP68, BIP112, BIP113 deployment
 	pub csv_deployment: Option<Deployment>,
-	/// BIP141, BIP143, BIP147 deployment
-	pub segwit_deployment: Option<Deployment>,
 
 	/// Interval (in blocks) to calculate average work.
 	pub pow_averaging_window: u32,
@@ -45,7 +43,6 @@ impl ConsensusParams {
 				bip34_height: 1,
 				bip65_height: 0,
 				bip66_height: 0,
-				segwit_deployment: None,
 				rule_change_activation_threshold: 1916, // 95%
 				miner_confirmation_window: 2016,
 				csv_deployment: None,
@@ -61,7 +58,6 @@ impl ConsensusParams {
 				bip34_height: 1,
 				bip65_height: 0,
 				bip66_height: 0,
-				segwit_deployment: None,
 				rule_change_activation_threshold: 1512, // 75%
 				miner_confirmation_window: 2016,
 				csv_deployment: None,
@@ -77,7 +73,6 @@ impl ConsensusParams {
 				bip34_height: 100000000,
 				bip65_height: 0,
 				bip66_height: 0,
-				segwit_deployment: None,
 				rule_change_activation_threshold: 108, // 75%
 				miner_confirmation_window: 144,
 				csv_deployment: None,

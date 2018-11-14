@@ -3,10 +3,10 @@ use bytes::Bytes;
 use keys::{Message, Signature, Public};
 use chain::constants::SEQUENCE_LOCKTIME_DISABLE_FLAG;
 use crypto::{sha1, sha256, dhash160, dhash256, ripemd160};
-use sign::{SignatureVersion, Sighash};
+use sign::Sighash;
 use script::MAX_SCRIPT_ELEMENT_SIZE;
 use {
-	script, Builder, Script, ScriptWitness, Num, VerificationFlags, Opcode, Error, SignatureChecker, Stack
+	script, Builder, Script, Num, VerificationFlags, Opcode, Error, SignatureChecker, Stack
 };
 
 /// Helper function.
@@ -15,7 +15,6 @@ fn check_signature(
 	mut script_sig: Vec<u8>,
 	public: Vec<u8>,
 	script_code: &Script,
-	version: SignatureVersion
 ) -> bool {
 	let public = match Public::from_slice(&public) {
 		Ok(public) => public,
@@ -29,7 +28,7 @@ fn check_signature(
 	let hash_type = script_sig.pop().unwrap() as u32;
 	let signature = script_sig.into();
 
-	checker.check_signature(&signature, &public, script_code, hash_type, version)
+	checker.check_signature(&signature, &public, script_code, hash_type)
 }
 
 /// Helper function.
@@ -169,19 +168,15 @@ fn is_low_der_signature(sig: &[u8]) -> Result<(), Error> {
 	Ok(())
 }
 
-fn is_defined_hashtype_signature(version: SignatureVersion, sig: &[u8]) -> bool {
+fn is_defined_hashtype_signature(sig: &[u8]) -> bool {
 	if sig.is_empty() {
 		return false;
 	}
 
-	Sighash::is_defined(version, sig[sig.len() - 1] as u32)
+	Sighash::is_defined(sig[sig.len() - 1] as u32)
 }
 
-fn parse_hash_type(version: SignatureVersion, sig: &[u8]) -> Sighash {
-	Sighash::from_u32(version, if sig.is_empty() { 0 } else { sig[sig.len() - 1] as u32 })
-}
-
-fn check_signature_encoding(sig: &[u8], flags: &VerificationFlags, version: SignatureVersion) -> Result<(), Error> {
+fn check_signature_encoding(sig: &[u8], flags: &VerificationFlags) -> Result<(), Error> {
 	// Empty signature. Not strictly DER encoded, but allowed to provide a
 	// compact way to provide an invalid signature for use with CHECK(MULTI)SIG
 
@@ -197,19 +192,8 @@ fn check_signature_encoding(sig: &[u8], flags: &VerificationFlags, version: Sign
 		is_low_der_signature(sig)?;
 	}
 
-	if flags.verify_strictenc && !is_defined_hashtype_signature(version, sig) {
+	if flags.verify_strictenc && !is_defined_hashtype_signature(sig) {
 		return Err(Error::SignatureHashtype)
-	}
-
-	// verify_strictenc is currently enabled for BitcoinCash only
-	if flags.verify_strictenc {
-		let uses_fork_id = parse_hash_type(version, sig).fork_id;
-		let enabled_fork_id = version == SignatureVersion::ForkId;
-		if uses_fork_id && !enabled_fork_id {
-			return Err(Error::SignatureIllegalForkId)
-		} else if !uses_fork_id && enabled_fork_id {
-			return Err(Error::SignatureMustUseForkId);
-		}
 	}
 
 	Ok(())
@@ -264,10 +248,8 @@ fn cast_to_bool(data: &[u8]) -> bool {
 pub fn verify_script(
 	script_sig: &Script,
 	script_pubkey: &Script,
-	witness: &ScriptWitness,
 	flags: &VerificationFlags,
 	checker: &SignatureChecker,
-	version: SignatureVersion,
 ) -> Result<(), Error> {
 	if flags.verify_sigpushonly && !script_sig.is_push_only() {
 		return Err(Error::SignaturePushOnly);
@@ -275,33 +257,16 @@ pub fn verify_script(
 
 	let mut stack = Stack::new();
 	let mut stack_copy = Stack::new();
-	let mut had_witness = false;
 
-	eval_script(&mut stack, script_sig, flags, checker, version)?;
+	eval_script(&mut stack, script_sig, flags, checker)?;
 
 	if flags.verify_p2sh {
 		stack_copy = stack.clone();
 	}
 
-	let res = eval_script(&mut stack, script_pubkey, flags, checker, version)?;
+	let res = eval_script(&mut stack, script_pubkey, flags, checker)?;
 	if !res {
 		return Err(Error::EvalFalse);
-	}
-
-	// Verify witness program
-	let mut verify_cleanstack = flags.verify_cleanstack;
-	if flags.verify_witness {
-		if let Some((witness_version, witness_program)) = script_pubkey.parse_witness_program() {
-			if !script_sig.is_empty() {
-				return Err(Error::WitnessMalleated);
-			}
-
-			had_witness = true;
-			verify_cleanstack = false;
-			if !verify_witness_program(witness, witness_version, witness_program, flags, checker)? {
-				return Err(Error::EvalFalse);
-			}
-		}
 	}
 
 	// Additional validation for spend-to-script-hash transactions:
@@ -319,116 +284,25 @@ pub fn verify_script(
 
 		let pubkey2: Script = stack.pop()?.into();
 
-		let res = eval_script(&mut stack, &pubkey2, flags, checker, version)?;
+		let res = eval_script(&mut stack, &pubkey2, flags, checker)?;
 		if !res {
 			return Err(Error::EvalFalse);
 		}
-
-		if flags.verify_witness {
-			if let Some((witness_version, witness_program)) = pubkey2.parse_witness_program() {
-				if script_sig != &Builder::default().push_data(&pubkey2).into_script() {
-					return Err(Error::WitnessMalleatedP2SH);
-				}
-
-				had_witness = true;
-				verify_cleanstack = false;
-				if !verify_witness_program(witness, witness_version, witness_program, flags, checker)? {
-					return Err(Error::EvalFalse);
-				}
-			}
-		}
 	}
 
-    // The CLEANSTACK check is only performed after potential P2SH evaluation,
-    // as the non-P2SH evaluation of a P2SH script will obviously not result in
-    // a clean stack (the P2SH inputs remain). The same holds for witness evaluation.
-	if verify_cleanstack {
-        // Disallow CLEANSTACK without P2SH, as otherwise a switch CLEANSTACK->P2SH+CLEANSTACK
-        // would be possible, which is not a softfork (and P2SH should be one).
+	// The CLEANSTACK check is only performed after potential P2SH evaluation,
+	// as the non-P2SH evaluation of a P2SH script will obviously not result in
+	// a clean stack (the P2SH inputs remain). The same holds for witness evaluation.
+	if flags.verify_cleanstack {
+		// Disallow CLEANSTACK without P2SH, as otherwise a switch CLEANSTACK->P2SH+CLEANSTACK
+		// would be possible, which is not a softfork (and P2SH should be one).
 		assert!(flags.verify_p2sh);
 		if stack.len() != 1 {
 			return Err(Error::Cleanstack);
 		}
 	}
 
-	if flags.verify_witness {
-		// We can't check for correct unexpected witness data if P2SH was off, so require
-		// that WITNESS implies P2SH. Otherwise, going from WITNESS->P2SH+WITNESS would be
-		// possible, which is not a softfork.
-		assert!(flags.verify_p2sh);
-		if !had_witness && !witness.is_empty() {
-			return Err(Error::WitnessUnexpected);
-		}
-	}
-
 	Ok(())
-}
-
-fn verify_witness_program(
-	witness: &ScriptWitness,
-	witness_version: u8,
-	witness_program: &[u8],
-	flags: &VerificationFlags,
-	checker: &SignatureChecker,
-) -> Result<bool, Error> {
-	if witness_version != 0 {
-		if flags.verify_discourage_upgradable_witness_program {
-			return Err(Error::DiscourageUpgradableWitnessProgram);
-		}
-
-		return Ok(true);
-	}
-
-	let witness_stack = witness;
-	let witness_stack_len = witness_stack.len();
-	let (mut stack, script_pubkey): (Stack<_>, Script) = match witness_program.len() {
-		32 => {
-			if witness_stack_len == 0 {
-				return Err(Error::WitnessProgramWitnessEmpty);
-			}
-
-			let script_pubkey = &witness_stack[witness_stack_len - 1];
-			let stack = &witness_stack[0..witness_stack_len - 1];
-			let script_pubkey_hash = sha256(script_pubkey);
-
-			if script_pubkey_hash != witness_program[0..32].into() {
-				return Err(Error::WitnessProgramMismatch);
-			}
-
-			(stack.iter().cloned().collect::<Vec<_>>().into(), Script::new(script_pubkey.clone()))
-		},
-		20 => {
-			if witness_stack_len != 2 {
-				return Err(Error::WitnessProgramMismatch);
-			}
-
-			let script_pubkey = Builder::default()
-				.push_opcode(Opcode::OP_DUP)
-				.push_opcode(Opcode::OP_HASH160)
-				.push_data(witness_program)
-				.push_opcode(Opcode::OP_EQUALVERIFY)
-				.push_opcode(Opcode::OP_CHECKSIG)
-				.into_script();
-
-			(witness_stack.clone().into(), script_pubkey)
-		},
-		_ => return Err(Error::WitnessProgramWrongLength),
-	};
-
-	if stack.iter().any(|s| s.len() > MAX_SCRIPT_ELEMENT_SIZE) {
-		return Err(Error::PushSize);
-	}
-
-	if !eval_script(&mut stack, &script_pubkey, flags, checker, SignatureVersion::WitnessV0)? {
-		return Ok(false);
-	}
-
-	if stack.len() != 1 {
-		return Err(Error::EvalFalse);
-	}
-
-	let success = cast_to_bool(stack.last().expect("stack.len() == 1; last() only returns errors when stack is empty; qed"));
-	Ok(success)
 }
 
 /// Evaluautes the script
@@ -438,7 +312,6 @@ pub fn eval_script(
 	script: &Script,
 	flags: &VerificationFlags,
 	checker: &SignatureChecker,
-	version: SignatureVersion
 ) -> Result<bool, Error> {
 	if script.len() > script::MAX_SCRIPT_SIZE {
 		return Err(Error::ScriptSize);
@@ -1024,21 +897,14 @@ pub fn eval_script(
 			Opcode::OP_CHECKSIG | Opcode::OP_CHECKSIGVERIFY => {
 				let pubkey = stack.pop()?;
 				let signature = stack.pop()?;
-				let sighash = parse_hash_type(version, &signature);
 				let mut subscript = script.subscript(begincode);
-				match version {
-					SignatureVersion::ForkId if sighash.fork_id => (),
-					SignatureVersion::WitnessV0 => (),
-					SignatureVersion::Base | SignatureVersion::ForkId => {
-						let signature_script = Builder::default().push_data(&*signature).into_script();
-						subscript = subscript.find_and_delete(&*signature_script);
-					},
-				}
+				let signature_script = Builder::default().push_data(&*signature).into_script();
+				subscript = subscript.find_and_delete(&*signature_script);
 
-				check_signature_encoding(&signature, flags, version)?;
+				check_signature_encoding(&signature, flags)?;
 				check_pubkey_encoding(&pubkey, flags)?;
 
-				let success = check_signature(checker, signature.into(), pubkey.into(), &subscript, version);
+				let success = check_signature(checker, signature.into(), pubkey.into(), &subscript);
 				match opcode {
 					Opcode::OP_CHECKSIG => {
 						if success {
@@ -1071,17 +937,9 @@ pub fn eval_script(
 				let sigs = (0..sigs_count).into_iter().map(|_| stack.pop()).collect::<Result<Vec<_>, _>>()?;
 
 				let mut subscript = script.subscript(begincode);
-
 				for signature in &sigs {
-					let sighash = parse_hash_type(version, &signature);
-					match version {
-						SignatureVersion::ForkId if sighash.fork_id => (),
-						SignatureVersion::WitnessV0 => (),
-						SignatureVersion::Base | SignatureVersion::ForkId => {
-							let signature_script = Builder::default().push_data(&*signature).into_script();
-							subscript = subscript.find_and_delete(&*signature_script);
-						},
-					}
+					let signature_script = Builder::default().push_data(&*signature).into_script();
+					subscript = subscript.find_and_delete(&*signature_script);
 				}
 
 				let mut success = true;
@@ -1092,10 +950,10 @@ pub fn eval_script(
 					let key = keys[k].clone();
 					let sig = sigs[s].clone();
 
-					check_signature_encoding(&sig, flags, version)?;
+					check_signature_encoding(&sig, flags)?;
 					check_pubkey_encoding(&key, flags)?;
 
-					let ok = check_signature(checker, sig.into(), key.into(), &subscript, version);
+					let ok = check_signature(checker, sig.into(), key.into(), &subscript);
 					if ok {
 						s += 1;
 					}
@@ -1139,7 +997,7 @@ pub fn eval_script(
 				let message = stack.pop()?;
 				let signature = stack.pop()?;
 
-				check_signature_encoding(&signature, flags, version)?;
+				check_signature_encoding(&signature, flags)?;
 				check_pubkey_encoding(&pubkey, flags)?;
 
 				let signature: Vec<u8> = signature.into();
@@ -1187,10 +1045,9 @@ mod tests {
 	use chain::Transaction;
 	use crypto::sha256;
 	use keys::{KeyPair, Private, Message, Network};
-	use sign::SignatureVersion;
 	use script::MAX_SCRIPT_ELEMENT_SIZE;
 	use {
-		Opcode, Script, ScriptWitness, VerificationFlags, Builder, Error, Num, TransactionInputSigner,
+		Opcode, Script, VerificationFlags, Builder, Error, Num, TransactionInputSigner,
 		NoopSignatureChecker, TransactionSignatureChecker, Stack
 	};
 	use super::{eval_script, verify_script, is_public_key};
@@ -1212,7 +1069,6 @@ mod tests {
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
 		let checker = NoopSignatureChecker;
-		let version = SignatureVersion::Base;
 		let direct: Script = vec![Opcode::OP_PUSHBYTES_1 as u8, 0x5a].into();
 		let pushdata1: Script = vec![Opcode::OP_PUSHDATA1 as u8, 0x1, 0x5a].into();
 		let pushdata2: Script = vec![Opcode::OP_PUSHDATA2 as u8, 0x1, 0, 0x5a].into();
@@ -1222,10 +1078,10 @@ mod tests {
 		let mut pushdata1_stack = Stack::new();
 		let mut pushdata2_stack = Stack::new();
 		let mut pushdata4_stack = Stack::new();
-		assert!(eval_script(&mut direct_stack, &direct, &flags, &checker, version).unwrap());
-		assert!(eval_script(&mut pushdata1_stack, &pushdata1, &flags, &checker, version).unwrap());
-		assert!(eval_script(&mut pushdata2_stack, &pushdata2, &flags, &checker, version).unwrap());
-		assert!(eval_script(&mut pushdata4_stack, &pushdata4, &flags, &checker, version).unwrap());
+		assert!(eval_script(&mut direct_stack, &direct, &flags, &checker).unwrap());
+		assert!(eval_script(&mut pushdata1_stack, &pushdata1, &flags, &checker).unwrap());
+		assert!(eval_script(&mut pushdata2_stack, &pushdata2, &flags, &checker).unwrap());
+		assert!(eval_script(&mut pushdata4_stack, &pushdata4, &flags, &checker).unwrap());
 
 		assert_eq!(direct_stack, expected);
 		assert_eq!(pushdata1_stack, expected);
@@ -1235,9 +1091,8 @@ mod tests {
 
 	fn basic_test_with_flags(script: &Script, flags: &VerificationFlags, expected: Result<bool, Error>, expected_stack: Stack<Bytes>) {
 		let checker = NoopSignatureChecker;
-		let version = SignatureVersion::Base;
 		let mut stack = Stack::new();
-		assert_eq!(eval_script(&mut stack, script, &flags, &checker, version), expected);
+		assert_eq!(eval_script(&mut stack, script, &flags, &checker), expected);
 		if expected.is_ok() {
 			assert_eq!(stack, expected_stack);
 		}
@@ -2144,7 +1999,7 @@ mod tests {
 		let output: Script = "76a914df3bd30160e6c6145baaf2c88a8844c13a00d1d588ac".into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 	}
 
 	// https://blockchain.info/rawtx/02b082113e35d5386285094c2829e7e2963fa0b5369fb7f4b79c4c90877dcd3d
@@ -2161,7 +2016,7 @@ mod tests {
 		let output: Script = "a9141a8b0026343166625c7475f01e48b5ede8c0252e87".into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 	}
 
 	// https://blockchain.info/en/tx/12b5633bad1f9c167d523ad1aa1947b2732a865bf5414eab2f9e5ae5d5c191ba?show_adv=true
@@ -2178,7 +2033,7 @@ mod tests {
 		let output: Script = "410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac".into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 	}
 
 	// https://blockchain.info/rawtx/fb0a1d8d34fa5537e461ac384bac761125e1bfa7fec286fa72511240fa66864d
@@ -2195,7 +2050,7 @@ mod tests {
 		let output: Script = "76a9147a2a3b481ca80c4ba7939c54d9278e50189d94f988ac".into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 	}
 
 	// https://blockchain.info/rawtx/eb3b82c0884e3efa6d8b0be55b4915eb20be124c9766245bcc7f34fdac32bccb
@@ -2213,12 +2068,12 @@ mod tests {
 
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true)
 			.verify_locktime(true);
-		assert_eq!(verify_script(&input, &output, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Err(Error::NumberOverflow));
+		assert_eq!(verify_script(&input, &output, &flags, &checker), Err(Error::NumberOverflow));
 	}
 
 	// https://blockchain.info/rawtx/54fabd73f1d20c980a0686bf0035078e07f69c58437e4d586fb29aa0bee9814f
@@ -2234,7 +2089,7 @@ mod tests {
 		let input: Script = "483045022100d92e4b61452d91a473a43cde4b469a472467c0ba0cbd5ebba0834e4f4762810402204802b76b7783db57ac1f61d2992799810e173e91055938750815b6d8a675902e014f".into();
 		let output: Script = "76009f69905160a56b210378d430274f8c5ec1321338151e9f27f4c676a008bdf8638d07c0b6be9ab35c71ad6c".into();
 		let flags = VerificationFlags::default();
-		assert_eq!(verify_script(&input, &output, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 	}
 
 	#[test]
@@ -2287,83 +2142,9 @@ mod tests {
 
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 	}
 
-
-	#[test]
-	fn test_script_with_forkid_signature() {
-		use sign::UnsignedTransactionInput;
-		use chain::{OutPoint, TransactionOutput};
-
-		let key_pair = KeyPair::from_private(Private { network: Network::Mainnet, secret: 1.into(), compressed: false, }).unwrap();
-		let redeem_script = Builder::default()
-			.push_data(key_pair.public())
-			.push_opcode(Opcode::OP_CHECKSIG)
-			.into_script();
-
-
-		let amount = 12345000000000;
-		let sighashtype = 0x41; // All + ForkId
-		let checker = TransactionSignatureChecker {
-			input_index: 0,
-			input_amount: amount,
-			signer: TransactionInputSigner {
-				version: 1,
-				inputs: vec![
-					UnsignedTransactionInput {
-						previous_output: OutPoint {
-							hash: 0u8.into(),
-							index: 0xffffffff,
-						},
-						sequence: 0xffffffff,
-					},
-				],
-				outputs: vec![
-					TransactionOutput {
-						value: amount,
-						script_pubkey: redeem_script.to_bytes(),
-					},
-				],
-				lock_time: 0,
-			},
-		};
-
-		let script_pubkey = redeem_script;
-		let flags = VerificationFlags::default();
-
-		// valid signature
-		{
-			let signed_input = checker.signer.signed_input(&key_pair, 0, amount, &script_pubkey, SignatureVersion::ForkId, sighashtype);
-			let script_sig = signed_input.script_sig.into();
-
-			assert_eq!(verify_script(&script_sig, &script_pubkey, &ScriptWitness::default(), &flags, &checker, SignatureVersion::ForkId), Ok(()));
-		}
-
-		// signature with wrong amount
-		{
-			let signed_input = checker.signer.signed_input(&key_pair, 0, amount + 1, &script_pubkey, SignatureVersion::ForkId, sighashtype);
-			let script_sig = signed_input.script_sig.into();
-
-			assert_eq!(verify_script(&script_sig, &script_pubkey, &ScriptWitness::default(), &flags, &checker, SignatureVersion::ForkId), Err(Error::EvalFalse));
-		}
-
-		// fork-id signature passed when not expected
-		{
-			let signed_input = checker.signer.signed_input(&key_pair, 0, amount + 1, &script_pubkey, SignatureVersion::ForkId, sighashtype);
-			let script_sig = signed_input.script_sig.into();
-
-			assert_eq!(verify_script(&script_sig, &script_pubkey, &ScriptWitness::default(), &flags, &checker, SignatureVersion::Base), Err(Error::EvalFalse));
-		}
-
-		// non-fork-id signature passed when expected
-		{
-			let signed_input = checker.signer.signed_input(&key_pair, 0, amount + 1, &script_pubkey, SignatureVersion::Base, 1);
-			let script_sig = signed_input.script_sig.into();
-
-			assert_eq!(verify_script(&script_sig, &script_pubkey, &ScriptWitness::default(), &flags.verify_strictenc(true), &checker, SignatureVersion::ForkId), Err(Error::SignatureMustUseForkId));
-		}
-	}
 
 	#[test]
 	fn op_cat_disabled_by_default() {

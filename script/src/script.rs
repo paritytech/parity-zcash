@@ -26,8 +26,6 @@ pub enum ScriptType {
 	ScriptHash,
 	Multisig,
 	NullData,
-	WitnessScript,
-	WitnessKey,
 }
 
 /// Address from Script
@@ -350,10 +348,6 @@ impl Script {
 			ScriptType::Multisig
 		} else if self.is_null_data_script() {
 			ScriptType::NullData
-		} else if self.is_pay_to_witness_key_hash() {
-			ScriptType::WitnessKey
-		} else if self.is_pay_to_witness_script_hash() {
-			ScriptType::WitnessScript
 		} else {
 			ScriptType::NonStandard
 		}
@@ -447,12 +441,6 @@ impl Script {
 			},
 			ScriptType::NullData => {
 				Ok(vec![])
-			},
-			ScriptType::WitnessScript => {
-				Ok(vec![]) // TODO
-			},
-			ScriptType::WitnessKey => {
-				Ok(vec![]) // TODO
 			},
 		}
 	}

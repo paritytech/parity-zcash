@@ -78,17 +78,6 @@ impl Deployments {
 			None => false
 		}
 	}
-
-	/// Returns true if SegWit deployment is active
-	pub fn segwit(&self, number: u32, headers: &BlockHeaderProvider, consensus: &ConsensusParams) -> bool {
-		match consensus.segwit_deployment {
-			Some(segwit) => {
-				let mut cache = self.cache.lock();
-				threshold_state(&mut cache, segwit, number, headers, consensus.miner_confirmation_window, consensus.rule_change_activation_threshold).is_active()
-			},
-			None => false
-		}
-	}
 }
 
 impl<'a> BlockDeployments<'a> {
@@ -103,10 +92,6 @@ impl<'a> BlockDeployments<'a> {
 
 	pub fn csv(&self) -> bool {
 		self.deployments.csv(self.number, self.headers, self.consensus)
-	}
-
-	pub fn segwit(&self) -> bool {
-		self.deployments.segwit(self.number, self.headers, self.consensus)
 	}
 }
 

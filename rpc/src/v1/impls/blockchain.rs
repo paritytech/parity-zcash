@@ -87,8 +87,8 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 				VerboseBlock {
 					confirmations: confirmations,
 					size: block_size as u32,
-					strippedsize: block_size as u32, // TODO: segwit
-					weight: block_size as u32, // TODO: segwit
+					strippedsize: block_size as u32,
+					weight: block_size as u32,
 					height: height,
 					mediantime: Some(median_time),
 					difficulty: block.header.raw.bits.to_f64(self.network.max_bits().into()),

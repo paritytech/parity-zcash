@@ -1,6 +1,6 @@
 use storage::{TransactionMetaProvider, TransactionOutputProvider};
 use network::{ConsensusParams};
-use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, SignatureVersion};
+use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner};
 use duplex_store::DuplexTransactionOutputProvider;
 use deployments::BlockDeployments;
 use sigops::transaction_sigops;
@@ -275,7 +275,6 @@ pub struct TransactionEval<'a> {
 	verify_magnetic_anomaly_opcodes: bool,
 	verify_sigpushonly: bool,
 	verify_cleanstack: bool,
-	signature_version: SignatureVersion,
 }
 
 impl<'a> TransactionEval<'a> {
@@ -294,7 +293,6 @@ impl<'a> TransactionEval<'a> {
 		let verify_dersig = height >= params.bip66_height;
 		let verify_monolith_opcodes = false;
 		let verify_magnetic_anomaly_opcodes = false;
-		let signature_version = SignatureVersion::Base;
 
 		let verify_checksequence = deployments.csv();
 		let verify_sigpushonly = verify_magnetic_anomaly_opcodes;
@@ -314,7 +312,6 @@ impl<'a> TransactionEval<'a> {
 			verify_magnetic_anomaly_opcodes: verify_magnetic_anomaly_opcodes,
 			verify_sigpushonly: verify_sigpushonly,
 			verify_cleanstack: verify_cleanstack,
-			signature_version: signature_version,
 		}
 	}
 
@@ -366,7 +363,7 @@ impl<'a> TransactionEval<'a> {
 				.verify_sigpushonly(self.verify_sigpushonly)
 				.verify_cleanstack(self.verify_cleanstack);
 
-			try!(verify_script(&input, &output, &Default::default(), &flags, &checker, self.signature_version)
+			try!(verify_script(&input, &output, &flags, &checker)
 				.map_err(|e| TransactionError::Signature(index, e)));
 		}
 
