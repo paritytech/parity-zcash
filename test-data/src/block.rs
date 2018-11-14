@@ -579,7 +579,7 @@ fn example5() {
 			.build()
 		.build();
 
-	assert_eq!(hash, "3e24319d69a77c58e2da8c7331a21729482835c96834dafb3e1793c1253847c7".into());
+	assert_eq!(hash, "f50c5629c1b6921cb9219574152b253dc72f7de96b0813aab75e2f2fb43e05e5".into());
 	assert_eq!(block.header().previous_header_hash, "0000000000000000000000000000000000000000000000000000000000000000".into());
 }
 

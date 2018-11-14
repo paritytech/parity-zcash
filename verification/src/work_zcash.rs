@@ -1,5 +1,5 @@
 use primitives::compact::Compact;
-use primitives::bigint::U256;
+use primitives::bigint::{U256, Uint};
 use chain::IndexedBlockHeader;
 use network::ConsensusParams;
 use storage::BlockHeaderProvider;
@@ -7,6 +7,8 @@ use timestamp::median_timestamp_inclusive;
 
 /// Returns work required for given header for the ZCash block
 pub fn work_required_zcash(parent_header: IndexedBlockHeader, store: &BlockHeaderProvider, consensus: &ConsensusParams, max_bits: Compact) -> Compact {
+	// TODO: special testnet case!
+
 	// Find the first block in the averaging interval
 	let parent_hash = parent_header.hash.clone();
 	let mut oldest_hash = parent_header.raw.previous_header_hash;
@@ -17,7 +19,11 @@ pub fn work_required_zcash(parent_header: IndexedBlockHeader, store: &BlockHeade
 			None => return max_bits,
 		};
 
-		bits_total = bits_total + previous_header.bits.into();
+		// TODO: check this
+		bits_total = match bits_total.overflowing_add(previous_header.bits.into()) {
+			(bits_total, false) => bits_total,
+			(_, true) => return max_bits,
+		};
 		oldest_hash = previous_header.previous_header_hash;
 	}
 
