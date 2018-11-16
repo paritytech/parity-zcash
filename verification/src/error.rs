@@ -55,7 +55,10 @@ pub enum Error {
 	NonCanonicalTransactionOrdering,
 	/// Database error
 	Database(DBError),
+	/// Invalid equihash solution
 	InvalidEquihashSolution,
+	/// Invalid block version
+	InvalidVersion,
 }
 
 impl From<DBError> for Error {

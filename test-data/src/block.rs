@@ -214,6 +214,11 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 		}
 	}
 
+	pub fn version(mut self, version: u32) -> Self {
+		self.version = version;
+		self
+	}
+
 	pub fn parent(mut self, parent: H256) -> Self {
 		self.parent = parent;
 		self

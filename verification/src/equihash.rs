@@ -7,21 +7,21 @@ use chain::BlockHeader;
 #[allow(non_snake_case)]
 #[derive(Debug)]
 pub struct EquihashParams {
-	pub N: u32,
-	pub K: u32,
+	pub n: u32,
+	pub k: u32,
 }
 
 impl EquihashParams {
 	pub fn indices_per_hash_output(&self) -> usize {
-		(512 / self.N) as usize
+		(512 / self.n) as usize
 	}
 
 	pub fn hash_output(&self) -> usize {
-		(self.indices_per_hash_output() * self.N as usize / 8usize) as usize
+		(self.indices_per_hash_output() * self.n as usize / 8usize) as usize
 	}
 
 	pub fn collision_bit_length(&self) -> usize {
-		(self.N / (self.K + 1)) as usize
+		(self.n / (self.k + 1)) as usize
 	}
 
 	pub fn collision_byte_length(&self) -> usize {
@@ -29,22 +29,24 @@ impl EquihashParams {
 	}
 
 	pub fn final_full_width(&self) -> usize {
-		2 * self.collision_byte_length() + 4 * (1 << self.K)
+		2 * self.collision_byte_length() + 4 * (1 << self.k)
 	}
 
 	pub fn solution_size(&self) -> usize {
-		((1usize << self.K) * (self.collision_bit_length() + 1) / 8) as usize
+		((1usize << self.k) * (self.collision_bit_length() + 1) / 8) as usize
 	}
 
 	pub fn hash_length(&self) -> usize {
-		(self.K as usize + 1) * self.collision_byte_length()
+		(self.k as usize + 1) * self.collision_byte_length()
 	}
 }
 
-pub fn verify_block_equihash_solution(params: &EquihashParams, header: &BlockHeader) -> bool {
+pub fn verify_block_equihash_solution(params: (u32, u32), header: &BlockHeader) -> bool {
+	let (n, k) = params;
+	let params = EquihashParams { n, k };
 	let equihash_solution = header.solution.as_ref();
 	let input = header.equihash_input();
-	verify_equihash_solution(params, &input, equihash_solution)
+	verify_equihash_solution(&params, &input, equihash_solution)
 }
 
 pub fn verify_equihash_solution(params: &EquihashParams, input: &[u8], solution: &[u8]) -> bool {
@@ -63,8 +65,8 @@ pub fn verify_equihash_solution(params: &EquihashParams, input: &[u8], solution:
 	let mut rows = Vec::new();
 	for idx in indices {
 		let hash = generate_hash(&context, (idx as usize / params.indices_per_hash_output()) as u32);
-		let hash_begin = (idx as usize % params.indices_per_hash_output()) * params.N as usize / 8;
-		let hash_end = hash_begin + params.N as usize / 8;
+		let hash_begin = (idx as usize % params.indices_per_hash_output()) * params.n as usize / 8;
+		let hash_end = hash_begin + params.n as usize / 8;
 
 		let mut row = vec![0; params.final_full_width()];
 		let expanded_hash = expand_array(
@@ -225,8 +227,8 @@ fn expand_array(data: &[u8], bit_len: usize, byte_pad: usize) -> Vec<u8> {
 fn new_blake2(params: &EquihashParams) -> Blake2b {
 	let mut personalization = [0u8; 16];
 	personalization[0..8].clone_from_slice(b"ZcashPoW");
-	personalization[8..12].clone_from_slice(&to_little_endian(params.N));
-	personalization[12..16].clone_from_slice(&to_little_endian(params.K));
+	personalization[8..12].clone_from_slice(&to_little_endian(params.n));
+	personalization[12..16].clone_from_slice(&to_little_endian(params.k));
 	Blake2b::with_params(params.hash_output(), &[], &[], &personalization)
 }
 
@@ -304,7 +306,7 @@ mod tests {
 		let mut input = input.to_vec();
 		input.extend(le_nonce);
 
-		let params = EquihashParams { N: n, K: k };
+		let params = EquihashParams { n, k };
 
 		verify_equihash_solution(&params, &input, &solution)
 	}

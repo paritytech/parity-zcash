@@ -39,6 +39,9 @@ pub struct ConsensusParams {
 	pub pow_max_adjust_up: u32,
 	/// Optimal blocks interval (in seconds).
 	pub pow_target_spacing: u32,
+
+	/// Equihash (N, K) parameters.
+	pub equihash_params: Option<(u32, u32)>,
 }
 
 impl ConsensusParams {
@@ -61,6 +64,8 @@ impl ConsensusParams {
 				pow_max_adjust_down: 32,
 				pow_max_adjust_up: 16,
 				pow_target_spacing: (2.5 * 60.0) as u32,
+
+				equihash_params: Some((200, 9)),
 			},
 			Network::Testnet => ConsensusParams {
 				network: network,
@@ -79,8 +84,10 @@ impl ConsensusParams {
 				pow_max_adjust_down: 32,
 				pow_max_adjust_up: 16,
 				pow_target_spacing: (2.5 * 60.0) as u32,
+
+				equihash_params: Some((200, 9)),
 			},
-			Network::Regtest | Network::Unitest => ConsensusParams {
+			Network::Regtest => ConsensusParams {
 				network: network,
 				bip16_time: 0,
 				bip34_height: 100000000,
@@ -97,6 +104,28 @@ impl ConsensusParams {
 				pow_max_adjust_down: 0,
 				pow_max_adjust_up: 0,
 				pow_target_spacing: (2.5 * 60.0) as u32,
+
+				equihash_params: Some((200, 9)),
+			},
+			Network::Unitest => ConsensusParams {
+				network: network,
+				bip16_time: 0,
+				bip34_height: 100000000,
+				bip65_height: 0,
+				bip66_height: 0,
+				rule_change_activation_threshold: 108, // 75%
+				miner_confirmation_window: 144,
+				csv_deployment: None,
+
+				overwinter_height: ::std::u32::MAX,
+				sapling_height: ::std::u32::MAX,
+
+				pow_averaging_window: 17,
+				pow_max_adjust_down: 0,
+				pow_max_adjust_up: 0,
+				pow_target_spacing: (2.5 * 60.0) as u32,
+
+				equihash_params: None,
 			},
 		}
 	}
@@ -115,6 +144,10 @@ impl ConsensusParams {
 
 	pub fn max_actual_timespan(&self) -> u32 {
 		(self.averaging_window_timespan() * (100 + self.pow_max_adjust_down)) / 100
+	}
+
+	pub fn min_block_version(&self) -> u32 {
+		4
 	}
 
 	pub fn max_block_size(&self) -> usize {
