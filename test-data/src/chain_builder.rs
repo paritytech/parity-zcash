@@ -49,6 +49,12 @@ impl Into<IndexedTransaction> for TransactionBuilder {
 }
 
 impl TransactionBuilder {
+	pub fn overwintered() -> TransactionBuilder {
+		let mut builder = TransactionBuilder::default();
+		builder.transaction.overwintered = true;
+		builder
+	}
+
 	pub fn coinbase() -> TransactionBuilder {
 		let mut builder = TransactionBuilder::default();
 		builder.transaction.inputs.push(TransactionInput::coinbase(Default::default()));
@@ -81,6 +87,11 @@ impl TransactionBuilder {
 
 	pub fn set_version(mut self, version: i32) -> TransactionBuilder {
 		self.transaction.version = version;
+		self
+	}
+
+	pub fn set_version_group_id(mut self, version_group_id: u32) -> TransactionBuilder {
+		self.transaction.version_group_id = version_group_id;
 		self
 	}
 

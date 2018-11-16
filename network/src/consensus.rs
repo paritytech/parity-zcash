@@ -158,6 +158,10 @@ impl ConsensusParams {
 		20_000
 	}
 
+	pub fn max_transaction_value(&self) -> u64 {
+		21_000_000 * 100_000_000 // No amount larger than this (in satoshi) is valid
+	}
+
 	pub fn absolute_max_transaction_size(&self) -> usize {
 		2_000_000
 	}
@@ -168,9 +172,5 @@ impl ConsensusParams {
 		} else {
 			100_000
 		}
-	}
-
-	pub fn max_transaction_value(&self) -> u64 {
-		21_000_000 * 100_000_000 // No amount larger than this (in satoshi) is valid
 	}
 }

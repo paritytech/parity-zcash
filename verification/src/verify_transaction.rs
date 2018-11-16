@@ -1,6 +1,7 @@
 use std::ops;
 use ser::Serializable;
-use chain::IndexedTransaction;
+use chain::{IndexedTransaction, BTC_TX_VERSION, OVERWINTER_TX_VERSION,
+	OVERWINTER_TX_VERSION_GROUP_ID, SAPLING_TX_VERSION_GROUP_ID};
 use network::{ConsensusParams};
 use duplex_store::NoopStore;
 use sigops::transaction_sigops;
@@ -235,7 +236,28 @@ impl<'a> TransactionVersion<'a> {
 	}
 
 	fn check(&self) -> Result<(), TransactionError> {
-		if self.transaction.raw.version < 1 {
+		match self.transaction.raw.overwintered {
+			true => self.check_overwintered(),
+			false => self.check_non_overwintered(),
+		}
+	}
+
+	fn check_overwintered(&self) -> Result<(), TransactionError> {
+		if self.transaction.raw.version < OVERWINTER_TX_VERSION {
+			return Err(TransactionError::InvalidVersion);
+		}
+
+		let is_overwinter_group = self.transaction.raw.version_group_id == OVERWINTER_TX_VERSION_GROUP_ID;
+		let is_sapling_group = self.transaction.raw.version_group_id == SAPLING_TX_VERSION_GROUP_ID;
+		if !is_overwinter_group && !is_sapling_group {
+			return Err(TransactionError::InvalidVersionGroup);
+		}
+
+		Ok(())
+	}
+
+	fn check_non_overwintered(&self) -> Result<(), TransactionError> {
+		if self.transaction.raw.version < BTC_TX_VERSION {
 			return Err(TransactionError::InvalidVersion);
 		}
 
@@ -299,6 +321,8 @@ impl<'a> TransactionValueOverflow<'a> {
 mod tests {
 	extern crate test_data;
 
+	use chain::{BTC_TX_VERSION, OVERWINTER_TX_VERSION, OVERWINTER_TX_VERSION_GROUP_ID,
+		SAPLING_TX_VERSION_GROUP_ID};
 	use network::{Network, ConsensusParams};
 	use error::TransactionError;
 	use super::{TransactionEmpty, TransactionVersion, TransactionJointSplitInCoinbase, TransactionValueOverflow};
@@ -325,11 +349,41 @@ mod tests {
 
 	#[test]
 	fn transaction_version_works() {
+
+/*
+		if self.transaction.raw.version < OVERWINTER_TX_VERSION {
+			return Err(TransactionError::InvalidVersion);
+		}
+
+		let is_overwinter_group = self.transaction.raw.version_group_id == OVERWINTER_TX_VERSION_GROUP_ID;
+		let is_sapling_group = self.transaction.raw.version_group_id == SAPLING_TX_VERSION_GROUP_ID;
+		if !is_overwinter_group && !is_sapling_group {
+			return Err(TransactionError::InvalidVersionGroup);
+		}
+
+		Ok(())
+*/
+
+
 		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::with_version(0)
 			.into()).check(), Err(TransactionError::InvalidVersion));
 
-		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::with_version(1)
+		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::with_version(BTC_TX_VERSION)
 			.into()).check(), Ok(()));
+
+		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::overwintered()
+			.set_version(BTC_TX_VERSION).into()).check(), Err(TransactionError::InvalidVersion));
+
+		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::overwintered()
+			.set_version(OVERWINTER_TX_VERSION).into()).check(), Err(TransactionError::InvalidVersionGroup));
+
+		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::overwintered()
+			.set_version(OVERWINTER_TX_VERSION).set_version_group_id(OVERWINTER_TX_VERSION_GROUP_ID).into()).check(),
+			Ok(()));
+
+		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::overwintered()
+			.set_version(OVERWINTER_TX_VERSION).set_version_group_id(SAPLING_TX_VERSION_GROUP_ID).into()).check(),
+			Ok(()));
 	}
 
 	#[test]

@@ -342,7 +342,7 @@ impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
 				version: self.version,
 				inputs: self.inputs,
 				outputs: self.outputs,
-				joint_split: None,
+				..Default::default()
 			}
 		)
 	}

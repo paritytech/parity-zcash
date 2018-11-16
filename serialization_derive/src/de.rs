@@ -58,6 +58,9 @@ fn deserialize_field(index: usize, field: &syn::Field) -> quote::Tokens {
 				quote! { #id: reader.read()?, }
 			}
 		},
+		syn::Ty::Array(_, _) => {
+			quote! { #id: reader.read()?, }
+		},
 		_ => panic!("serialization not supported"),
 	}
 }

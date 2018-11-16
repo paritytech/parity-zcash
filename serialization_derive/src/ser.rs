@@ -63,6 +63,9 @@ fn serialize_field_size(index: usize, field: &syn::Field) -> quote::Tokens {
 				quote! { #id.serialized_size() }
 			}
 		},
+		syn::Ty::Array(_, _) => {
+			quote! { #id.serialized_size() }
+		},
 		_ => panic!("serialization not supported"),
 	}
 }
@@ -87,6 +90,9 @@ fn serialize_field(index: usize, field: &syn::Field) -> quote::Tokens {
 			} else {
 				quote! { stream.append(&#id); }
 			}
+		},
+		syn::Ty::Array(_, _) => {
+			quote! { stream.append(&#id); }
 		},
 		_ => panic!("serialization not supported"),
 	}
