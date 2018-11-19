@@ -9,7 +9,7 @@ use ser::{deserialize, serialize};
 use crypto::dhash256;
 use hash::H256;
 use constants::{SEQUENCE_FINAL, LOCKTIME_THRESHOLD};
-use join_split::{JointSplit, deserialize_joint_split, serialize_joint_split};
+use join_split::{JoinSplit, deserialize_joint_split, serialize_joint_split};
 use sapling::Sapling;
 use ser::{Error, Serializable, Deserializable, Stream, Reader};
 
@@ -103,7 +103,7 @@ pub struct Transaction {
 	pub outputs: Vec<TransactionOutput>,
 	pub lock_time: u32,
 	pub expiry_height: u32,
-	pub joint_split: Option<JointSplit>,
+	pub joint_split: Option<JoinSplit>,
 	pub sapling: Option<Sapling>,
 }
 

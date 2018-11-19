@@ -13,7 +13,7 @@ pub struct TransactionVerifier<'a> {
 	pub empty: TransactionEmpty<'a>,
 	pub null_non_coinbase: TransactionNullNonCoinbase<'a>,
 	pub oversized_coinbase: TransactionOversizedCoinbase<'a>,
-	pub joint_split_in_coinbase: TransactionJointSplitInCoinbase<'a>,
+	pub joint_split_in_coinbase: TransactionJoinSplitInCoinbase<'a>,
 	pub size: TransactionAbsoluteSize<'a>,
 	pub value_overflow: TransactionValueOverflow<'a>,
 }
@@ -26,7 +26,7 @@ impl<'a> TransactionVerifier<'a> {
 			empty: TransactionEmpty::new(transaction),
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			oversized_coinbase: TransactionOversizedCoinbase::new(transaction, MIN_COINBASE_SIZE..MAX_COINBASE_SIZE),
-			joint_split_in_coinbase: TransactionJointSplitInCoinbase::new(transaction),
+			joint_split_in_coinbase: TransactionJoinSplitInCoinbase::new(transaction),
 			size: TransactionAbsoluteSize::new(transaction, consensus),
 			value_overflow: TransactionValueOverflow::new(transaction, consensus),
 		}
@@ -77,7 +77,7 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 	}
 }
 
-/// If version == 1 or nJointSplit == 0, then tx_in_count MUST NOT be 0.
+/// If version == 1 or nJoinSplit == 0, then tx_in_count MUST NOT be 0.
 /// Transactions containing empty `vin` must have either non-empty `vjoinsplit` or non-empty `vShieldedSpend`.
 /// Transactions containing empty `vout` must have either non-empty `vjoinsplit` or non-empty `vShieldedOutput`.
 pub struct TransactionEmpty<'a> {
@@ -92,7 +92,7 @@ impl<'a> TransactionEmpty<'a> {
 	}
 
 	fn check(&self) -> Result<(), TransactionError> {
-		// If version == 1 or nJointSplit == 0, then tx_in_count MUST NOT be 0.
+		// If version == 1 or nJoinSplit == 0, then tx_in_count MUST NOT be 0.
 		if self.transaction.raw.version == 1 || self.transaction.raw.joint_split.is_none() {
 			if self.transaction.raw.inputs.is_empty() {
 				return Err(TransactionError::Empty);
@@ -266,20 +266,20 @@ impl<'a> TransactionVersion<'a> {
 }
 
 /// A coinbase transaction MUST NOT have any JoinSplit descriptions.
-pub struct TransactionJointSplitInCoinbase<'a> {
+pub struct TransactionJoinSplitInCoinbase<'a> {
 	transaction: &'a IndexedTransaction,
 }
 
-impl<'a> TransactionJointSplitInCoinbase<'a> {
+impl<'a> TransactionJoinSplitInCoinbase<'a> {
 	fn new(transaction: &'a IndexedTransaction) -> Self {
-		TransactionJointSplitInCoinbase {
+		TransactionJoinSplitInCoinbase {
 			transaction,
 		}
 	}
 
 	fn check(&self) -> Result<(), TransactionError> {
 		if self.transaction.raw.is_coinbase() && self.transaction.raw.joint_split.is_some() {
-			return Err(TransactionError::CoinbaseWithJointSplit);
+			return Err(TransactionError::CoinbaseWithJoinSplit);
 		}
 
 		Ok(())
@@ -325,7 +325,7 @@ mod tests {
 		SAPLING_TX_VERSION_GROUP_ID};
 	use network::{Network, ConsensusParams};
 	use error::TransactionError;
-	use super::{TransactionEmpty, TransactionVersion, TransactionJointSplitInCoinbase, TransactionValueOverflow};
+	use super::{TransactionEmpty, TransactionVersion, TransactionJoinSplitInCoinbase, TransactionValueOverflow};
 
 	#[test]
 	fn transaction_empty_works() {
@@ -349,22 +349,6 @@ mod tests {
 
 	#[test]
 	fn transaction_version_works() {
-
-/*
-		if self.transaction.raw.version < OVERWINTER_TX_VERSION {
-			return Err(TransactionError::InvalidVersion);
-		}
-
-		let is_overwinter_group = self.transaction.raw.version_group_id == OVERWINTER_TX_VERSION_GROUP_ID;
-		let is_sapling_group = self.transaction.raw.version_group_id == SAPLING_TX_VERSION_GROUP_ID;
-		if !is_overwinter_group && !is_sapling_group {
-			return Err(TransactionError::InvalidVersionGroup);
-		}
-
-		Ok(())
-*/
-
-
 		assert_eq!(TransactionVersion::new(&test_data::TransactionBuilder::with_version(0)
 			.into()).check(), Err(TransactionError::InvalidVersion));
 
@@ -388,16 +372,16 @@ mod tests {
 
 	#[test]
 	fn transaction_joint_split_in_coinbase_works() {
-		assert_eq!(TransactionJointSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
-			.add_default_joint_split().into()).check(), Err(TransactionError::CoinbaseWithJointSplit));
+		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.add_default_joint_split().into()).check(), Err(TransactionError::CoinbaseWithJoinSplit));
 
-		assert_eq!(TransactionJointSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
+		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
 			.into()).check(), Ok(()));
 
-		assert_eq!(TransactionJointSplitInCoinbase::new(&test_data::TransactionBuilder::default()
+		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::default()
 			.add_default_joint_split().into()).check(), Ok(()));
 
-		assert_eq!(TransactionJointSplitInCoinbase::new(&test_data::TransactionBuilder::default()
+		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::default()
 			.into()).check(), Ok(()));
 	}
 

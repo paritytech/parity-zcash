@@ -4,20 +4,20 @@ use hex::ToHex;
 use ser::{Error, Stream, Reader, CompactInteger};
 
 #[derive(Clone)]
-pub enum JointSplitProof {
+pub enum JoinSplitProof {
 	PHGR([u8; 296]),
 	Groth([u8; 192]),
 }
 
 #[derive(Debug, PartialEq, Default, Clone)]
-pub struct JointSplit {
-	pub descriptions: Vec<JointSplitDescription>,
+pub struct JoinSplit {
+	pub descriptions: Vec<JoinSplitDescription>,
 	pub pubkey: H256,
 	pub sig: H512,
 }
 
 #[derive(Clone)]
-pub struct JointSplitDescription {
+pub struct JoinSplitDescription {
 	pub value_pub_old: u64,
 	pub value_pub_new: u64,
 	pub anchor: [u8; 32],
@@ -26,13 +26,13 @@ pub struct JointSplitDescription {
 	pub ephemeral_key: [u8; 32],
 	pub random_seed: [u8; 32],
 	pub macs: [[u8; 32]; 2],
-	pub zkproof: JointSplitProof,
+	pub zkproof: JoinSplitProof,
 	pub ciphertexts: [[u8; 601]; 2],
 }
 
-impl Default for JointSplitDescription {
+impl Default for JoinSplitDescription {
 	fn default() -> Self {
-		JointSplitDescription {
+		JoinSplitDescription {
 			value_pub_old: Default::default(),
 			value_pub_new: Default::default(),
 			anchor: Default::default(),
@@ -47,9 +47,9 @@ impl Default for JointSplitDescription {
 	}
 }
 
-impl fmt::Debug for JointSplitDescription {
+impl fmt::Debug for JoinSplitDescription {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		f.debug_struct("JointSplitDescription")
+		f.debug_struct("JoinSplitDescription")
 			.field("value_pub_old", &self.value_pub_old)
 			.field("value_pub_new", &self.value_pub_new)
 			.field("anchor", &self.anchor.to_hex::<String>())
@@ -68,8 +68,8 @@ impl fmt::Debug for JointSplitDescription {
 	}
 }
 
-impl PartialEq<JointSplitDescription> for JointSplitDescription {
-	fn eq(&self, other: &JointSplitDescription) -> bool {
+impl PartialEq<JoinSplitDescription> for JoinSplitDescription {
+	fn eq(&self, other: &JoinSplitDescription) -> bool {
 		self.value_pub_old == other.value_pub_old
 			&& self.value_pub_new == other.value_pub_new
 			&& self.anchor == other.anchor
@@ -84,32 +84,32 @@ impl PartialEq<JointSplitDescription> for JointSplitDescription {
 	}
 }
 
-impl Default for JointSplitProof {
+impl Default for JoinSplitProof {
 	fn default() -> Self {
-		JointSplitProof::Groth([0; 192])
+		JoinSplitProof::Groth([0; 192])
 	}
 }
 
-impl fmt::Debug for JointSplitProof {
+impl fmt::Debug for JoinSplitProof {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			JointSplitProof::PHGR(ref proof) => f.write_fmt(format_args!("PHGR({:?})", &proof.to_hex::<String>())),
-			JointSplitProof::Groth(ref proof) => f.write_fmt(format_args!("Groth({:?})", &proof.to_hex::<String>())),
+			JoinSplitProof::PHGR(ref proof) => f.write_fmt(format_args!("PHGR({:?})", &proof.to_hex::<String>())),
+			JoinSplitProof::Groth(ref proof) => f.write_fmt(format_args!("Groth({:?})", &proof.to_hex::<String>())),
 		}
 	}
 }
 
-impl PartialEq<JointSplitProof> for JointSplitProof {
-	fn eq(&self, other: &JointSplitProof) -> bool {
+impl PartialEq<JoinSplitProof> for JoinSplitProof {
+	fn eq(&self, other: &JoinSplitProof) -> bool {
 		match (self, other) {
-			(&JointSplitProof::Groth(v1), &JointSplitProof::Groth(v2)) => v1.as_ref() == v2.as_ref(),
-			(&JointSplitProof::PHGR(v1), &JointSplitProof::PHGR(v2)) => v1.as_ref() == v2.as_ref(),
+			(&JoinSplitProof::Groth(v1), &JoinSplitProof::Groth(v2)) => v1.as_ref() == v2.as_ref(),
+			(&JoinSplitProof::PHGR(v1), &JoinSplitProof::PHGR(v2)) => v1.as_ref() == v2.as_ref(),
 			_ => false,
 		}
 	}
 }
 
-pub fn serialize_joint_split(stream: &mut Stream, joint_split: &Option<JointSplit>) {
+pub fn serialize_joint_split(stream: &mut Stream, joint_split: &Option<JoinSplit>) {
 	if let &Some(ref joint_split) = joint_split {
 		let len: CompactInteger = joint_split.descriptions.len().into();
 		stream.append(&len);
@@ -124,8 +124,8 @@ pub fn serialize_joint_split(stream: &mut Stream, joint_split: &Option<JointSpli
 					.append(&d.random_seed)
 					.append(&d.macs);
 				match d.zkproof {
-					JointSplitProof::PHGR(ref proof) => stream.append(proof),
-					JointSplitProof::Groth(ref proof) => stream.append(proof),
+					JoinSplitProof::PHGR(ref proof) => stream.append(proof),
+					JoinSplitProof::Groth(ref proof) => stream.append(proof),
 				};
 				stream.append(&d.ciphertexts);
 			}
@@ -135,11 +135,11 @@ pub fn serialize_joint_split(stream: &mut Stream, joint_split: &Option<JointSpli
 	}
 }
 
-pub fn deserialize_joint_split<T>(reader: &mut Reader<T>, use_groth: bool) -> Result<Option<JointSplit>, Error> where T: io::Read {
+pub fn deserialize_joint_split<T>(reader: &mut Reader<T>, use_groth: bool) -> Result<Option<JoinSplit>, Error> where T: io::Read {
 	let len: usize = reader.read::<CompactInteger>()?.into();
 	let mut descriptions = Vec::with_capacity(len);
 	for _ in 0..len {
-		descriptions.push(JointSplitDescription {
+		descriptions.push(JoinSplitDescription {
 			value_pub_old: reader.read()?,
 			value_pub_new: reader.read()?,
 			anchor: reader.read()?,
@@ -149,9 +149,9 @@ pub fn deserialize_joint_split<T>(reader: &mut Reader<T>, use_groth: bool) -> Re
 			random_seed: reader.read()?,
 			macs: reader.read()?,
 			zkproof: if use_groth {
-				JointSplitProof::Groth(reader.read()?)
+				JoinSplitProof::Groth(reader.read()?)
 			} else {
-				JointSplitProof::PHGR(reader.read()?)
+				JoinSplitProof::PHGR(reader.read()?)
 			},
 			ciphertexts: reader.read()?,
 		});
@@ -160,7 +160,7 @@ pub fn deserialize_joint_split<T>(reader: &mut Reader<T>, use_groth: bool) -> Re
 	let pubkey = reader.read()?;
 	let sig = reader.read()?;
 
-	Ok(Some(JointSplit {
+	Ok(Some(JoinSplit {
 		descriptions,
 		pubkey,
 		sig,
