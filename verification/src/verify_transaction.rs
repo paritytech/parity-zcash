@@ -18,7 +18,7 @@ pub struct TransactionVerifier<'a> {
 	pub size: TransactionAbsoluteSize<'a>,
 	pub sapling: TransactionSapling<'a>,
 	pub join_split: TransactionJoinSplit<'a>,
-	pub value_overflow: TransactionOutputValueOverflow<'a>,
+	pub output_value_overflow: TransactionOutputValueOverflow<'a>,
 }
 
 impl<'a> TransactionVerifier<'a> {
@@ -34,7 +34,7 @@ impl<'a> TransactionVerifier<'a> {
 			size: TransactionAbsoluteSize::new(transaction, consensus),
 			sapling: TransactionSapling::new(transaction),
 			join_split: TransactionJoinSplit::new(transaction),
-			value_overflow: TransactionOutputValueOverflow::new(transaction, consensus),
+			output_value_overflow: TransactionOutputValueOverflow::new(transaction, consensus),
 		}
 	}
 
@@ -48,40 +48,52 @@ impl<'a> TransactionVerifier<'a> {
 		self.size.check()?;
 		self.sapling.check()?;
 		self.join_split.check()?;
-		self.value_overflow.check()?;
+		self.output_value_overflow.check()?;
 		Ok(())
 	}
 }
 
 pub struct MemoryPoolTransactionVerifier<'a> {
+	pub version: TransactionVersion<'a>,
+	pub expiry: TransactionExpiry<'a>,
 	pub empty: TransactionEmpty<'a>,
 	pub null_non_coinbase: TransactionNullNonCoinbase<'a>,
 	pub is_coinbase: TransactionMemoryPoolCoinbase<'a>,
 	pub size: TransactionAbsoluteSize<'a>,
 	pub sigops: TransactionSigops<'a>,
-	pub value_overflow: TransactionOutputValueOverflow<'a>,
+	pub sapling: TransactionSapling<'a>,
+	pub join_split: TransactionJoinSplit<'a>,
+	pub output_value_overflow: TransactionOutputValueOverflow<'a>,
 }
 
 impl<'a> MemoryPoolTransactionVerifier<'a> {
 	pub fn new(transaction: &'a IndexedTransaction, consensus: &'a ConsensusParams) -> Self {
 		trace!(target: "verification", "Mempool-Tx pre-verification {}", transaction.hash.to_reversed_str());
 		MemoryPoolTransactionVerifier {
+			version: TransactionVersion::new(transaction),
+			expiry: TransactionExpiry::new(transaction, consensus),
 			empty: TransactionEmpty::new(transaction),
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			is_coinbase: TransactionMemoryPoolCoinbase::new(transaction),
 			size: TransactionAbsoluteSize::new(transaction, consensus),
 			sigops: TransactionSigops::new(transaction, consensus.max_block_sigops()),
-			value_overflow: TransactionOutputValueOverflow::new(transaction, consensus),
+			sapling: TransactionSapling::new(transaction),
+			join_split: TransactionJoinSplit::new(transaction),
+			output_value_overflow: TransactionOutputValueOverflow::new(transaction, consensus),
 		}
 	}
 
 	pub fn check(&self) -> Result<(), TransactionError> {
+		self.version.check()?;
+		self.expiry.check()?;
 		self.empty.check()?;
 		self.null_non_coinbase.check()?;
 		self.is_coinbase.check()?;
 		self.size.check()?;
 		self.sigops.check()?;
-		self.value_overflow.check()?;
+		self.sapling.check()?;
+		self.join_split.check()?;
+		self.output_value_overflow.check()?;
 		Ok(())
 	}
 }
