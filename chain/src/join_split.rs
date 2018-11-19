@@ -109,12 +109,12 @@ impl PartialEq<JoinSplitProof> for JoinSplitProof {
 	}
 }
 
-pub fn serialize_joint_split(stream: &mut Stream, joint_split: &Option<JoinSplit>) {
-	if let &Some(ref joint_split) = joint_split {
-		let len: CompactInteger = joint_split.descriptions.len().into();
+pub fn serialize_join_split(stream: &mut Stream, join_split: &Option<JoinSplit>) {
+	if let &Some(ref join_split) = join_split {
+		let len: CompactInteger = join_split.descriptions.len().into();
 		stream.append(&len);
-		if !joint_split.descriptions.is_empty() {
-			for d in &joint_split.descriptions {
+		if !join_split.descriptions.is_empty() {
+			for d in &join_split.descriptions {
 				stream.append(&d.value_pub_old)
 					.append(&d.value_pub_new)
 					.append(&d.anchor)
@@ -129,13 +129,13 @@ pub fn serialize_joint_split(stream: &mut Stream, joint_split: &Option<JoinSplit
 				};
 				stream.append(&d.ciphertexts);
 			}
-			stream.append(&joint_split.pubkey)
-				.append(&joint_split.sig);
+			stream.append(&join_split.pubkey)
+				.append(&join_split.sig);
 		}
 	}
 }
 
-pub fn deserialize_joint_split<T>(reader: &mut Reader<T>, use_groth: bool) -> Result<Option<JoinSplit>, Error> where T: io::Read {
+pub fn deserialize_join_split<T>(reader: &mut Reader<T>, use_groth: bool) -> Result<Option<JoinSplit>, Error> where T: io::Read {
 	let len: usize = reader.read::<CompactInteger>()?.into();
 	let mut descriptions = Vec::with_capacity(len);
 	for _ in 0..len {

@@ -9,7 +9,7 @@ use ser::{deserialize, serialize};
 use crypto::dhash256;
 use hash::H256;
 use constants::{SEQUENCE_FINAL, LOCKTIME_THRESHOLD};
-use join_split::{JoinSplit, deserialize_joint_split, serialize_joint_split};
+use join_split::{JoinSplit, deserialize_join_split, serialize_join_split};
 use sapling::Sapling;
 use ser::{Error, Serializable, Deserializable, Stream, Reader};
 
@@ -103,7 +103,7 @@ pub struct Transaction {
 	pub outputs: Vec<TransactionOutput>,
 	pub lock_time: u32,
 	pub expiry_height: u32,
-	pub joint_split: Option<JoinSplit>,
+	pub join_split: Option<JoinSplit>,
 	pub sapling: Option<Sapling>,
 }
 
@@ -229,7 +229,7 @@ impl Serializable for Transaction {
 				.append_list(&sapling.outputs);
 		}
 
-		serialize_joint_split(stream, &self.joint_split);
+		serialize_join_split(stream, &self.join_split);
 
 		if let Some(sapling) = self.sapling.as_ref() {
 			if !sapling.spends.is_empty() || !sapling.outputs.is_empty() {
@@ -295,9 +295,9 @@ impl Deserializable for Transaction {
 			None
 		};
 
-		let joint_split = if version >= SPROUT_TX_VERSION {
+		let join_split = if version >= SPROUT_TX_VERSION {
 			let use_groth = overwintered && version >= SAPLING_TX_VERSION;
-			deserialize_joint_split(reader, use_groth)?
+			deserialize_join_split(reader, use_groth)?
 		} else {
 			None
 		};
@@ -316,7 +316,7 @@ impl Deserializable for Transaction {
 			outputs,
 			lock_time,
 			expiry_height,
-			joint_split,
+			join_split,
 			sapling,
 		})
 	}
@@ -351,7 +351,7 @@ mod tests {
 		let tx_output = &t.outputs[0];
 		assert_eq!(tx_output.value, 5000000000);
 		assert_eq!(tx_output.script_pubkey, "76a914404371705fa9bd789a2fcd52d2c580b65d35549d88ac".into());
-		assert!(t.joint_split.is_none());
+		assert!(t.join_split.is_none());
 		assert!(t.sapling.is_none());
 
 		// serialize && check tx
@@ -374,7 +374,7 @@ mod tests {
 		assert_eq!(t.expiry_height, 0);
 		assert_eq!(t.inputs.len(), 1);
 		assert_eq!(t.outputs.len(), 0);
-		assert!(t.joint_split.is_some());
+		assert!(t.join_split.is_some());
 		assert!(t.sapling.is_none());
 
 		// serialize && check tx
@@ -397,7 +397,7 @@ mod tests {
 		assert_eq!(t.expiry_height, 0x1843ccb3);
 		assert_eq!(t.inputs.len(), 0);
 		assert_eq!(t.outputs.len(), 2);
-		assert!(t.joint_split.is_some());
+		assert!(t.join_split.is_some());
 		assert!(t.sapling.is_some());
 
 		// serialize && check tx

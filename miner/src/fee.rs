@@ -8,12 +8,12 @@ pub fn transaction_fee(store: &TransactionProvider, transaction: &Transaction) -
 			.expect("transaction must be verified by caller");
 		input_transaction.outputs[input.previous_output.index as usize].value
 	}).sum::<u64>();
-	inputs_sum += transaction.joint_split.as_ref().map(|js| js.descriptions.iter()
+	inputs_sum += transaction.join_split.as_ref().map(|js| js.descriptions.iter()
 		.map(|jsd| jsd.value_pub_new)
 		.sum::<u64>()).unwrap_or_default();
 
 	let mut outputs_sum = transaction.outputs.iter().map(|output| output.value).sum();
-	outputs_sum += transaction.joint_split.as_ref().map(|js| js.descriptions.iter()
+	outputs_sum += transaction.join_split.as_ref().map(|js| js.descriptions.iter()
 		.map(|jsd| jsd.value_pub_old)
 		.sum::<u64>()).unwrap_or_default();
 

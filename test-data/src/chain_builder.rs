@@ -158,8 +158,8 @@ impl TransactionBuilder {
 		self.transaction.hash()
 	}
 
-	pub fn add_default_joint_split(mut self) -> Self {
-		self.transaction.joint_split = Some(Default::default());
+	pub fn add_default_join_split(mut self) -> Self {
+		self.transaction.join_split = Some(Default::default());
 		self
 	}
 }
