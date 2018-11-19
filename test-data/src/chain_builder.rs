@@ -1,7 +1,8 @@
 use primitives::hash::H256;
 use ser::Serializable;
 use primitives::bytes::Bytes;
-use chain::{Transaction, IndexedTransaction, TransactionInput, TransactionOutput, OutPoint};
+use chain::{Transaction, IndexedTransaction, TransactionInput, TransactionOutput, OutPoint,
+	JoinSplit, Sapling};
 
 #[derive(Debug, Default, Clone)]
 pub struct ChainBuilder {
@@ -76,6 +77,16 @@ impl TransactionBuilder {
 		builder.add_input(&Transaction::default(), output_index)
 	}
 
+	pub fn with_sapling(sapling: Sapling) -> TransactionBuilder {
+		let builder = TransactionBuilder::default();
+		builder.set_sapling(sapling)
+	}
+
+	pub fn with_join_split(join_split: JoinSplit) -> TransactionBuilder {
+		let builder = TransactionBuilder::default();
+		builder.set_join_split(join_split)
+	}
+
 	pub fn reset(self) -> TransactionBuilder {
 		TransactionBuilder::default()
 	}
@@ -140,6 +151,21 @@ impl TransactionBuilder {
 			script_sig: Bytes::new_with_len(0),
 			sequence: 0xffffffff,
 		}];
+		self
+	}
+
+	pub fn set_sapling(mut self, sapling: Sapling) -> TransactionBuilder {
+		self.transaction.sapling = Some(sapling);
+		self
+	}
+
+	pub fn set_join_split(mut self, join_split: JoinSplit) -> TransactionBuilder {
+		self.transaction.join_split = Some(join_split);
+		self
+	}
+
+	pub fn set_expiry_height(mut self, expiry_height: u32) -> TransactionBuilder {
+		self.transaction.expiry_height = expiry_height;
 		self
 	}
 

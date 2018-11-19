@@ -158,7 +158,7 @@ impl ConsensusParams {
 		20_000
 	}
 
-	pub fn max_transaction_value(&self) -> u64 {
+	pub fn max_transaction_value(&self) -> i64 {
 		21_000_000 * 100_000_000 // No amount larger than this (in satoshi) is valid
 	}
 
@@ -172,5 +172,9 @@ impl ConsensusParams {
 		} else {
 			100_000
 		}
+	}
+
+	pub fn transaction_expiry_height_threshold(&self) -> u32 {
+		500_000_000
 	}
 }

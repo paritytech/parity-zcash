@@ -3,7 +3,7 @@ use hex::ToHex;
 
 #[derive(Clone)]
 pub struct Sapling {
-	pub amount: u64,
+	pub amount: i64,
 	pub spends: Vec<SaplingSpendDescription>,
 	pub outputs: Vec<SaplingOutputDescription>,
 	pub binding_sig: [u8; 64],

@@ -114,5 +114,11 @@ pub enum TransactionError {
 	InvalidVersionGroup,
 	/// Transaction has too large output value.
 	ValueOverflow,
+	/// Transaction expiry height is too high.
+	ExpiryHeightTooHigh,
+	/// Sapling with empty spends && outputs has non-empty balance.
+	EmptySaplingHasBalance,
+	/// Both value_pub_old && value_pub_new in join split description are non-zero.
+	JoinSplitBothPubsNonZero,
 }
 
