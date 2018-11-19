@@ -19,6 +19,7 @@ pub struct TransactionVerifier<'a> {
 	pub sapling: TransactionSapling<'a>,
 	pub join_split: TransactionJoinSplit<'a>,
 	pub output_value_overflow: TransactionOutputValueOverflow<'a>,
+	pub input_value_overflow: TransactionInputValueOverflow<'a>,
 }
 
 impl<'a> TransactionVerifier<'a> {
@@ -35,6 +36,7 @@ impl<'a> TransactionVerifier<'a> {
 			sapling: TransactionSapling::new(transaction),
 			join_split: TransactionJoinSplit::new(transaction),
 			output_value_overflow: TransactionOutputValueOverflow::new(transaction, consensus),
+			input_value_overflow: TransactionInputValueOverflow::new(transaction, consensus),
 		}
 	}
 
@@ -49,6 +51,7 @@ impl<'a> TransactionVerifier<'a> {
 		self.sapling.check()?;
 		self.join_split.check()?;
 		self.output_value_overflow.check()?;
+		self.input_value_overflow.check()?;
 		Ok(())
 	}
 }
@@ -64,6 +67,7 @@ pub struct MemoryPoolTransactionVerifier<'a> {
 	pub sapling: TransactionSapling<'a>,
 	pub join_split: TransactionJoinSplit<'a>,
 	pub output_value_overflow: TransactionOutputValueOverflow<'a>,
+	pub input_value_overflow: TransactionInputValueOverflow<'a>,
 }
 
 impl<'a> MemoryPoolTransactionVerifier<'a> {
@@ -80,6 +84,7 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 			sapling: TransactionSapling::new(transaction),
 			join_split: TransactionJoinSplit::new(transaction),
 			output_value_overflow: TransactionOutputValueOverflow::new(transaction, consensus),
+			input_value_overflow: TransactionInputValueOverflow::new(transaction, consensus),
 		}
 	}
 
@@ -94,6 +99,7 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 		self.sapling.check()?;
 		self.join_split.check()?;
 		self.output_value_overflow.check()?;
+		self.input_value_overflow.check()?;
 		Ok(())
 	}
 }
@@ -380,26 +386,26 @@ impl<'a> TransactionOutputValueOverflow<'a> {
 		// the sum of all outputs should be less than max value
 		for output in &self.transaction.raw.outputs {
 			if output.value > self.max_value as u64 {
-				return Err(TransactionError::ValueOverflow)
+				return Err(TransactionError::OutputValueOverflow)
 			}
 
 			total_output = match total_output.checked_add(output.value as i64) {
 				Some(total_output) if total_output <= self.max_value => total_output,
-				_ => return Err(TransactionError::ValueOverflow),
+				_ => return Err(TransactionError::OutputValueOverflow),
 			};
 		}
 
 		if let Some(ref sapling) = self.transaction.raw.sapling {
 			// check that sapling amount is within limits
 			if sapling.amount < -self.max_value || sapling.amount > self.max_value {
-				return Err(TransactionError::ValueOverflow);
+				return Err(TransactionError::OutputValueOverflow);
 			}
 
 			// negative sapling amount takes value from transparent pool
 			if sapling.amount < 0 {
 				total_output = match total_output.checked_add(-sapling.amount) {
 					Some(total_output) if total_output <= self.max_value => total_output,
-					_ => return Err(TransactionError::ValueOverflow),
+					_ => return Err(TransactionError::OutputValueOverflow),
 				};
 			}
 		}
@@ -407,16 +413,64 @@ impl<'a> TransactionOutputValueOverflow<'a> {
 		if let Some(ref join_split) = self.transaction.raw.join_split {
 			for desc in &join_split.descriptions {
 				if desc.value_pub_old > self.max_value as u64 {
-					return Err(TransactionError::ValueOverflow);
+					return Err(TransactionError::OutputValueOverflow);
 				}
 
 				if desc.value_pub_new > self.max_value as u64 {
-					return Err(TransactionError::ValueOverflow);
+					return Err(TransactionError::OutputValueOverflow);
 				}
 
 				total_output = match total_output.checked_add(desc.value_pub_old as i64) {
 					Some(total_output) if total_output <= self.max_value => total_output,
-					_ => return Err(TransactionError::ValueOverflow),
+					_ => return Err(TransactionError::OutputValueOverflow),
+				};
+			}
+		}
+
+		Ok(())
+	}
+}
+
+/// Check for overflow of (known) input values.
+pub struct TransactionInputValueOverflow<'a> {
+	transaction: &'a IndexedTransaction,
+	max_value: u64,
+}
+
+impl<'a> TransactionInputValueOverflow<'a> {
+	fn new(transaction: &'a IndexedTransaction, consensus: &'a ConsensusParams) -> Self {
+		TransactionInputValueOverflow {
+			transaction,
+			max_value: consensus.max_transaction_value() as u64,
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		let mut total_input = 0u64;
+
+		// inputs values are unknown at verification stage
+
+		// every value_pub_new should be within money range
+		// their sum should be within money range
+		if let Some(ref join_split) = self.transaction.raw.join_split {
+			for desc in &join_split.descriptions {
+				if desc.value_pub_new > self.max_value {
+					return Err(TransactionError::InputValueOverflow);
+				}
+
+				total_input = match total_input.checked_add(desc.value_pub_new) {
+					Some(total_input) if total_input <= self.max_value => total_input,
+					_ => return Err(TransactionError::InputValueOverflow),
+				};
+			}
+		}
+
+		if let Some(ref sapling) = self.transaction.raw.sapling {
+			// positive sapling amount adds value to the transparent pool
+			if sapling.amount > 0 {
+				match total_input.checked_add(sapling.amount as u64) {
+					Some(total_input) if total_input <= self.max_value => (),
+					_ => return Err(TransactionError::InputValueOverflow),
 				};
 			}
 		}
@@ -457,7 +511,8 @@ mod tests {
 	use network::{Network, ConsensusParams};
 	use error::TransactionError;
 	use super::{TransactionEmpty, TransactionVersion, TransactionJoinSplitInCoinbase,
-		TransactionOutputValueOverflow, TransactionExpiry, TransactionSapling, TransactionJoinSplit};
+		TransactionOutputValueOverflow, TransactionExpiry, TransactionSapling, TransactionJoinSplit,
+		TransactionInputValueOverflow};
 
 	#[test]
 	fn transaction_empty_works() {
@@ -535,36 +590,37 @@ mod tests {
 	#[test]
 	fn transaction_output_value_overflow_works() {
 		let consensus = ConsensusParams::new(Network::Mainnet);
+		let max_value = consensus.max_transaction_value();
 
-		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(consensus.max_transaction_value() as u64 + 1)
-			.into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(max_value as u64 + 1)
+			.into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
 
-		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(consensus.max_transaction_value() as u64 / 2)
-			.add_output(consensus.max_transaction_value() as u64 / 2 + 1)
-			.into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(max_value as u64 / 2)
+			.add_output(max_value as u64 / 2 + 1)
+			.into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
 
-		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(consensus.max_transaction_value() as u64)
+		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(max_value as u64)
 			.into(), &consensus).check(), Ok(()));
 
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: consensus.max_transaction_value(),
+				amount: max_value,
 				..Default::default()
 			}).into(), &consensus).check(), Ok(()));
 
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: consensus.max_transaction_value() + 1,
+				amount: max_value + 1,
 				..Default::default()
-			}).into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+			}).into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
 
-		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(consensus.max_transaction_value() as u64 / 2 + 1)
+		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(max_value as u64 / 2 + 1)
 			.set_sapling(Sapling {
-				amount: -consensus.max_transaction_value() / 2,
+				amount: -max_value / 2,
 				..Default::default()
-			}).into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+			}).into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
 
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
 				descriptions: vec![JoinSplitDescription {
-					value_pub_old: consensus.max_transaction_value() as u64,
+					value_pub_old: max_value as u64,
 					value_pub_new: 0,
 					..Default::default()
 				}],
@@ -573,17 +629,17 @@ mod tests {
 
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
 				descriptions: vec![JoinSplitDescription {
-					value_pub_old: consensus.max_transaction_value() as u64 + 1,
+					value_pub_old: max_value as u64 + 1,
 					value_pub_new: 0,
 					..Default::default()
 				}],
 				..Default::default()
-			}).into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+			}).into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
 
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
 				descriptions: vec![JoinSplitDescription {
 					value_pub_old: 0,
-					value_pub_new: consensus.max_transaction_value() as u64,
+					value_pub_new: max_value as u64,
 					..Default::default()
 				}],
 				..Default::default()
@@ -592,21 +648,64 @@ mod tests {
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
 				descriptions: vec![JoinSplitDescription {
 					value_pub_old: 0,
-					value_pub_new: consensus.max_transaction_value() as u64 + 1,
+					value_pub_new: max_value as u64 + 1,
 					..Default::default()
 				}],
 				..Default::default()
-			}).into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+			}).into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
 
-		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(consensus.max_transaction_value() as u64 / 2 + 1)
+		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(max_value as u64 / 2 + 1)
 			.set_join_split(JoinSplit {
 				descriptions: vec![JoinSplitDescription {
-					value_pub_old: consensus.max_transaction_value() as u64 / 2,
+					value_pub_old: max_value as u64 / 2,
 					value_pub_new: 0,
 					..Default::default()
 				}],
 				..Default::default()
-			}).into(), &consensus).check(), Err(TransactionError::ValueOverflow));
+			}).into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
+	}
+
+	#[test]
+	fn transaction_input_value_overflow_works() {
+		let consensus = ConsensusParams::new(Network::Mainnet);
+		let max_value = consensus.max_transaction_value();
+
+		assert_eq!(TransactionInputValueOverflow::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
+				descriptions: vec![JoinSplitDescription {
+					value_pub_new: max_value as u64,
+					..Default::default()
+				}],
+				..Default::default()
+			}).into(), &consensus).check(), Ok(()));
+
+		assert_eq!(TransactionInputValueOverflow::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
+				descriptions: vec![JoinSplitDescription {
+					value_pub_new: max_value as u64 + 1,
+					..Default::default()
+				}],
+				..Default::default()
+			}).into(), &consensus).check(), Err(TransactionError::InputValueOverflow));
+
+		assert_eq!(TransactionInputValueOverflow::new(&test_data::TransactionBuilder::with_sapling(Sapling {
+				amount: max_value,
+				..Default::default()
+			}).into(), &consensus).check(), Ok(()));
+
+		assert_eq!(TransactionInputValueOverflow::new(&test_data::TransactionBuilder::with_sapling(Sapling {
+				amount: max_value + 1,
+				..Default::default()
+			}).into(), &consensus).check(), Err(TransactionError::InputValueOverflow));
+
+		assert_eq!(TransactionInputValueOverflow::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
+				descriptions: vec![JoinSplitDescription {
+					value_pub_new: max_value as u64 / 2 + 1,
+					..Default::default()
+				}],
+				..Default::default()
+			}).set_sapling(Sapling {
+				amount: max_value / 2,
+				..Default::default()
+			}).into(), &consensus).check(), Err(TransactionError::InputValueOverflow));
 	}
 
 	#[test]

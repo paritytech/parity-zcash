@@ -113,7 +113,9 @@ pub enum TransactionError {
 	/// Invalid transaction version group.
 	InvalidVersionGroup,
 	/// Transaction has too large output value.
-	ValueOverflow,
+	OutputValueOverflow,
+	/// Transaction has too large input value.
+	InputValueOverflow,
 	/// Transaction expiry height is too high.
 	ExpiryHeightTooHigh,
 	/// Sapling with empty spends && outputs has non-empty balance.
