@@ -1,7 +1,7 @@
 name: pbtc
 version: "0.1.0"
 author: Parity Technologies <info@parity.io>
-about: Parity Bitcoin client
+about: Parity zcash client
 args:
     - testnet:
         long: testnet
