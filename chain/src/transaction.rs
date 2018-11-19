@@ -27,7 +27,7 @@ pub const OVERWINTER_TX_VERSION_GROUP_ID: u32 = 0x03C48270;
 /// Sapling version group id.
 pub const SAPLING_TX_VERSION_GROUP_ID: u32 = 0x892F2085;
 
-#[derive(Debug, PartialEq, Eq, Clone, Default, Serializable, Deserializable)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Serializable, Deserializable, Hash)]
 pub struct OutPoint {
 	pub hash: H256,
 	pub index: u32,

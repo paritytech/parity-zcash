@@ -122,5 +122,12 @@ pub enum TransactionError {
 	EmptySaplingHasBalance,
 	/// Both value_pub_old && value_pub_new in join split description are non-zero.
 	JoinSplitBothPubsNonZero,
+	/// Transaction has duplicate inputs. Inputs indexes are provided.
+	DuplicateInput(usize, usize),
+	/// Transaction has join split descriptions with duplicate nullifiers.
+	/// Join split descriptions indexes are provided.
+	DuplicateJoinSplitNullifier(usize, usize),
+	/// Transaction has sapling spends with duplicate nullifiers. Sapling spends indexes are provided.
+	DuplicateSaplingSpendNullifier(usize, usize),
 }
 
