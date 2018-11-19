@@ -14,7 +14,7 @@ pub struct TransactionVerifier<'a> {
 	pub empty: TransactionEmpty<'a>,
 	pub null_non_coinbase: TransactionNullNonCoinbase<'a>,
 	pub oversized_coinbase: TransactionOversizedCoinbase<'a>,
-	pub join_split_in_coinbase: TransactionJoinSplitInCoinbase<'a>,
+	pub non_transparent_coinbase: TransactionNonTransparentCoinbase<'a>,
 	pub size: TransactionAbsoluteSize<'a>,
 	pub sapling: TransactionSapling<'a>,
 	pub join_split: TransactionJoinSplit<'a>,
@@ -34,7 +34,7 @@ impl<'a> TransactionVerifier<'a> {
 			empty: TransactionEmpty::new(transaction),
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			oversized_coinbase: TransactionOversizedCoinbase::new(transaction, MIN_COINBASE_SIZE..MAX_COINBASE_SIZE),
-			join_split_in_coinbase: TransactionJoinSplitInCoinbase::new(transaction),
+			non_transparent_coinbase: TransactionNonTransparentCoinbase::new(transaction),
 			size: TransactionAbsoluteSize::new(transaction, consensus),
 			sapling: TransactionSapling::new(transaction),
 			join_split: TransactionJoinSplit::new(transaction),
@@ -52,7 +52,7 @@ impl<'a> TransactionVerifier<'a> {
 		self.empty.check()?;
 		self.null_non_coinbase.check()?;
 		self.oversized_coinbase.check()?;
-		self.join_split_in_coinbase.check()?;
+		self.non_transparent_coinbase.check()?;
 		self.size.check()?;
 		self.sapling.check()?;
 		self.join_split.check()?;
@@ -313,20 +313,28 @@ impl<'a> TransactionVersion<'a> {
 }
 
 /// A coinbase transaction MUST NOT have any JoinSplit descriptions.
-pub struct TransactionJoinSplitInCoinbase<'a> {
+/// A coinbase transaction cannot have spend descriptions or output descriptions.
+pub struct TransactionNonTransparentCoinbase<'a> {
 	transaction: &'a IndexedTransaction,
 }
 
-impl<'a> TransactionJoinSplitInCoinbase<'a> {
+impl<'a> TransactionNonTransparentCoinbase<'a> {
 	fn new(transaction: &'a IndexedTransaction) -> Self {
-		TransactionJoinSplitInCoinbase {
+		TransactionNonTransparentCoinbase {
 			transaction,
 		}
 	}
 
 	fn check(&self) -> Result<(), TransactionError> {
-		if self.transaction.raw.is_coinbase() && self.transaction.raw.join_split.is_some() {
-			return Err(TransactionError::CoinbaseWithJoinSplit);
+		if self.transaction.raw.is_coinbase() {
+			if self.transaction.raw.join_split.is_some() {
+				return Err(TransactionError::NonTransparentCoinbase);
+			}
+			if let Some(ref sapling) = self.transaction.raw.sapling {
+				if !sapling.spends.is_empty() || !sapling.outputs.is_empty() {
+					return Err(TransactionError::NonTransparentCoinbase);
+				}
+			}
 		}
 
 		Ok(())
@@ -607,7 +615,7 @@ mod tests {
 		SAPLING_TX_VERSION_GROUP_ID, Sapling, JoinSplit, JoinSplitDescription};
 	use network::{Network, ConsensusParams};
 	use error::TransactionError;
-	use super::{TransactionEmpty, TransactionVersion, TransactionJoinSplitInCoinbase,
+	use super::{TransactionEmpty, TransactionVersion, TransactionNonTransparentCoinbase,
 		TransactionOutputValueOverflow, TransactionExpiry, TransactionSapling, TransactionJoinSplit,
 		TransactionInputValueOverflow, TransactionDuplicateInputs, TransactionDuplicateJoinSplitNullifiers,
 		TransactionDuplicateSaplingNullifiers};
@@ -671,17 +679,29 @@ mod tests {
 	}
 
 	#[test]
-	fn transaction_join_split_in_coinbase_works() {
-		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
-			.add_default_join_split().into()).check(), Err(TransactionError::CoinbaseWithJoinSplit));
+	fn transaction_non_transparent_coinbase_works() {
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.add_default_join_split().into()).check(), Err(TransactionError::NonTransparentCoinbase));
 
-		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.set_sapling(Sapling { spends: vec![Default::default()], ..Default::default() }).into()).check(),
+			Err(TransactionError::NonTransparentCoinbase));
+
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.set_sapling(Sapling { outputs: vec![Default::default()], ..Default::default() }).into()).check(),
+			Err(TransactionError::NonTransparentCoinbase));
+
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.set_sapling(Default::default()).into()).check(),
+			Ok(()));
+
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
 			.into()).check(), Ok(()));
 
-		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::default()
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::default()
 			.add_default_join_split().into()).check(), Ok(()));
 
-		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::default()
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::default()
 			.into()).check(), Ok(()));
 	}
 

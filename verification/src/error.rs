@@ -106,8 +106,8 @@ pub enum TransactionError {
 	UnspentTransactionWithTheSameHash,
 	/// Using output that is surely spent
 	UsingSpentOutput(H256, u32),
-	/// A coinbase transaction MUST NOT have any joint split descriptions
-	CoinbaseWithJoinSplit,
+	/// A coinbase transaction contains JointSplit/Spend/Output descriptions.
+	NonTransparentCoinbase,
 	/// Invalid transaction version.
 	InvalidVersion,
 	/// Invalid transaction version group.
