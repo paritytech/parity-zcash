@@ -29,9 +29,9 @@ impl<'a> HeaderAcceptor<'a> {
 	}
 
 	pub fn check(&self) -> Result<(), Error> {
-		try!(self.version.check());
-		try!(self.work.check());
-		try!(self.median_timestamp.check());
+		self.version.check()?;
+		self.work.check()?;
+		self.median_timestamp.check()?;
 		Ok(())
 	}
 }
@@ -54,9 +54,7 @@ impl<'a> HeaderVersion<'a> {
 	}
 
 	fn check(&self) -> Result<(), Error> {
-		if (self.header.raw.version < 2 && self.height >= self.consensus_params.bip34_height) ||
-			(self.header.raw.version < 3 && self.height >= self.consensus_params.bip66_height) ||
-			(self.header.raw.version < 4 && self.height >= self.consensus_params.bip65_height) {
+		if self.header.raw.version < 4 {
 			Err(Error::OldVersionBlock)
 		} else {
 			Ok(())
