@@ -1,4 +1,4 @@
-use std::ops;
+use std::{collections::HashMap, ops};
 use ser::Serializable;
 use chain::{IndexedTransaction, BTC_TX_VERSION, OVERWINTER_TX_VERSION,
 	OVERWINTER_TX_VERSION_GROUP_ID, SAPLING_TX_VERSION_GROUP_ID};
@@ -14,12 +14,15 @@ pub struct TransactionVerifier<'a> {
 	pub empty: TransactionEmpty<'a>,
 	pub null_non_coinbase: TransactionNullNonCoinbase<'a>,
 	pub oversized_coinbase: TransactionOversizedCoinbase<'a>,
-	pub join_split_in_coinbase: TransactionJoinSplitInCoinbase<'a>,
+	pub non_transparent_coinbase: TransactionNonTransparentCoinbase<'a>,
 	pub size: TransactionAbsoluteSize<'a>,
 	pub sapling: TransactionSapling<'a>,
 	pub join_split: TransactionJoinSplit<'a>,
 	pub output_value_overflow: TransactionOutputValueOverflow<'a>,
 	pub input_value_overflow: TransactionInputValueOverflow<'a>,
+	pub duplicate_inputs: TransactionDuplicateInputs<'a>,
+	pub duplicate_join_split_nullifiers: TransactionDuplicateJoinSplitNullifiers<'a>,
+	pub duplicate_sapling_nullifiers: TransactionDuplicateSaplingNullifiers<'a>,
 }
 
 impl<'a> TransactionVerifier<'a> {
@@ -31,12 +34,15 @@ impl<'a> TransactionVerifier<'a> {
 			empty: TransactionEmpty::new(transaction),
 			null_non_coinbase: TransactionNullNonCoinbase::new(transaction),
 			oversized_coinbase: TransactionOversizedCoinbase::new(transaction, MIN_COINBASE_SIZE..MAX_COINBASE_SIZE),
-			join_split_in_coinbase: TransactionJoinSplitInCoinbase::new(transaction),
+			non_transparent_coinbase: TransactionNonTransparentCoinbase::new(transaction),
 			size: TransactionAbsoluteSize::new(transaction, consensus),
 			sapling: TransactionSapling::new(transaction),
 			join_split: TransactionJoinSplit::new(transaction),
 			output_value_overflow: TransactionOutputValueOverflow::new(transaction, consensus),
 			input_value_overflow: TransactionInputValueOverflow::new(transaction, consensus),
+			duplicate_inputs: TransactionDuplicateInputs::new(transaction),
+			duplicate_join_split_nullifiers: TransactionDuplicateJoinSplitNullifiers::new(transaction),
+			duplicate_sapling_nullifiers: TransactionDuplicateSaplingNullifiers::new(transaction),
 		}
 	}
 
@@ -46,12 +52,15 @@ impl<'a> TransactionVerifier<'a> {
 		self.empty.check()?;
 		self.null_non_coinbase.check()?;
 		self.oversized_coinbase.check()?;
-		self.join_split_in_coinbase.check()?;
+		self.non_transparent_coinbase.check()?;
 		self.size.check()?;
 		self.sapling.check()?;
 		self.join_split.check()?;
 		self.output_value_overflow.check()?;
 		self.input_value_overflow.check()?;
+		self.duplicate_inputs.check()?;
+		self.duplicate_join_split_nullifiers.check()?;
+		self.duplicate_sapling_nullifiers.check()?;
 		Ok(())
 	}
 }
@@ -68,6 +77,9 @@ pub struct MemoryPoolTransactionVerifier<'a> {
 	pub join_split: TransactionJoinSplit<'a>,
 	pub output_value_overflow: TransactionOutputValueOverflow<'a>,
 	pub input_value_overflow: TransactionInputValueOverflow<'a>,
+	pub duplicate_inputs: TransactionDuplicateInputs<'a>,
+	pub duplicate_join_split_nullifiers: TransactionDuplicateJoinSplitNullifiers<'a>,
+	pub duplicate_sapling_nullifiers: TransactionDuplicateSaplingNullifiers<'a>,
 }
 
 impl<'a> MemoryPoolTransactionVerifier<'a> {
@@ -85,6 +97,9 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 			join_split: TransactionJoinSplit::new(transaction),
 			output_value_overflow: TransactionOutputValueOverflow::new(transaction, consensus),
 			input_value_overflow: TransactionInputValueOverflow::new(transaction, consensus),
+			duplicate_inputs: TransactionDuplicateInputs::new(transaction),
+			duplicate_join_split_nullifiers: TransactionDuplicateJoinSplitNullifiers::new(transaction),
+			duplicate_sapling_nullifiers: TransactionDuplicateSaplingNullifiers::new(transaction),
 		}
 	}
 
@@ -100,6 +115,9 @@ impl<'a> MemoryPoolTransactionVerifier<'a> {
 		self.join_split.check()?;
 		self.output_value_overflow.check()?;
 		self.input_value_overflow.check()?;
+		self.duplicate_inputs.check()?;
+		self.duplicate_join_split_nullifiers.check()?;
+		self.duplicate_sapling_nullifiers.check()?;
 		Ok(())
 	}
 }
@@ -295,20 +313,28 @@ impl<'a> TransactionVersion<'a> {
 }
 
 /// A coinbase transaction MUST NOT have any JoinSplit descriptions.
-pub struct TransactionJoinSplitInCoinbase<'a> {
+/// A coinbase transaction cannot have spend descriptions or output descriptions.
+pub struct TransactionNonTransparentCoinbase<'a> {
 	transaction: &'a IndexedTransaction,
 }
 
-impl<'a> TransactionJoinSplitInCoinbase<'a> {
+impl<'a> TransactionNonTransparentCoinbase<'a> {
 	fn new(transaction: &'a IndexedTransaction) -> Self {
-		TransactionJoinSplitInCoinbase {
+		TransactionNonTransparentCoinbase {
 			transaction,
 		}
 	}
 
 	fn check(&self) -> Result<(), TransactionError> {
-		if self.transaction.raw.is_coinbase() && self.transaction.raw.join_split.is_some() {
-			return Err(TransactionError::CoinbaseWithJoinSplit);
+		if self.transaction.raw.is_coinbase() {
+			if self.transaction.raw.join_split.is_some() {
+				return Err(TransactionError::NonTransparentCoinbase);
+			}
+			if let Some(ref sapling) = self.transaction.raw.sapling {
+				if !sapling.spends.is_empty() || !sapling.outputs.is_empty() {
+					return Err(TransactionError::NonTransparentCoinbase);
+				}
+			}
 		}
 
 		Ok(())
@@ -502,6 +528,85 @@ impl<'a> TransactionExpiry<'a> {
 	}
 }
 
+/// Check that transaction doesn't have duplicate inputs.
+pub struct TransactionDuplicateInputs<'a> {
+	transaction: &'a IndexedTransaction,
+}
+
+impl<'a> TransactionDuplicateInputs<'a> {
+	fn new(transaction: &'a IndexedTransaction) -> Self {
+		TransactionDuplicateInputs {
+			transaction,
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		let mut inputs = HashMap::new();
+		for (idx, input) in self.transaction.raw.inputs.iter().enumerate() {
+			if let Some(old_idx) = inputs.insert(&input.previous_output, idx) {
+				return Err(TransactionError::DuplicateInput(old_idx, idx));
+			}
+		}
+
+		Ok(())
+	}
+}
+
+/// Check that transaction doesn't have duplicate JoinSplit nullifiers.
+pub struct TransactionDuplicateJoinSplitNullifiers<'a> {
+	transaction: &'a IndexedTransaction,
+}
+
+impl<'a> TransactionDuplicateJoinSplitNullifiers<'a> {
+	fn new(transaction: &'a IndexedTransaction) -> Self {
+		TransactionDuplicateJoinSplitNullifiers {
+			transaction,
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		if let Some(join_split) = self.transaction.raw.join_split.as_ref() {
+			let mut nullifiers = HashMap::new();
+			for (idx, description) in join_split.descriptions.iter().enumerate() {
+				if let Some(old_idx) = nullifiers.insert(&description.nullifiers[0], idx) {
+					return Err(TransactionError::DuplicateJoinSplitNullifier(old_idx, idx));
+				}
+				if let Some(old_idx) = nullifiers.insert(&description.nullifiers[1], idx) {
+					return Err(TransactionError::DuplicateJoinSplitNullifier(old_idx, idx));
+				}
+			}
+		}
+
+		Ok(())
+	}
+}
+
+/// Check that transaction doesn't have duplicate Sapling nullifiers.
+pub struct TransactionDuplicateSaplingNullifiers<'a> {
+	transaction: &'a IndexedTransaction,
+}
+
+impl<'a> TransactionDuplicateSaplingNullifiers<'a> {
+	fn new(transaction: &'a IndexedTransaction) -> Self {
+		TransactionDuplicateSaplingNullifiers {
+			transaction,
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		if let Some(sapling) = self.transaction.raw.sapling.as_ref() {
+			let mut nullifiers = HashMap::new();
+			for (idx, spend) in sapling.spends.iter().enumerate() {
+				if let Some(old_idx) = nullifiers.insert(&spend.nullifier, idx) {
+					return Err(TransactionError::DuplicateSaplingSpendNullifier(old_idx, idx));
+				}
+			}
+		}
+
+		Ok(())
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	extern crate test_data;
@@ -510,9 +615,10 @@ mod tests {
 		SAPLING_TX_VERSION_GROUP_ID, Sapling, JoinSplit, JoinSplitDescription};
 	use network::{Network, ConsensusParams};
 	use error::TransactionError;
-	use super::{TransactionEmpty, TransactionVersion, TransactionJoinSplitInCoinbase,
+	use super::{TransactionEmpty, TransactionVersion, TransactionNonTransparentCoinbase,
 		TransactionOutputValueOverflow, TransactionExpiry, TransactionSapling, TransactionJoinSplit,
-		TransactionInputValueOverflow};
+		TransactionInputValueOverflow, TransactionDuplicateInputs, TransactionDuplicateJoinSplitNullifiers,
+		TransactionDuplicateSaplingNullifiers};
 
 	#[test]
 	fn transaction_empty_works() {
@@ -573,17 +679,29 @@ mod tests {
 	}
 
 	#[test]
-	fn transaction_join_split_in_coinbase_works() {
-		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
-			.add_default_join_split().into()).check(), Err(TransactionError::CoinbaseWithJoinSplit));
+	fn transaction_non_transparent_coinbase_works() {
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.add_default_join_split().into()).check(), Err(TransactionError::NonTransparentCoinbase));
 
-		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::coinbase()
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.set_sapling(Sapling { spends: vec![Default::default()], ..Default::default() }).into()).check(),
+			Err(TransactionError::NonTransparentCoinbase));
+
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.set_sapling(Sapling { outputs: vec![Default::default()], ..Default::default() }).into()).check(),
+			Err(TransactionError::NonTransparentCoinbase));
+
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
+			.set_sapling(Default::default()).into()).check(),
+			Ok(()));
+
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::coinbase()
 			.into()).check(), Ok(()));
 
-		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::default()
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::default()
 			.add_default_join_split().into()).check(), Ok(()));
 
-		assert_eq!(TransactionJoinSplitInCoinbase::new(&test_data::TransactionBuilder::default()
+		assert_eq!(TransactionNonTransparentCoinbase::new(&test_data::TransactionBuilder::default()
 			.into()).check(), Ok(()));
 	}
 
@@ -776,5 +894,43 @@ mod tests {
 				}],
 				..Default::default()
 			}).into()).check(), Err(TransactionError::JoinSplitBothPubsNonZero));
+	}
+
+	#[test]
+	fn transaction_duplicate_inputs_works() {
+		assert_eq!(TransactionDuplicateInputs::new(&test_data::TransactionBuilder::with_default_input(0)
+			.add_default_input(1).into()).check(), Ok(()));
+
+		assert_eq!(TransactionDuplicateInputs::new(&test_data::TransactionBuilder::with_default_input(0)
+			.add_default_input(0).into()).check(), Err(TransactionError::DuplicateInput(0, 1)));
+	}
+
+	#[test]
+	fn transaction_duplicate_join_split_nullifiers_works() {
+		assert_eq!(TransactionDuplicateJoinSplitNullifiers::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
+			descriptions: vec![JoinSplitDescription {
+				nullifiers: [[1; 32], [2; 32]],
+				..Default::default()
+			}],
+			..Default::default()
+		}).into()).check(), Ok(()));
+
+		assert_eq!(TransactionDuplicateJoinSplitNullifiers::new(&test_data::TransactionBuilder::with_join_split(JoinSplit {
+			descriptions: vec![Default::default(), Default::default()],
+			..Default::default()
+		}).into()).check(), Err(TransactionError::DuplicateJoinSplitNullifier(0, 0)));
+	}
+
+	#[test]
+	fn transaction_duplicate_sapling_nullifiers_works() {
+		assert_eq!(TransactionDuplicateSaplingNullifiers::new(&test_data::TransactionBuilder::with_sapling(Sapling {
+			spends: vec![Default::default()],
+			..Default::default()
+		}).into()).check(), Ok(()));
+
+		assert_eq!(TransactionDuplicateSaplingNullifiers::new(&test_data::TransactionBuilder::with_sapling(Sapling {
+			spends: vec![Default::default(), Default::default()],
+			..Default::default()
+		}).into()).check(), Err(TransactionError::DuplicateSaplingSpendNullifier(0, 1)));
 	}
 }

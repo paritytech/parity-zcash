@@ -27,7 +27,7 @@ pub const OVERWINTER_TX_VERSION_GROUP_ID: u32 = 0x03C48270;
 /// Sapling version group id.
 pub const SAPLING_TX_VERSION_GROUP_ID: u32 = 0x892F2085;
 
-#[derive(Debug, PartialEq, Eq, Clone, Default, Serializable, Deserializable)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Serializable, Deserializable, Hash)]
 pub struct OutPoint {
 	pub hash: H256,
 	pub index: u32,
@@ -329,28 +329,36 @@ mod tests {
 	use ser::{Serializable, serialize};
 	use super::Transaction;
 
-	// real transaction from BTC block 80000
-	// https://blockchain.info/rawtx/5a4ebf66822b0b2d56bd9dc64ece0bc38ee7844a23ff1d7320a88c5fdb2ad3e2
-	// https://blockchain.info/rawtx/5a4ebf66822b0b2d56bd9dc64ece0bc38ee7844a23ff1d7320a88c5fdb2ad3e2?format=hex
+	// real transaction from ZCash block 30003
+	// https://zcash.blockexplorer.com/api/rawtx/54c8acf69271dad83e9faa34284cda725caa5bea7378db92acf35becd0989463
 	#[test]
-	fn test_btc_transaction() {
-		let hex = "0100000001a6b97044d03da79c005b20ea9c0e1a6d9dc12d9f7b91a5911c9030a439eed8f5000000004948304502206e21798a42fae0e854281abd38bacd1aeed3ee3738d9e1446618c4571d1090db022100e2ac980643b0b82c0e88ffdfec6b64e3e6ba35e7ba5fdd7d5d6cc8d25c6b241501ffffffff0100f2052a010000001976a914404371705fa9bd789a2fcd52d2c580b65d35549d88ac00000000";
+	fn test_transparent_only_transaction() {
+		let hex = "0100000003cfe0214a992ed056767bf963091b1cdce9a6d8585fc8bf91e7670e813bca36cfa40000006a47304402201380ad195adf528b05e6c78322434d40b0cd08f676611bf86733179c2851229102202f7ebeceffead9fe62e36126d1f15acf8c577558fff43a09aa7373c367465e7c012102ec25f8fb5efcac5b6424fd16faafdb0c24b71d7b21695dc020e1665c98da74d4feffffffeda306bdfd48c01fed953e87423ef371068bca6b4014e90da02744dda46cbbec8f0000006a47304402200a4c28685c28c7838e16100579976793f46d395f861ab103cd526a7ea69eec6602203a1410646f6cbbc336714de0dfd1d010ff3498759fe826117b87237e12e46a22012103c2a6d838e8931fe8d54c8f80b5e47a30d0ed95e7887f24c398836c57cd9a828efeffffff2dfb5bbe7cdd99757d215ad0c982274d96c560235bcec98fd5a3c30ff188df31030000006b483045022100c78051999c9a924588b09efb7320a6db2a9993132f5db2ee21864496d43386a90220494227e6b6504e92e29217cefc9fc1dea8b0ce221d678e6a0737e9aa1358081a012102a41cd4db977e834981915ef220566956cb4399305490ad4399396b1218989b55feffffff0240420f00000000001976a914c269627d8f5329930ce4259c1cc84cfa8d48f3ca88aca0d92164000000001976a9148061115677d41cd5661b86a6f9c288fbeb9d8e1f88ac28750000";
 
 		// deserialize && check tx
 		let t: Transaction = hex.into();
 		assert_eq!(t.overwintered, false);
 		assert_eq!(t.version, 1);
 		assert_eq!(t.version_group_id, 0);
-		assert_eq!(t.lock_time, 0);
+		assert_eq!(t.lock_time, 29992);
 		assert_eq!(t.expiry_height, 0);
-		assert_eq!(t.inputs.len(), 1);
-		assert_eq!(t.outputs.len(), 1);
+		assert_eq!(t.inputs.len(), 3);
+		assert_eq!(t.outputs.len(), 2);
 		let tx_input = &t.inputs[0];
-		assert_eq!(tx_input.sequence, 4294967295);
-		assert_eq!(tx_input.script_sig, "48304502206e21798a42fae0e854281abd38bacd1aeed3ee3738d9e1446618c4571d1090db022100e2ac980643b0b82c0e88ffdfec6b64e3e6ba35e7ba5fdd7d5d6cc8d25c6b241501".into());
+		assert_eq!(tx_input.sequence, 4294967294);
+		assert_eq!(tx_input.script_sig, "47304402201380ad195adf528b05e6c78322434d40b0cd08f676611bf86733179c2851229102202f7ebeceffead9fe62e36126d1f15acf8c577558fff43a09aa7373c367465e7c012102ec25f8fb5efcac5b6424fd16faafdb0c24b71d7b21695dc020e1665c98da74d4".into());
+		let tx_input = &t.inputs[1];
+		assert_eq!(tx_input.sequence, 4294967294);
+		assert_eq!(tx_input.script_sig, "47304402200a4c28685c28c7838e16100579976793f46d395f861ab103cd526a7ea69eec6602203a1410646f6cbbc336714de0dfd1d010ff3498759fe826117b87237e12e46a22012103c2a6d838e8931fe8d54c8f80b5e47a30d0ed95e7887f24c398836c57cd9a828e".into());
+		let tx_input = &t.inputs[2];
+		assert_eq!(tx_input.sequence, 4294967294);
+		assert_eq!(tx_input.script_sig, "483045022100c78051999c9a924588b09efb7320a6db2a9993132f5db2ee21864496d43386a90220494227e6b6504e92e29217cefc9fc1dea8b0ce221d678e6a0737e9aa1358081a012102a41cd4db977e834981915ef220566956cb4399305490ad4399396b1218989b55".into());
 		let tx_output = &t.outputs[0];
-		assert_eq!(tx_output.value, 5000000000);
-		assert_eq!(tx_output.script_pubkey, "76a914404371705fa9bd789a2fcd52d2c580b65d35549d88ac".into());
+		assert_eq!(tx_output.value, 1000000);
+		assert_eq!(tx_output.script_pubkey, "76a914c269627d8f5329930ce4259c1cc84cfa8d48f3ca88ac".into());
+		let tx_output = &t.outputs[1];
+		assert_eq!(tx_output.value, 1679940000);
+		assert_eq!(tx_output.script_pubkey, "76a9148061115677d41cd5661b86a6f9c288fbeb9d8e1f88ac".into());
 		assert!(t.join_split.is_none());
 		assert!(t.sapling.is_none());
 
