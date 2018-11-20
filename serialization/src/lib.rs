@@ -10,8 +10,6 @@ mod reader;
 mod stream;
 
 pub use primitives::{hash, bytes, compact};
-
-pub use fixed_array::*;
 pub use compact_integer::CompactInteger;
 pub use list::List;
 pub use reader::{

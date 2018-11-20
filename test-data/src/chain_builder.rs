@@ -1,7 +1,8 @@
 use primitives::hash::H256;
 use ser::Serializable;
 use primitives::bytes::Bytes;
-use chain::{Transaction, IndexedTransaction, TransactionInput, TransactionOutput, OutPoint};
+use chain::{Transaction, IndexedTransaction, TransactionInput, TransactionOutput, OutPoint,
+	JoinSplit, Sapling};
 
 #[derive(Debug, Default, Clone)]
 pub struct ChainBuilder {
@@ -49,6 +50,12 @@ impl Into<IndexedTransaction> for TransactionBuilder {
 }
 
 impl TransactionBuilder {
+	pub fn overwintered() -> TransactionBuilder {
+		let mut builder = TransactionBuilder::default();
+		builder.transaction.overwintered = true;
+		builder
+	}
+
 	pub fn coinbase() -> TransactionBuilder {
 		let mut builder = TransactionBuilder::default();
 		builder.transaction.inputs.push(TransactionInput::coinbase(Default::default()));
@@ -70,6 +77,16 @@ impl TransactionBuilder {
 		builder.add_input(&Transaction::default(), output_index)
 	}
 
+	pub fn with_sapling(sapling: Sapling) -> TransactionBuilder {
+		let builder = TransactionBuilder::default();
+		builder.set_sapling(sapling)
+	}
+
+	pub fn with_join_split(join_split: JoinSplit) -> TransactionBuilder {
+		let builder = TransactionBuilder::default();
+		builder.set_join_split(join_split)
+	}
+
 	pub fn reset(self) -> TransactionBuilder {
 		TransactionBuilder::default()
 	}
@@ -81,6 +98,11 @@ impl TransactionBuilder {
 
 	pub fn set_version(mut self, version: i32) -> TransactionBuilder {
 		self.transaction.version = version;
+		self
+	}
+
+	pub fn set_version_group_id(mut self, version_group_id: u32) -> TransactionBuilder {
+		self.transaction.version_group_id = version_group_id;
 		self
 	}
 
@@ -132,6 +154,21 @@ impl TransactionBuilder {
 		self
 	}
 
+	pub fn set_sapling(mut self, sapling: Sapling) -> TransactionBuilder {
+		self.transaction.sapling = Some(sapling);
+		self
+	}
+
+	pub fn set_join_split(mut self, join_split: JoinSplit) -> TransactionBuilder {
+		self.transaction.join_split = Some(join_split);
+		self
+	}
+
+	pub fn set_expiry_height(mut self, expiry_height: u32) -> TransactionBuilder {
+		self.transaction.expiry_height = expiry_height;
+		self
+	}
+
 	pub fn lock(mut self) -> Self {
 		self.transaction.inputs[0].sequence = 0;
 		self.transaction.lock_time = 500000;
@@ -147,8 +184,8 @@ impl TransactionBuilder {
 		self.transaction.hash()
 	}
 
-	pub fn add_default_joint_split(mut self) -> Self {
-		self.transaction.joint_split = Some(Default::default());
+	pub fn add_default_join_split(mut self) -> Self {
+		self.transaction.join_split = Some(Default::default());
 		self
 	}
 }

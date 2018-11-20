@@ -83,7 +83,7 @@ impl RawClientCore {
 			inputs: inputs,
 			outputs: outputs,
 			lock_time: lock_time,
-			joint_split: None,
+			..Default::default() // TODO
 		};
 
 		Ok(transaction)

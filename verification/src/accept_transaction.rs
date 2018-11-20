@@ -35,25 +35,6 @@ impl<'a> TransactionAcceptor<'a> {
 		transaction_index: usize,
 		deployments: &'a BlockDeployments<'a>,
 	) -> Self {
-		/*
-			TODO:
-			Sprout:
-				reject transactions which are intended for Overwinter and beyond
-			Overwinter:
-				tx version
-				tx version group
-				reject transactions with valid version but missing overwinter flag
-				reject transactions intended for Sprout
-				check that all transactions are unexpired
-			Sapling:
-				tx version
-				tx version group
-				reject transactions intended for Sprout
-				check that all transactions are unexpired
-				block max size changes!!!
-		*/
-
-
 		trace!(target: "verification", "Tx verification {}", transaction.hash.to_reversed_str());
 		TransactionAcceptor {
 			size: TransactionSize::new(transaction, consensus, height),

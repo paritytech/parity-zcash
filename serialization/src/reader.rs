@@ -24,6 +24,7 @@ pub enum Error {
 	MalformedData,
 	UnexpectedEnd,
 	UnreadData,
+	InvalidFormat(String),
 }
 
 impl From<io::Error> for Error {

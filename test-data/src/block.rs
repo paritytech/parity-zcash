@@ -214,6 +214,11 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 		}
 	}
 
+	pub fn version(mut self, version: u32) -> Self {
+		self.version = version;
+		self
+	}
+
 	pub fn parent(mut self, parent: H256) -> Self {
 		self.parent = parent;
 		self
@@ -337,7 +342,7 @@ impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
 				version: self.version,
 				inputs: self.inputs,
 				outputs: self.outputs,
-				joint_split: None,
+				..Default::default()
 			}
 		)
 	}

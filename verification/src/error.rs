@@ -55,7 +55,10 @@ pub enum Error {
 	NonCanonicalTransactionOrdering,
 	/// Database error
 	Database(DBError),
+	/// Invalid equihash solution
 	InvalidEquihashSolution,
+	/// Invalid block version
+	InvalidVersion,
 }
 
 impl From<DBError> for Error {
@@ -103,11 +106,28 @@ pub enum TransactionError {
 	UnspentTransactionWithTheSameHash,
 	/// Using output that is surely spent
 	UsingSpentOutput(H256, u32),
-	/// A coinbase transaction MUST NOT have any joint split descriptions
-	CoinbaseWithJointSplit,
+	/// A coinbase transaction contains JointSplit/Spend/Output descriptions.
+	NonTransparentCoinbase,
 	/// Invalid transaction version.
 	InvalidVersion,
+	/// Invalid transaction version group.
+	InvalidVersionGroup,
 	/// Transaction has too large output value.
-	ValueOverflow,
+	OutputValueOverflow,
+	/// Transaction has too large input value.
+	InputValueOverflow,
+	/// Transaction expiry height is too high.
+	ExpiryHeightTooHigh,
+	/// Sapling with empty spends && outputs has non-empty balance.
+	EmptySaplingHasBalance,
+	/// Both value_pub_old && value_pub_new in join split description are non-zero.
+	JoinSplitBothPubsNonZero,
+	/// Transaction has duplicate inputs. Inputs indexes are provided.
+	DuplicateInput(usize, usize),
+	/// Transaction has join split descriptions with duplicate nullifiers.
+	/// Join split descriptions indexes are provided.
+	DuplicateJoinSplitNullifier(usize, usize),
+	/// Transaction has sapling spends with duplicate nullifiers. Sapling spends indexes are provided.
+	DuplicateSaplingSpendNullifier(usize, usize),
 }
 
