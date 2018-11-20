@@ -194,7 +194,7 @@ pub enum Opcode {
 	OP_SHA256 = 0xa8,
 	OP_HASH160 = 0xa9,
 	OP_HASH256 = 0xaa,
-	OP_CODESEPARATOR = 0xab,
+	//OP_CODESEPARATOR = 0xab,
 	OP_CHECKSIG = 0xac,
 	OP_CHECKSIGVERIFY = 0xad,
 	OP_CHECKMULTISIG = 0xae,
@@ -415,7 +415,6 @@ impl Opcode {
 			0xa8 => Some(OP_SHA256),
 			0xa9 => Some(OP_HASH160),
 			0xaa => Some(OP_HASH256),
-			0xab => Some(OP_CODESEPARATOR),
 			0xac => Some(OP_CHECKSIG),
 			0xad => Some(OP_CHECKSIGVERIFY),
 			0xae => Some(OP_CHECKMULTISIG),
@@ -680,7 +679,6 @@ mod tests {
 		assert_eq!(Opcode::OP_SHA256, Opcode::from_u8(Opcode::OP_SHA256 as u8).unwrap());
 		assert_eq!(Opcode::OP_HASH160, Opcode::from_u8(Opcode::OP_HASH160 as u8).unwrap());
 		assert_eq!(Opcode::OP_HASH256, Opcode::from_u8(Opcode::OP_HASH256 as u8).unwrap());
-		assert_eq!(Opcode::OP_CODESEPARATOR, Opcode::from_u8(Opcode::OP_CODESEPARATOR as u8).unwrap());
 		assert_eq!(Opcode::OP_CHECKSIG, Opcode::from_u8(Opcode::OP_CHECKSIG as u8).unwrap());
 		assert_eq!(Opcode::OP_CHECKSIGVERIFY, Opcode::from_u8(Opcode::OP_CHECKSIGVERIFY as u8).unwrap());
 		assert_eq!(Opcode::OP_CHECKMULTISIG, Opcode::from_u8(Opcode::OP_CHECKMULTISIG as u8).unwrap());
@@ -697,7 +695,7 @@ mod tests {
 		assert_eq!(Opcode::OP_NOP8, Opcode::from_u8(Opcode::OP_NOP8 as u8).unwrap());
 		assert_eq!(Opcode::OP_NOP9, Opcode::from_u8(Opcode::OP_NOP9 as u8).unwrap());
 		assert_eq!(Opcode::OP_NOP10, Opcode::from_u8(Opcode::OP_NOP10 as u8).unwrap());
-	
+
 		// BCH crypto
 		assert_eq!(Opcode::OP_CHECKDATASIG, Opcode::from_u8(Opcode::OP_CHECKDATASIG as u8).unwrap());
 		assert_eq!(Opcode::OP_CHECKDATASIGVERIFY, Opcode::from_u8(Opcode::OP_CHECKDATASIGVERIFY as u8).unwrap());

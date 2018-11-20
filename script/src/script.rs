@@ -192,29 +192,6 @@ impl Script {
 		self.data[from..].to_vec().into()
 	}
 
-	pub fn find_and_delete(&self, data: &[u8]) -> Script {
-		let mut result = Vec::new();
-		let mut current = 0;
-		let len = data.len();
-		let end = self.data.len();
-
-		if len > end || len == 0 {
-			return self.data.to_vec().into()
-		}
-
-		while current < end - len {
-			if &self.data[current..current + len] != data {
-				result.push(self.data[current]);
-				current += 1;
-			} else {
-				current += len;
-			}
-		}
-
-		result.extend_from_slice(&self.data[current..]);
-		result.into()
-	}
-
 	pub fn get_opcode(&self, position: usize) -> Result<Opcode, Error> {
 		Opcode::from_u8(self.data[position]).ok_or(Error::BadOpcode)
 	}
@@ -265,30 +242,6 @@ impl Script {
 		} else {
 			Ok(&self.data[offset..offset + len])
 		}
-	}
-
-	/// Returns Script without OP_CODESEPARATOR opcodes
-	pub fn without_separators(&self) -> Script {
-		let mut pc = 0;
-		let mut result = Vec::new();
-
-		while pc < self.len() {
-			match self.get_instruction(pc) {
-				Ok(instruction) => {
-					if instruction.opcode != Opcode::OP_CODESEPARATOR {
-						result.extend_from_slice(&self[pc..pc + instruction.step]);
-					}
-
-					pc += instruction.step;
-				},
-				_ => {
-					result.push(self[pc]);
-					pc += 1;
-				}
-			}
-		}
-
-		result.into()
 	}
 
 	/// Returns true if script contains only push opcodes
@@ -577,13 +530,6 @@ OP_ADD
 	}
 
 	#[test]
-	fn test_script_without_op_codeseparator() {
-		let script: Script = "ab00270025512102e485fdaa062387c0bbb5ab711a093b6635299ec155b7b852fce6b992d5adbfec51ae".into();
-		let scr_goal: Script = "00270025512102e485fdaa062387c0bbb5ab711a093b6635299ec155b7b852fce6b992d5adbfec51ae".into();
-		assert_eq!(script.without_separators(), scr_goal);
-	}
-
-	#[test]
 	fn test_script_is_multisig() {
 		let script: Script = "524104a882d414e478039cd5b52a92ffb13dd5e6bd4515497439dffd691a0f12af9575fa349b5694ed3155b136f09e63975a1700c9f4d4df849323dac06cf3bd6458cd41046ce31db9bdd543e72fe3039a1f1c047dab87037c36a669ff90e28da1848f640de68c2fe913d363a51154a0c62d7adea1b822d05035077418267b1a1379790187410411ffd36c70776538d079fbae117dc38effafb33304af83ce4894589747aee1ef992f63280567f52f5ba870678b4ab4ff6c8ea600bd217870a8b4f1f09f3a8e8353ae".into();
 		let not: Script = "ab00270025512102e485fdaa062387c0bbb5ab711a093b6635299ec155b7b852fce6b992d5adbfec51ae".into();
@@ -638,12 +584,6 @@ OP_ADD
 		assert_eq!(script.sigops_count(false, false), 20001);
 	}
 
-	#[test]
-	fn test_script_empty_find_and_delete() {
-		let s: Script = vec![Opcode::OP_0 as u8].into();
-		let result = s.find_and_delete(&[]);
-		assert_eq!(s, result);
-	}
 
 	#[test]
 	fn test_extract_destinations_pub_key_compressed() {

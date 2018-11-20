@@ -133,8 +133,6 @@ impl TransactionInputSigner {
 			return 1u8.into();
 		}
 
-		let script_pubkey = script_pubkey.without_separators();
-
 		let inputs = if sighash.anyone_can_pay {
 			let input = &self.inputs[input_index];
 			vec![TransactionInput {
@@ -204,7 +202,6 @@ impl TransactionInputSigner {
 		signature.push(sighash as u8);
 		let script_sig = Builder::default()
 			.push_data(&signature)
-			//.push_data(keypair.public())
 			.into_script();
 
 		let unsigned_input = &self.inputs[input_index];
