@@ -435,7 +435,6 @@ mod tests {
 	use script::{Script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, verify_script};
 
 	#[test]
-	#[ignore]
 	fn join_split() {
 
 		let input_hex = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff05021d010101ffffffff021070d90000000000232102bdbbb2eb3066bb138d31349ce32b7f05871ac08cfb382023155249b213417d82ac045c36000000000017a9147d46a730d31f97b1930d3368a967c309bd4d136a8700000000";
@@ -448,7 +447,7 @@ mod tests {
 		let output_script: Script = coinbase_tx.outputs()[0].script_pubkey.clone().into();
 		let input_script: Script = spending_tx.inputs()[0].script_sig.clone().into();
 
-		let signer: TransactionInputSigner = coinbase_tx.into();
+		let signer: TransactionInputSigner = spending_tx.into();
 
 		let checker = TransactionSignatureChecker {
 			signer: signer,

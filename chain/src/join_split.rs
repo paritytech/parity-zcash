@@ -129,8 +129,8 @@ pub fn serialize_join_split(stream: &mut Stream, join_split: &Option<JoinSplit>)
 				};
 				stream.append(&d.ciphertexts);
 			}
-			stream.append(&join_split.pubkey)
-				.append(&join_split.sig);
+			stream.append(&join_split.pubkey);
+			stream.append(&join_split.sig);
 		}
 	}
 }

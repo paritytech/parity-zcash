@@ -229,6 +229,7 @@ impl Serializable for Transaction {
 				.append_list(&sapling.outputs);
 		}
 
+		println!("serializing tx! ({:?})", self.join_split);
 		serialize_join_split(stream, &self.join_split);
 
 		if let Some(sapling) = self.sapling.as_ref() {
