@@ -409,7 +409,9 @@ impl<'a> Iterator for Instructions<'a> {
 
 		let instruction = match self.script.get_instruction(self.position) {
 			Ok(x) => x,
-			Err(e) => return Some(Err(e)),
+			Err(e) => {
+				return Some(Err(e))
+			}
 		};
 
 		self.position += instruction.step;

@@ -63,9 +63,10 @@ impl BloomFilter {
 	}
 
 	/// Adds given data to current filter, so that new transactions can be accepted
-	pub fn update_bloom_filter(&mut self, message: types::FilterAdd) {
-		if let Some(ref mut bloom) = self.bloom {
-			bloom.lock().insert(&message.data);
+	pub fn update_bloom_filter(&self, message: types::FilterAdd) {
+		if let Some(ref bloom) = self.bloom {
+			let mut b = bloom.lock();
+			b.insert(&message.data);
 		}
 	}
 
@@ -127,11 +128,16 @@ impl BloomFilter {
 
 					// check if match any arbitrary script data element in any scriptSig in tx
 					let script = Script::new(input.script_sig.clone());
-					for instruction in script.iter().filter_map(|i| i.ok()) {
-						if let Some(instruction_data) = instruction.data {
-							is_match = bloom.contains(&*instruction_data);
-							if is_match {
-								return true;
+					for instruction in script.iter() {
+						match instruction {
+							Err(_) => break,
+							Ok(instruction) => {
+								if let Some(instruction_data) = instruction.data {
+									is_match = bloom.contains(&*instruction_data);
+									if is_match {
+										return true;
+									}
+								}
 							}
 						}
 					}
@@ -220,7 +226,7 @@ mod tests {
 		let tx1: IndexedTransaction = test_data::TransactionBuilder::with_output(10).into();
 		let tx2: IndexedTransaction = test_data::TransactionBuilder::with_output(20).into();
 
-		let mut filter = BloomFilter::with_filter_load(default_filterload());
+		let filter = BloomFilter::with_filter_load(default_filterload());
 
 		assert!(!filter.filter_transaction(&tx1));
 		assert!(!filter.filter_transaction(&tx2));
@@ -239,7 +245,7 @@ mod tests {
 		let tx1_out_data: Bytes = "380cb3c594de4e7e9b8e18db182987bebb5a4f70".into();
 		let tx2 = IndexedTransaction::default();
 
-		let mut filter = BloomFilter::with_filter_load(default_filterload());
+		let filter = BloomFilter::with_filter_load(default_filterload());
 
 		assert!(!filter.filter_transaction(&tx1));
 		assert!(!filter.filter_transaction(&tx2));
@@ -257,7 +263,7 @@ mod tests {
 		let tx1_previous_output: Bytes = serialize(&tx1.raw.inputs[0].previous_output);
 		let tx2 = IndexedTransaction::default();
 
-		let mut filter = BloomFilter::with_filter_load(default_filterload());
+		let filter = BloomFilter::with_filter_load(default_filterload());
 
 		assert!(!filter.filter_transaction(&tx1));
 		assert!(!filter.filter_transaction(&tx2));
@@ -276,7 +282,7 @@ mod tests {
 		let tx1_input_data: Bytes = "304502205b282fbc9b064f3bc823a23edcc0048cbb174754e7aa742e3c9f483ebe02911c022100e4b0b3a117d36cab5a67404dddbf43db7bea3c1530e0fe128ebc15621bd69a3b01".into();
 		let tx2 = IndexedTransaction::default();
 
-		let mut filter = BloomFilter::with_filter_load(default_filterload());
+		let filter = BloomFilter::with_filter_load(default_filterload());
 
 		assert!(!filter.filter_transaction(&tx1));
 		assert!(!filter.filter_transaction(&tx2));
