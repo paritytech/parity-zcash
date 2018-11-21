@@ -458,8 +458,6 @@ mod tests {
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
 		assert_eq!(verify_script(&input_script, &output_script, &flags, &checker), Ok(()));
-
-		assert_eq!(1, 0);
 	}
 
 }

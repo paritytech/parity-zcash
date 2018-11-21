@@ -179,7 +179,13 @@ impl TransactionInputSigner {
 			outputs: outputs,
 			version: self.version,
 			lock_time: self.lock_time,
-			join_split: self.join_split.clone(),
+			join_split: self.join_split.as_ref().map(|js| {
+				JoinSplit {
+					descriptions: js.descriptions.clone(),
+					pubkey: js.pubkey.clone(),
+					sig: [0u8; 64].as_ref().into(), // null signature for signing
+				}
+			}),
 			..Default::default()
 		};
 
