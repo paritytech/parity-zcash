@@ -40,16 +40,16 @@ impl<'a> HeaderAcceptor<'a> {
 /// https://github.com/bitcoin/bips/blob/master/bip-0090.mediawiki
 pub struct HeaderVersion<'a> {
 	header: CanonHeader<'a>,
-	height: u32,
-	consensus_params: &'a ConsensusParams,
+	_height: u32,
+	_consensus_params: &'a ConsensusParams,
 }
 
 impl<'a> HeaderVersion<'a> {
 	fn new(header: CanonHeader<'a>, height: u32, consensus_params: &'a ConsensusParams) -> Self {
 		HeaderVersion {
 			header: header,
-			height: height,
-			consensus_params: consensus_params,
+			_height: height,
+			_consensus_params: consensus_params,
 		}
 	}
 

@@ -6,7 +6,7 @@ use crypto::{sha1, sha256, dhash160, dhash256, ripemd160};
 use sign::Sighash;
 use script::MAX_SCRIPT_ELEMENT_SIZE;
 use {
-	script, Builder, Script, Num, VerificationFlags, Opcode, Error, SignatureChecker, Stack
+	script, Script, Num, VerificationFlags, Opcode, Error, SignatureChecker, Stack
 };
 
 /// Helper function.
