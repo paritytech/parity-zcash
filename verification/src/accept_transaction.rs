@@ -220,13 +220,20 @@ impl<'a> TransactionOverspent<'a> {
 			return Ok(());
 		}
 
-		let available = self.transaction.raw.inputs.iter()
+		let available_public = self.transaction.raw.inputs.iter()
 			.map(|input| self.store.transaction_output(&input.previous_output, usize::max_value()).map(|o| o.value).unwrap_or(0))
 			.sum::<u64>();
 
+		let available_join_split = self.transaction.raw.join_split.iter()
+			.flat_map(|js| &js.descriptions)
+			.map(|d| d.value_pub_new)
+			.sum::<u64>();
+
+		let total_available = available_public + available_join_split;
+
 		let spends = self.transaction.raw.total_spends();
 
-		if spends > available {
+		if spends > total_available {
 			Err(TransactionError::Overspend)
 		} else {
 			Ok(())
@@ -458,5 +465,4 @@ mod tests {
 			.verify_p2sh(true);
 		assert_eq!(verify_script(&input_script, &output_script, &flags, &checker), Ok(()));
 	}
-
 }
