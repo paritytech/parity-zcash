@@ -18,6 +18,7 @@ network = { path = "../network" }
 storage = { path = "../storage" }
 bitcrypto = { path = "../crypto" }
 rustc-hex = "2"
+bn = "0.4"
 
 [dev-dependencies]
 rand = "0.4"

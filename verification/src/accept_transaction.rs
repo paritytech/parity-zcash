@@ -432,6 +432,19 @@ impl<'a> TransactionSize<'a> {
 	}
 }
 
+/// Check the joinsplit proof of the transaction
+pub struct JoinSplitProof<'a> {
+	join_split: &'a chain::JoinSplit,
+}
+
+impl<'a> JoinSplitProof<'a> {
+	fn new(join_split: &'a chain::JoinSplit) -> Self { JoinSplitProof { join_split: join_split }}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		Ok(())
+	}
+}
+
 #[cfg(test)]
 mod tests {
 

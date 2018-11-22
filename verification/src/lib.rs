@@ -72,6 +72,8 @@ extern crate bitcrypto as crypto;
 #[cfg(test)]
 extern crate db;
 
+extern crate bn;
+
 pub mod constants;
 mod canon;
 mod deployments;
@@ -82,6 +84,7 @@ mod sigops;
 mod timestamp;
 mod work;
 mod work_zcash;
+mod pghr13;
 
 // pre-verification
 mod verify_block;
