@@ -5,7 +5,7 @@ use keys::KeyPair;
 use crypto::dhash256;
 use hash::H256;
 use ser::Stream;
-use chain::{Transaction, TransactionOutput, OutPoint, TransactionInput};
+use chain::{Transaction, TransactionOutput, OutPoint, TransactionInput, JoinSplit};
 use {Script, Builder};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -104,6 +104,7 @@ pub struct TransactionInputSigner {
 	pub inputs: Vec<UnsignedTransactionInput>,
 	pub outputs: Vec<TransactionOutput>,
 	pub lock_time: u32,
+	pub join_split: Option<JoinSplit>
 }
 
 /// Used for resigning and loading test transactions
@@ -114,6 +115,7 @@ impl From<Transaction> for TransactionInputSigner {
 			inputs: t.inputs.into_iter().map(Into::into).collect(),
 			outputs: t.outputs,
 			lock_time: t.lock_time,
+			join_split: t.join_split,
 		}
 	}
 }
@@ -132,8 +134,6 @@ impl TransactionInputSigner {
 		if sighash.base == SighashBase::Single && input_index >= self.outputs.len() {
 			return 1u8.into();
 		}
-
-		let script_pubkey = script_pubkey.without_separators();
 
 		let inputs = if sighash.anyone_can_pay {
 			let input = &self.inputs[input_index];
@@ -179,7 +179,14 @@ impl TransactionInputSigner {
 			outputs: outputs,
 			version: self.version,
 			lock_time: self.lock_time,
-			..Default::default() // TODO
+			join_split: self.join_split.as_ref().map(|js| {
+				JoinSplit {
+					descriptions: js.descriptions.clone(),
+					pubkey: js.pubkey.clone(),
+					sig: [0u8; 64].as_ref().into(), // null signature for signing
+				}
+			}),
+			..Default::default()
 		};
 
 		let mut stream = Stream::default();
@@ -204,7 +211,6 @@ impl TransactionInputSigner {
 		signature.push(sighash as u8);
 		let script_sig = Builder::default()
 			.push_data(&signature)
-			//.push_data(keypair.public())
 			.into_script();
 
 		let unsigned_input = &self.inputs[input_index];
@@ -263,6 +269,7 @@ mod tests {
 			lock_time: 0,
 			inputs: vec![unsigned_input],
 			outputs: vec![output],
+			join_split: None,
 		};
 
 		let hash = input_signer.signature_hash(0, &previous_output, SighashBase::All.into());

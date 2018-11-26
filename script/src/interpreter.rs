@@ -6,7 +6,7 @@ use crypto::{sha1, sha256, dhash160, dhash256, ripemd160};
 use sign::Sighash;
 use script::MAX_SCRIPT_ELEMENT_SIZE;
 use {
-	script, Builder, Script, Num, VerificationFlags, Opcode, Error, SignatureChecker, Stack
+	script, Script, Num, VerificationFlags, Opcode, Error, SignatureChecker, Stack
 };
 
 /// Helper function.
@@ -319,7 +319,6 @@ pub fn eval_script(
 
 	let mut pc = 0;
 	let mut op_count = 0;
-	let mut begincode = 0;
 	let mut exec_stack = Vec::<bool>::new();
 	let mut altstack = Stack::<Bytes>::new();
 
@@ -891,20 +890,14 @@ pub fn eval_script(
 				let v = dhash256(&stack.pop()?);
 				stack.push(v.to_vec().into());
 			},
-			Opcode::OP_CODESEPARATOR => {
-				begincode = pc;
-			},
 			Opcode::OP_CHECKSIG | Opcode::OP_CHECKSIGVERIFY => {
 				let pubkey = stack.pop()?;
 				let signature = stack.pop()?;
-				let mut subscript = script.subscript(begincode);
-				let signature_script = Builder::default().push_data(&*signature).into_script();
-				subscript = subscript.find_and_delete(&*signature_script);
 
 				check_signature_encoding(&signature, flags)?;
 				check_pubkey_encoding(&pubkey, flags)?;
 
-				let success = check_signature(checker, signature.into(), pubkey.into(), &subscript);
+				let success = check_signature(checker, signature.into(), pubkey.into(), &script);
 				match opcode {
 					Opcode::OP_CHECKSIG => {
 						if success {
@@ -936,12 +929,6 @@ pub fn eval_script(
 				let sigs_count: usize = sigs_count.into();
 				let sigs = (0..sigs_count).into_iter().map(|_| stack.pop()).collect::<Result<Vec<_>, _>>()?;
 
-				let mut subscript = script.subscript(begincode);
-				for signature in &sigs {
-					let signature_script = Builder::default().push_data(&*signature).into_script();
-					subscript = subscript.find_and_delete(&*signature_script);
-				}
-
 				let mut success = true;
 				let mut k = 0;
 				let mut s = 0;
@@ -953,7 +940,7 @@ pub fn eval_script(
 					check_signature_encoding(&sig, flags)?;
 					check_pubkey_encoding(&key, flags)?;
 
-					let ok = check_signature(checker, sig.into(), key.into(), &subscript);
+					let ok = check_signature(checker, sig.into(), key.into(), &script);
 					if ok {
 						s += 1;
 					}
@@ -2053,29 +2040,6 @@ mod tests {
 		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 	}
 
-	// https://blockchain.info/rawtx/eb3b82c0884e3efa6d8b0be55b4915eb20be124c9766245bcc7f34fdac32bccb
-	#[test]
-	fn test_transaction_bip65() {
-		let tx: Transaction = "01000000024de8b0c4c2582db95fa6b3567a989b664484c7ad6672c85a3da413773e63fdb8000000006b48304502205b282fbc9b064f3bc823a23edcc0048cbb174754e7aa742e3c9f483ebe02911c022100e4b0b3a117d36cab5a67404dddbf43db7bea3c1530e0fe128ebc15621bd69a3b0121035aa98d5f77cd9a2d88710e6fc66212aff820026f0dad8f32d1f7ce87457dde50ffffffff4de8b0c4c2582db95fa6b3567a989b664484c7ad6672c85a3da413773e63fdb8010000006f004730440220276d6dad3defa37b5f81add3992d510d2f44a317fd85e04f93a1e2daea64660202200f862a0da684249322ceb8ed842fb8c859c0cb94c81e1c5308b4868157a428ee01ab51210232abdc893e7f0631364d7fd01cb33d24da45329a00357b3a7886211ab414d55a51aeffffffff02e0fd1c00000000001976a914380cb3c594de4e7e9b8e18db182987bebb5a4f7088acc0c62d000000000017142a9bc5447d664c1d0141392a842d23dba45c4f13b17500000000".into();
-		let signer: TransactionInputSigner = tx.into();
-		let checker = TransactionSignatureChecker {
-			signer: signer,
-			input_index: 1,
-			input_amount: 0,
-		};
-		let input: Script = "004730440220276d6dad3defa37b5f81add3992d510d2f44a317fd85e04f93a1e2daea64660202200f862a0da684249322ceb8ed842fb8c859c0cb94c81e1c5308b4868157a428ee01ab51210232abdc893e7f0631364d7fd01cb33d24da45329a00357b3a7886211ab414d55a51ae".into();
-		let output: Script = "142a9bc5447d664c1d0141392a842d23dba45c4f13b175".into();
-
-		let flags = VerificationFlags::default()
-			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
-
-		let flags = VerificationFlags::default()
-			.verify_p2sh(true)
-			.verify_locktime(true);
-		assert_eq!(verify_script(&input, &output, &flags, &checker), Err(Error::NumberOverflow));
-	}
-
 	// https://blockchain.info/rawtx/54fabd73f1d20c980a0686bf0035078e07f69c58437e4d586fb29aa0bee9814f
 	#[test]
 	fn test_arithmetic_correct_arguments_order() {
@@ -2125,24 +2089,6 @@ mod tests {
 			.into_script();
 		let result = Ok(true);
 		basic_test(&script, result, vec![vec![1].into()].into());
-	}
-
-	// https://webbtc.com/tx/5df1375ffe61ac35ca178ebb0cab9ea26dedbd0e96005dfcee7e379fa513232f
-	#[test]
-	fn test_transaction_find_and_delete() {
-		let tx: Transaction = "0100000002f9cbafc519425637ba4227f8d0a0b7160b4e65168193d5af39747891de98b5b5000000006b4830450221008dd619c563e527c47d9bd53534a770b102e40faa87f61433580e04e271ef2f960220029886434e18122b53d5decd25f1f4acb2480659fea20aabd856987ba3c3907e0121022b78b756e2258af13779c1a1f37ea6800259716ca4b7f0b87610e0bf3ab52a01ffffffff42e7988254800876b69f24676b3e0205b77be476512ca4d970707dd5c60598ab00000000fd260100483045022015bd0139bcccf990a6af6ec5c1c52ed8222e03a0d51c334df139968525d2fcd20221009f9efe325476eb64c3958e4713e9eefe49bf1d820ed58d2112721b134e2a1a53034930460221008431bdfa72bc67f9d41fe72e94c88fb8f359ffa30b33c72c121c5a877d922e1002210089ef5fc22dd8bfc6bf9ffdb01a9862d27687d424d1fefbab9e9c7176844a187a014c9052483045022015bd0139bcccf990a6af6ec5c1c52ed8222e03a0d51c334df139968525d2fcd20221009f9efe325476eb64c3958e4713e9eefe49bf1d820ed58d2112721b134e2a1a5303210378d430274f8c5ec1321338151e9f27f4c676a008bdf8638d07c0b6be9ab35c71210378d430274f8c5ec1321338151e9f27f4c676a008bdf8638d07c0b6be9ab35c7153aeffffffff01a08601000000000017a914d8dacdadb7462ae15cd906f1878706d0da8660e68700000000".into();
-		let signer: TransactionInputSigner = tx.into();
-		let checker = TransactionSignatureChecker {
-			signer: signer,
-			input_index: 1,
-			input_amount: 0,
-		};
-		let input: Script = "00483045022015BD0139BCCCF990A6AF6EC5C1C52ED8222E03A0D51C334DF139968525D2FCD20221009F9EFE325476EB64C3958E4713E9EEFE49BF1D820ED58D2112721B134E2A1A53034930460221008431BDFA72BC67F9D41FE72E94C88FB8F359FFA30B33C72C121C5A877D922E1002210089EF5FC22DD8BFC6BF9FFDB01A9862D27687D424D1FEFBAB9E9C7176844A187A014C9052483045022015BD0139BCCCF990A6AF6EC5C1C52ED8222E03A0D51C334DF139968525D2FCD20221009F9EFE325476EB64C3958E4713E9EEFE49BF1D820ED58D2112721B134E2A1A5303210378D430274F8C5EC1321338151E9F27F4C676A008BDF8638D07C0B6BE9AB35C71210378D430274F8C5EC1321338151E9F27F4C676A008BDF8638D07C0B6BE9AB35C7153AE".into();
-		let output: Script = "A914D8DACDADB7462AE15CD906F1878706D0DA8660E687".into();
-
-		let flags = VerificationFlags::default()
-			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
 	}
 
 
@@ -2795,7 +2741,7 @@ mod tests {
 		// https://github.com/bitcoincashorg/bitcoincash.org/blob/0c6f91b0b713aae3bc6c9834b46e80e247ff5fab/spec/op_checkdatasig.md
 
 		let kp = KeyPair::from_private(Private { network: Network::Mainnet, secret: 1.into(), compressed: false, }).unwrap();
-		
+
 		let pubkey = kp.public().clone();
 		let message = vec![42u8; 32];
 		let correct_signature = kp.private().sign(&Message::from(sha256(&message))).unwrap();
@@ -2877,7 +2823,7 @@ mod tests {
 		// https://github.com/bitcoincashorg/bitcoincash.org/blob/0c6f91b0b713aae3bc6c9834b46e80e247ff5fab/spec/op_checkdatasig.md
 
 		let kp = KeyPair::from_private(Private { network: Network::Mainnet, secret: 1.into(), compressed: false, }).unwrap();
-		
+
 		let pubkey = kp.public().clone();
 		let message = vec![42u8; 32];
 		let correct_signature = kp.private().sign(&Message::from(sha256(&message))).unwrap();
