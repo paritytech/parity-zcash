@@ -1,4 +1,4 @@
-use {Network, Magic, Deployment};
+use {Network, Magic, Deployment, crypto};
 
 #[derive(Debug, Clone)]
 /// Parameters that influence chain consensus.
@@ -42,6 +42,24 @@ pub struct ConsensusParams {
 
 	/// Equihash (N, K) parameters.
 	pub equihash_params: Option<(u32, u32)>,
+
+	/// Active key for pghr13 joinsplit verification
+	pub joinsplit_verification_key: crypto::Pghr13VerifyingKey,
+}
+
+fn mainnet_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
+	use crypto::{G1, G2, Group};
+
+	crypto::Pghr13VerifyingKey {
+		a: G2::one(),
+		b: G1::one(),
+		c: G2::one(),
+		z: G2::one(),
+		gamma: G2::one(),
+		gamma_beta_1: G1::one(),
+		gamma_beta_2: G2::one(),
+		ic: Vec::new(),
+	}
 }
 
 impl ConsensusParams {
@@ -66,6 +84,8 @@ impl ConsensusParams {
 				pow_target_spacing: (2.5 * 60.0) as u32,
 
 				equihash_params: Some((200, 9)),
+
+				joinsplit_verification_key: mainnet_pghr_verification_key(),
 			},
 			Network::Testnet => ConsensusParams {
 				network: network,
@@ -86,6 +106,8 @@ impl ConsensusParams {
 				pow_target_spacing: (2.5 * 60.0) as u32,
 
 				equihash_params: Some((200, 9)),
+
+				joinsplit_verification_key: mainnet_pghr_verification_key(),
 			},
 			Network::Regtest => ConsensusParams {
 				network: network,
@@ -106,6 +128,8 @@ impl ConsensusParams {
 				pow_target_spacing: (2.5 * 60.0) as u32,
 
 				equihash_params: Some((200, 9)),
+
+				joinsplit_verification_key: mainnet_pghr_verification_key(),
 			},
 			Network::Unitest => ConsensusParams {
 				network: network,
@@ -126,6 +150,8 @@ impl ConsensusParams {
 				pow_target_spacing: (2.5 * 60.0) as u32,
 
 				equihash_params: None,
+
+				joinsplit_verification_key: mainnet_pghr_verification_key(),
 			},
 		}
 	}
