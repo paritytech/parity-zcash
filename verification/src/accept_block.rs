@@ -175,10 +175,20 @@ impl<'a> BlockCoinbaseClaim<'a> {
 				let prevout = store.transaction_output(&input.previous_output, tx_idx);
 				let (sum, overflow) = incoming.overflowing_add(prevout.map(|o| o.value).unwrap_or(0));
 				if overflow {
-					return Err(Error::ReferencedInputsSumOverflow);
+					return Err(Error::ReferencedInputsSumOverflow)
 				}
 				incoming = sum;
 			}
+
+			let join_split_public_new = tx.raw.join_split.iter()
+				.flat_map(|js| &js.descriptions)
+				.map(|d| d.value_pub_new)
+				.sum::<u64>();
+
+			incoming = match incoming.overflowing_add(join_split_public_new) {
+				(_, true) => return Err(Error::ReferencedInputsSumOverflow),
+				(incoming, _) => incoming,
+			};
 
 			// (2) Total sum of all outputs
 			let spends = tx.raw.total_spends();
