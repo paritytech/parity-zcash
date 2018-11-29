@@ -272,8 +272,6 @@ fn compute_value_balance(value: i64) -> Result<Point, Error> {
 }
 
 /// Reads an FrRepr from a [u8] of length 32.
-/// This will panic (abort) if length provided is
-/// not correct.
 fn read_le(from: &[u8; 32]) -> FrRepr {
 	let mut repr = FrRepr::default();
 	repr.read_le(&from[..]).expect("length is 32 bytes");
