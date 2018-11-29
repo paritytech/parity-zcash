@@ -21,8 +21,10 @@ pub struct Sapling {
 	/// Consistency of balancing_value with the value commitments in Spend descriptions
 	/// and Output descriptions is enforced by the binding_sig.
 	/// This signature has a dual role in Sapling:
+	///
 	/// 1) to prove that the total value spent by Spend transfers, minus that produced by
 	///    Output transfers, is consistent with the v balance field of the transaction;
+	///
 	/// 2) To prove that the signer knew the randomness used for the spend and output value
 	///    commitments, in order to prevent Output descriptions from being replayed by an
 	///    adversary in a different transaction. (A Spend description already cannot be
