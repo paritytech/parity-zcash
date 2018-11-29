@@ -129,5 +129,7 @@ pub enum TransactionError {
 	DuplicateJoinSplitNullifier(usize, usize),
 	/// Transaction has sapling spends with duplicate nullifiers. Sapling spends indexes are provided.
 	DuplicateSaplingSpendNullifier(usize, usize),
+	/// Transaction sapling verification has failed.
+	InvalidSapling,
 }
 

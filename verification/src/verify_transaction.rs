@@ -356,7 +356,7 @@ impl<'a> TransactionSapling<'a> {
 	fn check(&self) -> Result<(), TransactionError> {
 		if let Some(ref sapling) = self.transaction.raw.sapling {
 			// sapling balance should be zero if spends and outputs are empty
-			if sapling.amount != 0 && sapling.spends.is_empty() && sapling.outputs.is_empty() {
+			if sapling.balancing_value != 0 && sapling.spends.is_empty() && sapling.outputs.is_empty() {
 				return Err(TransactionError::EmptySaplingHasBalance);
 			}
 		}
@@ -423,13 +423,13 @@ impl<'a> TransactionOutputValueOverflow<'a> {
 
 		if let Some(ref sapling) = self.transaction.raw.sapling {
 			// check that sapling amount is within limits
-			if sapling.amount < -self.max_value || sapling.amount > self.max_value {
+			if sapling.balancing_value < -self.max_value || sapling.balancing_value > self.max_value {
 				return Err(TransactionError::OutputValueOverflow);
 			}
 
 			// negative sapling amount takes value from transparent pool
-			if sapling.amount < 0 {
-				total_output = match total_output.checked_add(-sapling.amount) {
+			if sapling.balancing_value < 0 {
+				total_output = match total_output.checked_add(-sapling.balancing_value) {
 					Some(total_output) if total_output <= self.max_value => total_output,
 					_ => return Err(TransactionError::OutputValueOverflow),
 				};
@@ -493,8 +493,8 @@ impl<'a> TransactionInputValueOverflow<'a> {
 
 		if let Some(ref sapling) = self.transaction.raw.sapling {
 			// positive sapling amount adds value to the transparent pool
-			if sapling.amount > 0 {
-				match total_input.checked_add(sapling.amount as u64) {
+			if sapling.balancing_value > 0 {
+				match total_input.checked_add(sapling.balancing_value as u64) {
 					Some(total_input) if total_input <= self.max_value => (),
 					_ => return Err(TransactionError::InputValueOverflow),
 				};
@@ -721,18 +721,18 @@ mod tests {
 			.into(), &consensus).check(), Ok(()));
 
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: max_value,
+				balancing_value: max_value,
 				..Default::default()
 			}).into(), &consensus).check(), Ok(()));
 
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: max_value + 1,
+				balancing_value: max_value + 1,
 				..Default::default()
 			}).into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
 
 		assert_eq!(TransactionOutputValueOverflow::new(&test_data::TransactionBuilder::with_output(max_value as u64 / 2 + 1)
 			.set_sapling(Sapling {
-				amount: -max_value / 2,
+				balancing_value: -max_value / 2,
 				..Default::default()
 			}).into(), &consensus).check(), Err(TransactionError::OutputValueOverflow));
 
@@ -805,12 +805,12 @@ mod tests {
 			}).into(), &consensus).check(), Err(TransactionError::InputValueOverflow));
 
 		assert_eq!(TransactionInputValueOverflow::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: max_value,
+				balancing_value: max_value,
 				..Default::default()
 			}).into(), &consensus).check(), Ok(()));
 
 		assert_eq!(TransactionInputValueOverflow::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: max_value + 1,
+				balancing_value: max_value + 1,
 				..Default::default()
 			}).into(), &consensus).check(), Err(TransactionError::InputValueOverflow));
 
@@ -821,7 +821,7 @@ mod tests {
 				}],
 				..Default::default()
 			}).set_sapling(Sapling {
-				amount: max_value / 2,
+				balancing_value: max_value / 2,
 				..Default::default()
 			}).into(), &consensus).check(), Err(TransactionError::InputValueOverflow));
 	}
@@ -842,26 +842,26 @@ mod tests {
 	#[test]
 	fn transaction_sapling_works() {
 		assert_eq!(TransactionSapling::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: 100,
+				balancing_value: 100,
 				spends: vec![Default::default()],
 				..Default::default()
 			}).into()).check(), Ok(()));
 
 		assert_eq!(TransactionSapling::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: 100,
+				balancing_value: 100,
 				outputs: vec![Default::default()],
 				..Default::default()
 			}).into()).check(), Ok(()));
 
 		assert_eq!(TransactionSapling::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: 100,
+				balancing_value: 100,
 				outputs: vec![Default::default()],
 				spends: vec![Default::default()],
 				..Default::default()
 			}).into()).check(), Ok(()));
 
 		assert_eq!(TransactionSapling::new(&test_data::TransactionBuilder::with_sapling(Sapling {
-				amount: 100,
+				balancing_value: 100,
 				..Default::default()
 			}).into()).check(), Err(TransactionError::EmptySaplingHasBalance));
 	}
