@@ -21,6 +21,7 @@ mod error;
 mod store;
 mod transaction_meta;
 mod transaction_provider;
+mod nullifier;
 
 pub use primitives::{hash, bytes};
 
@@ -35,4 +36,4 @@ pub use error::Error;
 pub use store::{AsSubstore, Store, SharedStore, CanonStore, ConfigStore};
 pub use transaction_meta::TransactionMeta;
 pub use transaction_provider::{TransactionProvider, TransactionOutputProvider, TransactionMetaProvider};
-
+pub use nullifier::{Nullifier, NullifierTracker};

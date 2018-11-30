@@ -10,7 +10,7 @@ fn transaction_output(transactions: &[IndexedTransaction], prevout: &OutPoint) -
 }
 
 fn is_spent(transactions: &[IndexedTransaction], prevout: &OutPoint) -> bool {
-	// the code below is valid, but has rather poor performance
+	// TODO: the code below is valid, but has rather poor performance!
 
 	// if previous transaction output appears more than once than we can safely
 	// tell that it's spent (double spent)
