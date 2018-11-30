@@ -23,7 +23,7 @@ use kv::{
 use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
 	TransactionMetaProvider, TransactionProvider, TransactionOutputProvider, BlockChain, Store,
-	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock
+	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock, NullifierTracker, Nullifier,
 };
 
 const KEY_BEST_BLOCK_NUMBER: &'static str = "best_block_number";
@@ -506,6 +506,12 @@ impl<T> TransactionOutputProvider for BlockChainDatabase<T> where T: KeyValueDat
 		self.transaction_meta(&prevout.hash)
 			.and_then(|meta| meta.is_spent(prevout.index as usize))
 			.unwrap_or(false)
+	}
+}
+
+impl<T> NullifierTracker for BlockChainDatabase<T> where T: KeyValueDatabase {
+	fn contains(&self, _nullifier: Nullifier) -> bool {
+		false
 	}
 }
 
