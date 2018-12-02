@@ -83,6 +83,10 @@ impl KeyValueDatabase for MemoryDatabase {
 					KeyValue::TransactionMeta(key, value) => { db.transaction_meta.insert(key, KeyState::Insert(value)); },
 					KeyValue::BlockNumber(key, value) => { db.block_number.insert(key, KeyState::Insert(value)); },
 					KeyValue::Configuration(key, value) => { db.configuration.insert(key, KeyState::Insert(value)); },
+					KeyValue::Nullifier(key) => match key.tag() {
+						NullifierTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
+						NullifierTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
+					},
 				},
 				Operation::Delete(delete) => match delete {
 					Key::Meta(key) => { db.meta.insert(key, KeyState::Delete); }
@@ -97,7 +101,7 @@ impl KeyValueDatabase for MemoryDatabase {
 						NullifierTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Delete); },
 						NullifierTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Delete); },
 					},
-				}
+				},
 			}
 		}
 		Ok(())

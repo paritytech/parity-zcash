@@ -32,6 +32,7 @@ pub enum KeyValue {
 	TransactionMeta(H256, TransactionMeta),
 	BlockNumber(H256, u32),
 	Configuration(&'static str, Bytes),
+	Nullifier(Nullifier),
 }
 
 #[derive(Debug)]
@@ -232,6 +233,10 @@ impl<'a> From<&'a KeyValue> for RawKeyValue {
 			KeyValue::BlockTransactions(ref key, ref value) => (COL_BLOCK_TRANSACTIONS, serialize(key), serialize(value)),
 			KeyValue::Transaction(ref key, ref value) => (COL_TRANSACTIONS, serialize(key), serialize(value)),
 			KeyValue::TransactionMeta(ref key, ref value) => (COL_TRANSACTIONS_META, serialize(key), serialize(value)),
+			KeyValue::Nullifier(ref key) => match key.tag() {
+				NullifierTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash()), Bytes::new()),
+				NullifierTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash()), Bytes::new()),
+			},
 			KeyValue::BlockNumber(ref key, ref value) => (COL_BLOCK_NUMBERS, serialize(key), serialize(value)),
 			KeyValue::Configuration(ref key, ref value) => (COL_CONFIGURATION, serialize(key), serialize(value)),
 		};
