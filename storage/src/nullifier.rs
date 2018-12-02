@@ -6,7 +6,9 @@ use hash::H256;
 /// even if they have the same bit pattern.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Tag {
+    /// Sprout nullifier.
     Sprout,
+    /// Sapling nullifier.
     Sapling,
 }
 
@@ -17,16 +19,28 @@ pub struct Nullifier {
     hash: H256,
 }
 
+/// Trait to query existing nullifier.
 pub trait NullifierTracker {
     fn contains(&self, nullifier: Nullifier) -> bool;
 }
 
 impl Nullifier {
+    /// New nullifer.
     pub fn new(tag: Tag, hash: H256) -> Self {
         Nullifier {
             tag: tag,
             hash: hash,
         }
+    }
+
+    /// Nullifer tag
+    pub fn tag(&self) -> Tag {
+        self.tag
+    }
+
+    /// Nullifer hash
+    pub fn hash(&self) -> &H256 {
+        &self.hash
     }
 }
 
