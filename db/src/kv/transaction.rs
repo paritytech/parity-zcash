@@ -4,7 +4,7 @@ use ser::{serialize, List, deserialize};
 use chain::{Transaction as ChainTransaction, BlockHeader};
 use storage::{TransactionMeta, Nullifier, NullifierTag};
 
-pub const COL_COUNT: u32 = 10;
+pub const COL_COUNT: u32 = 16;
 pub const COL_META: u32 = 0;
 pub const COL_BLOCK_HASHES: u32 = 1;
 pub const COL_BLOCK_HEADERS: u32 = 2;
