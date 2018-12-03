@@ -299,6 +299,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 							H256::from(&nullifier[..])
 						);
 						if self.contains_nullifier(nullifier_key) {
+							trace!(target: "db", "Duplicate nullifer during canonization: {:?}", nullifier_key);
 							return Err(Error::CannotCanonize);
 						}
 						update.insert(KeyValue::Nullifier(nullifier_key));
@@ -371,6 +372,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 							H256::from(&nullifier[..])
 						);
 						if !self.contains_nullifier(nullifier_key) {
+							warn!(target: "db", "cannot decanonize, no nullifier: {:?}", nullifier_key);
 							return Err(Error::CannotDecanonize);
 						}
 						update.delete(Key::Nullifier(nullifier_key));
