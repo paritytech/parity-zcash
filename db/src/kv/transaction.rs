@@ -58,7 +58,6 @@ pub enum Value {
 	TransactionMeta(TransactionMeta),
 	BlockNumber(u32),
 	Configuration(Bytes),
-	Bloom(Bytes),
 	Empty,
 }
 
