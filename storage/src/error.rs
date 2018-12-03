@@ -12,6 +12,9 @@ pub enum Error {
 	/// Ancient fork
 	#[display(fmt = "Fork is too long to proceed")]
 	AncientFork,
+	/// Invalid block
+	#[display(fmt = "Cannot decanonize block (invalid database state)")]
+	CannotDecanonize,
 }
 
 impl From<Error> for String {

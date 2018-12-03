@@ -7,7 +7,7 @@ use bytes::Bytes;
 use ser::List;
 use chain::{Transaction as ChainTransaction, BlockHeader};
 use kv::{Transaction, Key, KeyState, Operation, Value, KeyValueDatabase, KeyValue};
-use storage::{TransactionMeta};
+use storage::{TransactionMeta, NullifierTag};
 
 #[derive(Default, Debug)]
 struct InnerDatabase {
@@ -19,6 +19,8 @@ struct InnerDatabase {
 	transaction_meta: HashMap<H256, KeyState<TransactionMeta>>,
 	block_number: HashMap<H256, KeyState<u32>>,
 	configuration: HashMap<&'static str, KeyState<Bytes>>,
+	sprout_nullifiers: HashMap<H256, KeyState<()>>,
+	sapling_nullifiers: HashMap<H256, KeyState<()>>,
 }
 
 #[derive(Default, Debug)]
@@ -81,6 +83,10 @@ impl KeyValueDatabase for MemoryDatabase {
 					KeyValue::TransactionMeta(key, value) => { db.transaction_meta.insert(key, KeyState::Insert(value)); },
 					KeyValue::BlockNumber(key, value) => { db.block_number.insert(key, KeyState::Insert(value)); },
 					KeyValue::Configuration(key, value) => { db.configuration.insert(key, KeyState::Insert(value)); },
+					KeyValue::Nullifier(key) => match key.tag() {
+						NullifierTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
+						NullifierTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
+					},
 				},
 				Operation::Delete(delete) => match delete {
 					Key::Meta(key) => { db.meta.insert(key, KeyState::Delete); }
@@ -91,7 +97,11 @@ impl KeyValueDatabase for MemoryDatabase {
 					Key::TransactionMeta(key) => { db.transaction_meta.insert(key, KeyState::Delete); }
 					Key::BlockNumber(key) => { db.block_number.insert(key, KeyState::Delete); }
 					Key::Configuration(key) => { db.configuration.insert(key, KeyState::Delete); }
-				}
+					Key::Nullifier(key) => match key.tag() {
+						NullifierTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Delete); },
+						NullifierTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Delete); },
+					},
+				},
 			}
 		}
 		Ok(())
@@ -108,6 +118,10 @@ impl KeyValueDatabase for MemoryDatabase {
 			Key::TransactionMeta(ref key) => db.transaction_meta.get(key).cloned().unwrap_or_default().map(Value::TransactionMeta),
 			Key::BlockNumber(ref key) => db.block_number.get(key).cloned().unwrap_or_default().map(Value::BlockNumber),
 			Key::Configuration(ref key) => db.configuration.get(key).cloned().unwrap_or_default().map(Value::Configuration),
+			Key::Nullifier(ref key) => match key.tag() {
+				NullifierTag::Sprout => db.sprout_nullifiers.get(key.hash()).cloned().unwrap_or_default().map(|_| Value::Empty),
+				NullifierTag::Sapling => db.sapling_nullifiers.get(key.hash()).cloned().unwrap_or_default().map(|_| Value::Empty),
+			}
 		};
 
 		Ok(result)

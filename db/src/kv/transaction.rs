@@ -2,9 +2,9 @@ use bytes::Bytes;
 use hash::H256;
 use ser::{serialize, List, deserialize};
 use chain::{Transaction as ChainTransaction, BlockHeader};
-use storage::{TransactionMeta};
+use storage::{TransactionMeta, Nullifier, NullifierTag};
 
-pub const COL_COUNT: u32 = 10;
+pub const COL_COUNT: u32 = 16;
 pub const COL_META: u32 = 0;
 pub const COL_BLOCK_HASHES: u32 = 1;
 pub const COL_BLOCK_HEADERS: u32 = 2;
@@ -12,7 +12,9 @@ pub const COL_BLOCK_TRANSACTIONS: u32 = 3;
 pub const COL_TRANSACTIONS: u32 = 4;
 pub const COL_TRANSACTIONS_META: u32 = 5;
 pub const COL_BLOCK_NUMBERS: u32 = 6;
-pub const COL_CONFIGURATION: u32 = 7;
+pub const COL_SPROUT_NULLIFIERS: u32 = 7;
+pub const COL_SAPLING_NULLIFIERS: u32 = 8;
+pub const COL_CONFIGURATION: u32 = 9;
 
 #[derive(Debug)]
 pub enum Operation {
@@ -30,6 +32,7 @@ pub enum KeyValue {
 	TransactionMeta(H256, TransactionMeta),
 	BlockNumber(H256, u32),
 	Configuration(&'static str, Bytes),
+	Nullifier(Nullifier),
 }
 
 #[derive(Debug)]
@@ -42,6 +45,7 @@ pub enum Key {
 	TransactionMeta(H256),
 	BlockNumber(H256),
 	Configuration(&'static str),
+	Nullifier(Nullifier),
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +58,7 @@ pub enum Value {
 	TransactionMeta(TransactionMeta),
 	BlockNumber(u32),
 	Configuration(Bytes),
+	Empty,
 }
 
 impl Value {
@@ -67,6 +72,7 @@ impl Value {
 			Key::TransactionMeta(_) => deserialize(bytes).map(Value::TransactionMeta),
 			Key::BlockNumber(_) => deserialize(bytes).map(Value::BlockNumber),
 			Key::Configuration(_) => deserialize(bytes).map(Value::Configuration),
+			Key::Nullifier(_) => Ok(Value::Empty),
 		}.map_err(|e| format!("{:?}", e))
 	}
 
@@ -226,6 +232,10 @@ impl<'a> From<&'a KeyValue> for RawKeyValue {
 			KeyValue::BlockTransactions(ref key, ref value) => (COL_BLOCK_TRANSACTIONS, serialize(key), serialize(value)),
 			KeyValue::Transaction(ref key, ref value) => (COL_TRANSACTIONS, serialize(key), serialize(value)),
 			KeyValue::TransactionMeta(ref key, ref value) => (COL_TRANSACTIONS_META, serialize(key), serialize(value)),
+			KeyValue::Nullifier(ref key) => match key.tag() {
+				NullifierTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash()), Bytes::new()),
+				NullifierTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash()), Bytes::new()),
+			},
 			KeyValue::BlockNumber(ref key, ref value) => (COL_BLOCK_NUMBERS, serialize(key), serialize(value)),
 			KeyValue::Configuration(ref key, ref value) => (COL_CONFIGURATION, serialize(key), serialize(value)),
 		};
@@ -261,6 +271,10 @@ impl<'a> From<&'a Key> for RawKey {
 			Key::BlockTransactions(ref key) => (COL_BLOCK_TRANSACTIONS, serialize(key)),
 			Key::Transaction(ref key) => (COL_TRANSACTIONS, serialize(key)),
 			Key::TransactionMeta(ref key) => (COL_TRANSACTIONS_META, serialize(key)),
+			Key::Nullifier(ref key) => match key.tag() {
+				NullifierTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash())),
+				NullifierTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash())),
+			},
 			Key::BlockNumber(ref key) => (COL_BLOCK_NUMBERS, serialize(key)),
 			Key::Configuration(ref key) => (COL_CONFIGURATION, serialize(key)),
 		};

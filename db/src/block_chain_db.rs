@@ -7,14 +7,15 @@ use bytes::Bytes;
 use primitives::compact::Compact;
 use chain::{
 	IndexedBlock, IndexedBlockHeader, IndexedTransaction, BlockHeader, Block, Transaction,
-	OutPoint, TransactionOutput
+	OutPoint, TransactionOutput, SAPLING_TX_VERSION_GROUP_ID,
 };
 use ser::{
 	deserialize, serialize, List
 };
 use kv::{
 	KeyValueDatabase, OverlayDatabase, Transaction as DBTransaction, Value, DiskDatabase,
-	DatabaseConfig, MemoryDatabase, AutoFlushingOverlayDatabase, KeyValue, Key, KeyState, CacheDatabase
+	DatabaseConfig, MemoryDatabase, AutoFlushingOverlayDatabase, KeyValue, Key, KeyState,
+	CacheDatabase,
 };
 use kv::{
 	COL_COUNT, COL_BLOCK_HASHES, COL_BLOCK_HEADERS, COL_BLOCK_TRANSACTIONS, COL_TRANSACTIONS,
@@ -23,7 +24,8 @@ use kv::{
 use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
 	TransactionMetaProvider, TransactionProvider, TransactionOutputProvider, BlockChain, Store,
-	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock
+	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock, NullifierTracker, Nullifier,
+	NullifierTag,
 };
 
 const KEY_BEST_BLOCK_NUMBER: &'static str = "best_block_number";
@@ -221,7 +223,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 		self.db.write(update).map_err(Error::DatabaseError)
 	}
 
-	/// Rollbacks single best block
+	/// Rollbacks single best block.
 	fn rollback_best(&self) -> Result<H256, Error> {
 		let decanonized = match self.block(self.best_block.read().hash.clone().into()) {
 			Some(block) => block,
@@ -246,6 +248,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 	}
 
 	/// Marks block as a new best block.
+	///
 	/// Block must be already inserted into db, and it's parent must be current best block.
 	/// Updates meta data.
 	pub fn canonize(&self, hash: &H256) -> Result<(), Error> {
@@ -284,7 +287,25 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 		}
 
 		for tx in block.transactions.iter().skip(1) {
+			let is_sapling_group = tx.raw.version_group_id == SAPLING_TX_VERSION_GROUP_ID;
+
 			modified_meta.insert(tx.hash.clone(), TransactionMeta::new(new_best_block.number, tx.raw.outputs.len()));
+
+			if let Some(ref js) = tx.raw.join_split {
+				for js_descriptor in js.descriptions.iter() {
+					for nullifier in &js_descriptor.nullifiers[..] {
+						let nullifier_key = Nullifier::new(
+							if is_sapling_group { NullifierTag::Sapling } else { NullifierTag::Sprout },
+							H256::from(&nullifier[..])
+						);
+						if self.contains_nullifier(nullifier_key) {
+							trace!(target: "db", "Duplicate nullifer during canonization: {:?}", nullifier_key);
+							return Err(Error::CannotCanonize);
+						}
+						update.insert(KeyValue::Nullifier(nullifier_key));
+					}
+				}
+			}
 
 			for input in &tx.raw.inputs {
 				use std::collections::hash_map::Entry;
@@ -342,6 +363,23 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 
 		let mut modified_meta: HashMap<H256, TransactionMeta> = HashMap::new();
 		for tx in block.transactions.iter().skip(1) {
+			let is_sapling_group = tx.raw.version_group_id == SAPLING_TX_VERSION_GROUP_ID;
+			if let Some(ref js) = tx.raw.join_split {
+				for js_descriptor in js.descriptions.iter() {
+					for nullifier in &js_descriptor.nullifiers[..] {
+						let nullifier_key = Nullifier::new(
+							if is_sapling_group { NullifierTag::Sapling } else { NullifierTag::Sprout },
+							H256::from(&nullifier[..])
+						);
+						if !self.contains_nullifier(nullifier_key) {
+							warn!(target: "db", "cannot decanonize, no nullifier: {:?}", nullifier_key);
+							return Err(Error::CannotDecanonize);
+						}
+						update.delete(Key::Nullifier(nullifier_key));
+					}
+				}
+			}
+
 			for input in &tx.raw.inputs {
 				use std::collections::hash_map::Entry;
 
@@ -505,6 +543,12 @@ impl<T> TransactionOutputProvider for BlockChainDatabase<T> where T: KeyValueDat
 		self.transaction_meta(&prevout.hash)
 			.and_then(|meta| meta.is_spent(prevout.index as usize))
 			.unwrap_or(false)
+	}
+}
+
+impl<T> NullifierTracker for BlockChainDatabase<T> where T: KeyValueDatabase {
+	fn contains_nullifier(&self, nullifier: Nullifier) -> bool {
+		self.get(Key::Nullifier(nullifier)).is_some()
 	}
 }
 
