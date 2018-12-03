@@ -21,7 +21,7 @@ pub struct Nullifier {
 
 /// Trait to query existing nullifier.
 pub trait NullifierTracker {
-    fn contains(&self, nullifier: Nullifier) -> bool;
+    fn contains_nullifier(&self, nullifier: Nullifier) -> bool;
 }
 
 impl Nullifier {
