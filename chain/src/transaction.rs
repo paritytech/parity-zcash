@@ -224,7 +224,7 @@ impl Serializable for Transaction {
 		}
 
 		if let Some(sapling) = self.sapling.as_ref() {
-			stream.append(&sapling.amount)
+			stream.append(&sapling.balancing_value)
 				.append_list(&sapling.spends)
 				.append_list(&sapling.outputs);
 		}
@@ -282,11 +282,11 @@ impl Deserializable for Transaction {
 		};
 
 		let mut sapling = if is_sapling_tx {
-			let amount = reader.read()?;
+			let balancing_value = reader.read()?;
 			let spends = reader.read_list()?;
 			let outputs = reader.read_list()?;
 			Some(Sapling {
-				amount,
+				balancing_value,
 				spends,
 				outputs,
 				..Default::default()

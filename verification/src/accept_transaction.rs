@@ -4,6 +4,7 @@ use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner};
 use duplex_store::DuplexTransactionOutputProvider;
 use deployments::BlockDeployments;
+use sapling::accept_sapling;
 use sigops::transaction_sigops;
 use canon::CanonTransaction;
 use constants::{COINBASE_MATURITY};
@@ -15,6 +16,7 @@ pub struct TransactionAcceptor<'a> {
 	pub bip30: TransactionBip30<'a>,
 	pub missing_inputs: TransactionMissingInputs<'a>,
 	pub maturity: TransactionMaturity<'a>,
+	pub sapling_valid: TransactionSaplingValid<'a>,
 	pub overspent: TransactionOverspent<'a>,
 	pub double_spent: TransactionDoubleSpend<'a>,
 	pub eval: TransactionEval<'a>,
@@ -41,6 +43,7 @@ impl<'a> TransactionAcceptor<'a> {
 			bip30: TransactionBip30::new_for_sync(transaction, meta_store),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
+			sapling_valid: TransactionSaplingValid::new(transaction),
 			overspent: TransactionOverspent::new(transaction, output_store),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, deployments),
@@ -52,6 +55,7 @@ impl<'a> TransactionAcceptor<'a> {
 		self.bip30.check()?;
 		self.missing_inputs.check()?;
 		self.maturity.check()?;
+		self.sapling_valid.check()?;
 		self.overspent.check()?;
 		self.double_spent.check()?;
 		self.eval.check()?;
@@ -465,6 +469,29 @@ impl<'a> Nullifiers<'a> {
 			if self.tracker.contains_nullifier(check) {
 				return Err(TransctionError::JoinSplitExists(*check.hash()))
 			}
+		}
+
+		Ok(())
+	}
+}
+
+/// Checks that sapling signatures/proofs are valid.
+pub struct TransactionSaplingValid<'a> {
+	transaction: CanonTransaction<'a>,
+}
+
+impl<'a> TransactionSaplingValid<'a> {
+	fn new(transaction: CanonTransaction<'a>) -> Self {
+		TransactionSaplingValid {
+			transaction: transaction,
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		if let Some(sapling) = self.transaction.raw.sapling.as_ref() {
+			let sighash = Default::default(); // TODO: pass real sighash when ready
+			accept_sapling(&sighash, sapling)
+				.map_err(|_| TransactionError::InvalidSapling)?;
 		}
 
 		Ok(())

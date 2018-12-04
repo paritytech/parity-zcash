@@ -3,7 +3,7 @@ use chain::BlockHeader;
 use primitives::compact::Compact;
 use {
 	BestBlock, BlockProvider, BlockHeaderProvider, TransactionProvider, TransactionMetaProvider,
-	TransactionOutputProvider, BlockChain, IndexedBlockProvider, Forkable, Error
+	TransactionOutputProvider, BlockChain, IndexedBlockProvider, Forkable, Error, NullifierTracker,
 };
 
 pub trait CanonStore: Store + Forkable + ConfigStore {
@@ -32,7 +32,14 @@ pub trait Store: AsSubstore {
 }
 
 /// Allows casting Arc<Store> to reference to any substore type
-pub trait AsSubstore: BlockChain + IndexedBlockProvider + TransactionProvider + TransactionMetaProvider + TransactionOutputProvider {
+pub trait AsSubstore:
+	BlockChain +
+	IndexedBlockProvider +
+	TransactionProvider +
+	TransactionMetaProvider +
+	TransactionOutputProvider +
+	NullifierTracker
+{
 	fn as_block_provider(&self) -> &BlockProvider;
 
 	fn as_block_header_provider(&self) -> &BlockHeaderProvider;
@@ -42,9 +49,18 @@ pub trait AsSubstore: BlockChain + IndexedBlockProvider + TransactionProvider + 
 	fn as_transaction_output_provider(&self) -> &TransactionOutputProvider;
 
 	fn as_transaction_meta_provider(&self) -> &TransactionMetaProvider;
+
+	fn as_nullifier_tracker(&self) -> &NullifierTracker;
 }
 
-impl<T> AsSubstore for T where T: BlockChain + IndexedBlockProvider + TransactionProvider + TransactionMetaProvider + TransactionOutputProvider {
+impl<T> AsSubstore for T
+	where T: BlockChain +
+		IndexedBlockProvider +
+		TransactionProvider +
+		TransactionMetaProvider +
+		TransactionOutputProvider +
+		NullifierTracker
+{
 	fn as_block_provider(&self) -> &BlockProvider {
 		&*self
 	}
@@ -62,6 +78,10 @@ impl<T> AsSubstore for T where T: BlockChain + IndexedBlockProvider + Transactio
 	}
 
 	fn as_transaction_meta_provider(&self) -> &TransactionMetaProvider {
+		&*self
+	}
+
+	fn as_nullifier_tracker(&self) -> &NullifierTracker {
 		&*self
 	}
 }
