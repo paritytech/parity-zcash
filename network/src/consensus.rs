@@ -50,6 +50,7 @@ pub struct ConsensusParams {
 fn mainnet_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
 	use crypto::{G1, G2, Group};
 
+	// TODO: Actually use group elements from ceremony
 	crypto::Pghr13VerifyingKey {
 		a: G2::one(),
 		b: G1::one(),
