@@ -513,8 +513,6 @@ pub struct JoinSplitVerification<'a> {
 	nullifiers: Nullifiers<'a>,
 }
 
-//unsafe impl<'a> Sync for JoinSplitVerification<'a> {}
-
 impl<'a> JoinSplitVerification<'a> {
 	pub fn new(tx_version_group: u32, join_split: &'a chain::JoinSplit, tracker: &'a NullifierTracker)
 		-> Self
