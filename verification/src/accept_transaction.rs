@@ -1,5 +1,5 @@
 use ser::Serializable;
-use storage::{TransactionMetaProvider, TransactionOutputProvider};
+use storage::{TransactionMetaProvider, TransactionOutputProvider, Nullifier, NullifierTag, NullifierTracker};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner};
 use duplex_store::DuplexTransactionOutputProvider;
@@ -441,8 +441,40 @@ impl<'a> JoinSplitProof<'a> {
 	fn new(join_split: &'a chain::JoinSplit) -> Self { JoinSplitProof { join_split: join_split }}
 
 	fn check(&self) -> Result<(), TransactionError> {
+		/// TODO: Zero-knowledge proof
 		Ok(())
 	}
+}
+
+/// Check if nullifiers are unique
+pub struct Nullifiers<'a> {
+	tag: NullifierTag,
+	tracker: &'a NullifierTracker,
+	nullifiers: &'a [[u8; 32]]
+}
+
+impl<'a> Nullifiers<'a> {
+	fn new(tag: NullifierTag, tracker: &'a NullifierTracker, nullifiers: &'a [[u8; 32]]) -> Self {
+		Nullifiers { tag: tag, tracker: tracker, nullifiers: nullifiers }
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		for nullifier in self.nullifiers {
+			let check = Nullifier::new(self.tag, H256::from(&nullifier[..]));
+
+			if self.tracker.contains_nullifier(check) {
+				return Err(TransctionError::JoinSplitExists(*check.hash()))
+			}
+		}
+
+		Ok(())
+	}
+}
+
+/// Join split verification
+pub struct JoinSplitVerification<'a> {
+	proof: JoinSplitProof<'a>,
+	nullifiers: Nullifiers<'a>
 }
 
 #[cfg(test)]
