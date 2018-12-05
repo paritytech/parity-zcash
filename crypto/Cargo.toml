@@ -7,3 +7,4 @@ authors = ["debris <marek.kotewicz@gmail.com>"]
 rust-crypto = "0.2.36"
 siphasher = "0.1.1"
 primitives = { path = "../primitives" }
+bn = "0.4"

@@ -72,6 +72,10 @@ impl<'a> CanonTransaction<'a> {
 			transaction: transaction,
 		}
 	}
+
+	pub fn join_split(&self) -> Option<&'a chain::JoinSplit> {
+		self.transaction.raw.join_split.as_ref()
+	}
 }
 
 impl<'a> ops::Deref for CanonTransaction<'a> {

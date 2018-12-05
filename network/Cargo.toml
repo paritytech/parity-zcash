@@ -8,4 +8,5 @@ lazy_static = "1.0"
 chain = { path = "../chain" }
 primitives = { path = "../primitives" }
 serialization = { path = "../serialization" }
+bitcrypto = { path = "../crypto" }
 rustc-hex = "2"

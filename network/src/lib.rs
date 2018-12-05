@@ -4,6 +4,7 @@ extern crate lazy_static;
 extern crate chain;
 extern crate primitives;
 extern crate serialization;
+extern crate bitcrypto as crypto;
 extern crate rustc_hex as hex;
 
 mod consensus;

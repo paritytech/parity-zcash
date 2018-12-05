@@ -1,5 +1,5 @@
 use ser::Serializable;
-use storage::{TransactionMetaProvider, TransactionOutputProvider};
+use storage::{TransactionMetaProvider, TransactionOutputProvider, Nullifier, NullifierTag, NullifierTracker};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner};
 use duplex_store::DuplexTransactionOutputProvider;
@@ -7,8 +7,10 @@ use deployments::BlockDeployments;
 use sapling::accept_sapling;
 use sigops::transaction_sigops;
 use canon::CanonTransaction;
-use constants::{COINBASE_MATURITY};
+use constants::COINBASE_MATURITY;
 use error::TransactionError;
+use primitives::hash::H256;
+use chain::SAPLING_TX_VERSION_GROUP_ID;
 use VerificationLevel;
 
 pub struct TransactionAcceptor<'a> {
@@ -20,6 +22,7 @@ pub struct TransactionAcceptor<'a> {
 	pub overspent: TransactionOverspent<'a>,
 	pub double_spent: TransactionDoubleSpend<'a>,
 	pub eval: TransactionEval<'a>,
+	pub join_split: Option<JoinSplitVerification<'a>>,
 }
 
 impl<'a> TransactionAcceptor<'a> {
@@ -29,6 +32,7 @@ impl<'a> TransactionAcceptor<'a> {
 		// previous transaction outputs
 		// in case of block validation, that's database and currently processed block
 		output_store: DuplexTransactionOutputProvider<'a>,
+		nullifier_tracker: &'a NullifierTracker,
 		consensus: &'a ConsensusParams,
 		transaction: CanonTransaction<'a>,
 		verification_level: VerificationLevel,
@@ -47,6 +51,9 @@ impl<'a> TransactionAcceptor<'a> {
 			overspent: TransactionOverspent::new(transaction, output_store),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, deployments),
+			join_split: transaction.join_split().map(|js| {
+				JoinSplitVerification::new(transaction.raw.version_group_id, js, nullifier_tracker)
+			}),
 		}
 	}
 
@@ -436,6 +443,47 @@ impl<'a> TransactionSize<'a> {
 	}
 }
 
+/// Check the joinsplit proof of the transaction
+pub struct JoinSplitProof<'a> {
+	_join_split: &'a chain::JoinSplit,
+}
+
+impl<'a> JoinSplitProof<'a> {
+	fn new(join_split: &'a chain::JoinSplit) -> Self { JoinSplitProof { _join_split: join_split }}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		// TODO: Zero-knowledge proof
+		Ok(())
+	}
+}
+
+/// Check if nullifiers are unique
+pub struct Nullifiers<'a> {
+	tag: NullifierTag,
+	tracker: &'a NullifierTracker,
+	join_split: &'a chain::JoinSplit,
+}
+
+impl<'a> Nullifiers<'a> {
+	fn new(tag: NullifierTag, tracker: &'a NullifierTracker, join_split: &'a chain::JoinSplit) -> Self {
+		Nullifiers { tag: tag, tracker: tracker, join_split: join_split }
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		for description in self.join_split.descriptions.iter() {
+			for nullifier in &description.nullifiers[..] {
+				let check = Nullifier::new(self.tag, H256::from(&nullifier[..]));
+
+				if self.tracker.contains_nullifier(check) {
+					return Err(TransactionError::JoinSplitDeclared(*check.hash()))
+				}
+			}
+		}
+
+		Ok(())
+	}
+}
+
 /// Checks that sapling signatures/proofs are valid.
 pub struct TransactionSaplingValid<'a> {
 	transaction: CanonTransaction<'a>,
@@ -456,6 +504,31 @@ impl<'a> TransactionSaplingValid<'a> {
 		}
 
 		Ok(())
+	}
+}
+
+/// Join split verification
+pub struct JoinSplitVerification<'a> {
+	proof: JoinSplitProof<'a>,
+	nullifiers: Nullifiers<'a>,
+}
+
+impl<'a> JoinSplitVerification<'a> {
+	pub fn new(tx_version_group: u32, join_split: &'a chain::JoinSplit, tracker: &'a NullifierTracker)
+		-> Self
+	{
+		let tag = if tx_version_group == SAPLING_TX_VERSION_GROUP_ID
+			{ NullifierTag::Sapling } else { NullifierTag::Sprout };
+
+		JoinSplitVerification {
+			proof: JoinSplitProof::new(join_split),
+			nullifiers: Nullifiers::new(tag, tracker, join_split),
+		}
+	}
+
+	pub fn check(&self) -> Result<(), TransactionError> {
+		self.proof.check()?;
+		self.nullifiers.check()
 	}
 }
 

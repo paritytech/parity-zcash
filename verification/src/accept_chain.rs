@@ -31,6 +31,7 @@ impl<'a> ChainAcceptor<'a> {
 				.map(|(tx_index, tx)| TransactionAcceptor::new(
 						store.as_transaction_meta_provider(),
 						output_store,
+						store.as_nullifier_tracker(),
 						consensus,
 						tx,
 						verification_level,
