@@ -2,6 +2,9 @@ extern crate blake2_rfc;
 extern crate crypto as rcrypto;
 extern crate primitives;
 extern crate siphasher;
+extern crate bn;
+
+mod pghr13;
 
 pub use rcrypto::digest::Digest;
 pub use blake2_rfc::blake2b::Blake2b;
@@ -12,6 +15,11 @@ use rcrypto::sha2::Sha256;
 use rcrypto::ripemd160::Ripemd160;
 use siphasher::sip::SipHasher24;
 use primitives::hash::{H32, H160, H256};
+
+pub use pghr13::{
+	VerifyingKey as Pghr13VerifyingKey, Proof as Pghr13Proof, verify as pghr13_verify,
+	G1, G2, Fr, Group,
+};
 
 pub struct DHash160 {
 	sha256: Sha256,

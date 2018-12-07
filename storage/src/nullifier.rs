@@ -20,7 +20,7 @@ pub struct Nullifier {
 }
 
 /// Trait to query existing nullifier.
-pub trait NullifierTracker {
+pub trait NullifierTracker : Sync {
     fn contains_nullifier(&self, nullifier: Nullifier) -> bool;
 }
 

@@ -125,10 +125,13 @@ pub enum TransactionError {
 	/// Transaction has duplicate inputs. Inputs indexes are provided.
 	DuplicateInput(usize, usize),
 	/// Transaction has join split descriptions with duplicate nullifiers.
+	///
 	/// Join split descriptions indexes are provided.
 	DuplicateJoinSplitNullifier(usize, usize),
 	/// Transaction has sapling spends with duplicate nullifiers. Sapling spends indexes are provided.
 	DuplicateSaplingSpendNullifier(usize, usize),
+	/// Join split already declared earlier in the chain.
+	JoinSplitDeclared(H256),
 	/// Transaction sapling verification has failed.
 	InvalidSapling,
 }

@@ -8,3 +8,4 @@ blake2-rfc = { git = "https://github.com/gtank/blake2-rfc.git", branch = "person
 rust-crypto = "0.2.36"
 siphasher = "0.1.1"
 primitives = { path = "../primitives" }
+bn = "0.4"
