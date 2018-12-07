@@ -5,8 +5,13 @@ authors = ["debris <marek.kotewicz@gmail.com>"]
 
 [dependencies]
 bitcrypto = { path = "../crypto" }
+byteorder = "1.0"
 chain = { path = "../chain" }
 keys = { path = "../keys" }
 primitives = { path = "../primitives" }
 serialization = { path = "../serialization" }
 log = "0.4"
+
+[dev-dependencies]
+rustc-hex = "2"
+serde_json = "1.0"

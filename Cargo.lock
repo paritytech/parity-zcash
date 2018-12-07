@@ -116,6 +116,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "bitcrypto"
 version = "0.1.0"
 dependencies = [
+ "blake2-rfc 0.2.18 (git+https://github.com/gtank/blake2-rfc.git?branch=persona)",
  "bn 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "primitives 0.1.0",
  "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1175,10 +1176,13 @@ name = "script"
 version = "0.1.0"
 dependencies = [
  "bitcrypto 0.1.0",
+ "byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "chain 0.1.0",
  "keys 0.1.0",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "primitives 0.1.0",
+ "rustc-hex 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serialization 0.1.0",
 ]
 
@@ -1542,7 +1546,6 @@ version = "0.1.0"
 dependencies = [
  "bellman 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitcrypto 0.1.0",
- "blake2-rfc 0.2.18 (git+https://github.com/gtank/blake2-rfc.git?branch=persona)",
  "byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "chain 0.1.0",
  "db 0.1.0",

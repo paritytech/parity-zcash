@@ -3,7 +3,7 @@ use chain::constants::{
 	SEQUENCE_FINAL, SEQUENCE_LOCKTIME_DISABLE_FLAG,
 	SEQUENCE_LOCKTIME_MASK, SEQUENCE_LOCKTIME_TYPE_FLAG, LOCKTIME_THRESHOLD
 };
-use {Script, TransactionInputSigner, Num};
+use {Script, SighashCache, TransactionInputSigner, Num};
 
 /// Checks transaction signature
 pub trait SignatureChecker {
@@ -15,7 +15,7 @@ pub trait SignatureChecker {
 	) -> bool;
 
 	fn check_signature(
-		&self,
+		&mut self,
 		signature: &Signature,
 		public: &Public,
 		script_code: &Script,
@@ -34,7 +34,7 @@ impl SignatureChecker for NoopSignatureChecker {
 		public.verify(hash, signature).unwrap_or(false)
 	}
 
-	fn check_signature(&self, _: &Signature, _: &Public, _: &Script, _: u32) -> bool {
+	fn check_signature(&mut self, _: &Signature, _: &Public, _: &Script, _: u32) -> bool {
 		false
 	}
 
@@ -52,6 +52,8 @@ pub struct TransactionSignatureChecker {
 	pub signer: TransactionInputSigner,
 	pub input_index: usize,
 	pub input_amount: u64,
+	pub consensus_branch_id: u32,
+	pub cache: Option<SighashCache>,
 }
 
 impl SignatureChecker for TransactionSignatureChecker {
@@ -65,13 +67,20 @@ impl SignatureChecker for TransactionSignatureChecker {
 	}
 
 	fn check_signature(
-		&self,
+		&mut self,
 		signature: &Signature,
 		public: &Public,
 		script_code: &Script,
 		sighashtype: u32,
 	) -> bool {
-		let hash = self.signer.signature_hash(self.input_index, script_code, sighashtype);
+		let hash = self.signer.signature_hash(
+			&mut self.cache,
+			Some(self.input_index),
+			self.input_amount,
+			script_code,
+			sighashtype,
+			self.consensus_branch_id,
+		);
 		self.verify_signature(signature, public, &hash)
 	}
 

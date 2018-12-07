@@ -297,6 +297,7 @@ pub struct TransactionEval<'a> {
 	verify_magnetic_anomaly_opcodes: bool,
 	verify_sigpushonly: bool,
 	verify_cleanstack: bool,
+	consensus_branch_id: u32,
 }
 
 impl<'a> TransactionEval<'a> {
@@ -320,6 +321,8 @@ impl<'a> TransactionEval<'a> {
 		let verify_sigpushonly = verify_magnetic_anomaly_opcodes;
 		let verify_cleanstack = verify_magnetic_anomaly_opcodes;
 
+		let consensus_branch_id = params.consensus_branch_id(height);
+
 		TransactionEval {
 			transaction: transaction,
 			store: store,
@@ -334,6 +337,7 @@ impl<'a> TransactionEval<'a> {
 			verify_magnetic_anomaly_opcodes: verify_magnetic_anomaly_opcodes,
 			verify_sigpushonly: verify_sigpushonly,
 			verify_cleanstack: verify_cleanstack,
+			consensus_branch_id: consensus_branch_id,
 		}
 	}
 
@@ -353,6 +357,8 @@ impl<'a> TransactionEval<'a> {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
+			consensus_branch_id: self.consensus_branch_id,
+			cache: None,
 		};
 
 		for (index, input) in self.transaction.raw.inputs.iter().enumerate() {
@@ -385,7 +391,7 @@ impl<'a> TransactionEval<'a> {
 				.verify_sigpushonly(self.verify_sigpushonly)
 				.verify_cleanstack(self.verify_cleanstack);
 
-			verify_script(&input, &output, &flags, &checker)
+			verify_script(&input, &output, &flags, &mut checker)
 				.map_err(|e| TransactionError::Signature(index, e))?;
 		}
 
@@ -555,14 +561,16 @@ mod tests {
 
 		let signer: TransactionInputSigner = spending_tx.into();
 
-		let checker = TransactionSignatureChecker {
+		let mut checker = TransactionSignatureChecker {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
+			consensus_branch_id: 0,
+			cache: None,
 		};
 
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input_script, &output_script, &flags, &checker), Ok(()));
+		assert_eq!(verify_script(&input_script, &output_script, &flags, &mut checker), Ok(()));
 	}
 }

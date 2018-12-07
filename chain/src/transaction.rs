@@ -120,6 +120,15 @@ impl HeapSizeOf for Transaction {
 }
 
 impl Transaction {
+	/// Returns version as it is serialized (including overwintered flag).
+	pub fn serialized_version(&self) -> u32 {
+		let mut version = self.version as u32;
+		if self.overwintered {
+			version = version | 0x80000000;
+		}
+		version
+	}
+
 	pub fn hash(&self) -> H256 {
 		dhash256(&serialize(self))
 	}
@@ -205,12 +214,7 @@ impl Deserializable for TransactionInput {
 
 impl Serializable for Transaction {
 	fn serialize(&self, stream: &mut Stream) {
-		let mut version = self.version as u32;
-		if self.overwintered {
-			version = version | 0x80000000;
-		}
-		stream.append(&version);
-
+		stream.append(&self.serialized_version());
 		if self.overwintered {
 			stream.append(&self.version_group_id);
 		}
@@ -229,7 +233,9 @@ impl Serializable for Transaction {
 				.append_list(&sapling.outputs);
 		}
 
-		serialize_join_split(stream, &self.join_split);
+		if self.version >= SPROUT_TX_VERSION {
+			serialize_join_split(stream, &self.join_split);
+		}
 
 		if let Some(sapling) = self.sapling.as_ref() {
 			if !sapling.spends.is_empty() || !sapling.outputs.is_empty() {

@@ -252,4 +252,19 @@ impl ConsensusParams {
 	pub fn transaction_expiry_height_threshold(&self) -> u32 {
 		500_000_000
 	}
+
+	pub fn consensus_branch_id(&self, height: u32) -> u32 {
+		// sapling upgrade
+		if height >= self.sapling_height {
+			return 0x76b809bb;
+		}
+
+		// overwinter upgrade
+		if height >= self.overwinter_height {
+			return 0x5ba81b19;
+		}
+
+		// sprout
+		0
+	}
 }
