@@ -151,6 +151,7 @@ impl TransactionInputSigner {
 	/// Pass None as input_index to compute transparent input signature
 	pub fn signature_hash(
 		&self,
+		cache: &mut Option<SighashCache>,
 		input_index: Option<usize>,
 		input_amount: u64,
 		script_pubkey: &Script,
@@ -162,6 +163,7 @@ impl TransactionInputSigner {
 		match signature_version {
 			SignatureVersion::Sprout => self.signature_hash_sprout(input_index, script_pubkey, sighashtype, sighash),
 			SignatureVersion::Overwinter | SignatureVersion::Sapling => self.signature_hash_post_overwinter(
+				cache,
 				input_index,
 				input_amount,
 				script_pubkey,
@@ -246,6 +248,7 @@ impl TransactionInputSigner {
 	/// Overwinter/sapling version of the signature.
 	fn signature_hash_post_overwinter(
 		&self,
+		cache: &mut Option<SighashCache>,
 		input_index: Option<usize>,
 		input_amount: u64,
 		script_pubkey: &Script,
@@ -254,20 +257,36 @@ impl TransactionInputSigner {
 		consensus_branch_id: u32,
 		sapling: bool,
 	) -> H256 {
-		let hash_prevouts = compute_hash_prevouts(sighash, &self.inputs);
-		let hash_sequence = compute_hash_sequence(sighash, &self.inputs);
-		let hash_outputs = compute_hash_outputs(sighash, input_index, &self.outputs);
-		let hash_join_split = compute_hash_join_split(self.join_split.as_ref());
+		// compute signature portions that can be reused for other inputs
+		let hash_prevouts = cache.as_ref().map(|c| c.hash_prevouts)
+			.unwrap_or_else(|| compute_hash_prevouts(sighash, &self.inputs));
+		let hash_sequence = cache.as_ref().map(|c| c.hash_sequence)
+			.unwrap_or_else(|| compute_hash_sequence(sighash, &self.inputs));
+		let hash_outputs = compute_hash_outputs(cache, sighash, input_index, &self.outputs);
+		let hash_join_split = cache.as_ref().map(|c| c.hash_join_split)
+			.unwrap_or_else(|| compute_hash_join_split(self.join_split.as_ref()));
 		let hash_sapling_spends = if sapling {
-			compute_hash_sapling_spends(self.sapling.as_ref())
+			cache.as_ref().map(|c| c.hash_sapling_spends)
+				.unwrap_or_else(|| compute_hash_sapling_spends(self.sapling.as_ref()))
 		} else {
-			Default::default()
+			0u8.into()
 		};
 		let hash_sapling_outputs = if sapling {
-			compute_hash_sapling_outputs(self.sapling.as_ref())
+			cache.as_ref().map(|c| c.hash_sapling_spends)
+				.unwrap_or_else(|| compute_hash_sapling_outputs(self.sapling.as_ref()))
 		} else {
-			Default::default()
+			0u8.into()
 		};
+
+		// update cache
+		*cache = Some(SighashCache {
+			hash_prevouts,
+			hash_sequence,
+			hash_outputs,
+			hash_join_split,
+			hash_sapling_spends,
+			hash_sapling_outputs,
+		});
 
 		let mut personalization = [0u8; 16];
 		personalization[..12].copy_from_slice(b"ZcashSigHash");
@@ -352,16 +371,24 @@ fn compute_hash_sequence(sighash: Sighash, inputs: &[UnsignedTransactionInput]) 
 	}
 }
 
-fn compute_hash_outputs(sighash: Sighash, input_index: Option<usize>, outputs: &[TransactionOutput]) -> H256 {
+fn compute_hash_outputs(
+	cache: &mut Option<SighashCache>,
+	sighash: Sighash,
+	input_index: Option<usize>,
+	outputs: &[TransactionOutput]
+) -> H256 {
 	const PERSONALIZATION: &'static [u8; 16] = b"ZcashOutputsHash";
 
 	match (sighash.base, input_index) {
 		(SighashBase::All, _) => {
-			let mut stream = Stream::default();
-			for output in outputs {
-				stream.append(output);
-			}
-			blake2b_personal(PERSONALIZATION, &stream.out())
+			cache.as_ref().map(|c| c.hash_outputs)
+				.unwrap_or_else(|| {
+					let mut stream = Stream::default();
+					for output in outputs {
+						stream.append(output);
+					}
+					blake2b_personal(PERSONALIZATION, &stream.out())
+				})
 		},
 		(SighashBase::Single, Some(input_index)) if input_index < outputs.len() => {
 			let mut stream = Stream::default();
@@ -479,7 +506,8 @@ mod tests {
 			sapling: None,
 		};
 
-		let hash = input_signer.signature_hash(Some(0), 0, &previous_output, SighashBase::All.into(), 0);
+		let mut cache = None;
+		let hash = input_signer.signature_hash(&mut cache, Some(0), 0, &previous_output, SighashBase::All.into(), 0);
 		assert_eq!(hash, expected_signature_hash);
 	}
 
@@ -508,8 +536,9 @@ mod tests {
 		let expected: H256 = result.parse().unwrap();
 		let expected = expected.reversed();
 
+		let mut cache = None;
 		let input_index = if input_index as u64 == ::std::u64::MAX { None } else { Some(input_index) };
-		let hash = signer.signature_hash(input_index, 0, &script, hash_type as u32, consensus_branch_id);
+		let hash = signer.signature_hash(&mut cache, input_index, 0, &script, hash_type as u32, consensus_branch_id);
 		if expected != hash {
 			panic!("Test#{} of {:?} sighash failed: expected {}, got {}", idx, signer.signature_version(), expected, hash);
 		} else {

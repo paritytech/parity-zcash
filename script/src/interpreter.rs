@@ -11,7 +11,7 @@ use {
 
 /// Helper function.
 fn check_signature(
-	checker: &SignatureChecker,
+	checker: &mut SignatureChecker,
 	mut script_sig: Vec<u8>,
 	public: Vec<u8>,
 	script_code: &Script,
@@ -33,7 +33,7 @@ fn check_signature(
 
 /// Helper function.
 fn verify_signature(
-	checker: &SignatureChecker,
+	checker: &mut SignatureChecker,
 	signature: Vec<u8>,
 	public: Vec<u8>,
 	message: Message,
@@ -249,7 +249,7 @@ pub fn verify_script(
 	script_sig: &Script,
 	script_pubkey: &Script,
 	flags: &VerificationFlags,
-	checker: &SignatureChecker,
+	checker: &mut SignatureChecker,
 ) -> Result<(), Error> {
 	if flags.verify_sigpushonly && !script_sig.is_push_only() {
 		return Err(Error::SignaturePushOnly);
@@ -311,7 +311,7 @@ pub fn eval_script(
 	stack: &mut Stack<Bytes>,
 	script: &Script,
 	flags: &VerificationFlags,
-	checker: &SignatureChecker,
+	checker: &mut SignatureChecker,
 ) -> Result<bool, Error> {
 	if script.len() > script::MAX_SCRIPT_SIZE {
 		return Err(Error::ScriptSize);
@@ -1055,7 +1055,7 @@ mod tests {
 		let expected: Stack<Bytes> = vec![vec![0x5a].into()].into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		let checker = NoopSignatureChecker;
+		let mut checker = NoopSignatureChecker;
 		let direct: Script = vec![Opcode::OP_PUSHBYTES_1 as u8, 0x5a].into();
 		let pushdata1: Script = vec![Opcode::OP_PUSHDATA1 as u8, 0x1, 0x5a].into();
 		let pushdata2: Script = vec![Opcode::OP_PUSHDATA2 as u8, 0x1, 0, 0x5a].into();
@@ -1065,10 +1065,10 @@ mod tests {
 		let mut pushdata1_stack = Stack::new();
 		let mut pushdata2_stack = Stack::new();
 		let mut pushdata4_stack = Stack::new();
-		assert!(eval_script(&mut direct_stack, &direct, &flags, &checker).unwrap());
-		assert!(eval_script(&mut pushdata1_stack, &pushdata1, &flags, &checker).unwrap());
-		assert!(eval_script(&mut pushdata2_stack, &pushdata2, &flags, &checker).unwrap());
-		assert!(eval_script(&mut pushdata4_stack, &pushdata4, &flags, &checker).unwrap());
+		assert!(eval_script(&mut direct_stack, &direct, &flags, &mut checker).unwrap());
+		assert!(eval_script(&mut pushdata1_stack, &pushdata1, &flags, &mut checker).unwrap());
+		assert!(eval_script(&mut pushdata2_stack, &pushdata2, &flags, &mut checker).unwrap());
+		assert!(eval_script(&mut pushdata4_stack, &pushdata4, &flags, &mut checker).unwrap());
 
 		assert_eq!(direct_stack, expected);
 		assert_eq!(pushdata1_stack, expected);
@@ -1077,9 +1077,9 @@ mod tests {
 	}
 
 	fn basic_test_with_flags(script: &Script, flags: &VerificationFlags, expected: Result<bool, Error>, expected_stack: Stack<Bytes>) {
-		let checker = NoopSignatureChecker;
+		let mut checker = NoopSignatureChecker;
 		let mut stack = Stack::new();
-		assert_eq!(eval_script(&mut stack, script, &flags, &checker), expected);
+		assert_eq!(eval_script(&mut stack, script, &flags, &mut checker), expected);
 		if expected.is_ok() {
 			assert_eq!(stack, expected_stack);
 		}
@@ -1977,17 +1977,18 @@ mod tests {
 	fn test_check_transaction_signature() {
 		let tx: Transaction = "0100000001484d40d45b9ea0d652fca8258ab7caa42541eb52975857f96fb50cd732c8b481000000008a47304402202cb265bf10707bf49346c3515dd3d16fc454618c58ec0a0ff448a676c54ff71302206c6624d762a1fcef4618284ead8f08678ac05b13c84235f1654e6ad168233e8201410414e301b2328f17442c0b8310d787bf3d8a404cfbd0704f135b6ad4b2d3ee751310f981926e53a6e8c39bd7d3fefd576c543cce493cbac06388f2651d1aacbfcdffffffff0162640100000000001976a914c8e90996c7c6080ee06284600c684ed904d14c5c88ac00000000".into();
 		let signer: TransactionInputSigner = tx.into();
-		let checker = TransactionSignatureChecker {
+		let mut checker = TransactionSignatureChecker {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: 0,
+			cache: None,
 		};
 		let input: Script = "47304402202cb265bf10707bf49346c3515dd3d16fc454618c58ec0a0ff448a676c54ff71302206c6624d762a1fcef4618284ead8f08678ac05b13c84235f1654e6ad168233e8201410414e301b2328f17442c0b8310d787bf3d8a404cfbd0704f135b6ad4b2d3ee751310f981926e53a6e8c39bd7d3fefd576c543cce493cbac06388f2651d1aacbfcd".into();
 		let output: Script = "76a914df3bd30160e6c6145baaf2c88a8844c13a00d1d588ac".into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &mut checker), Ok(()));
 	}
 
 	// https://blockchain.info/rawtx/02b082113e35d5386285094c2829e7e2963fa0b5369fb7f4b79c4c90877dcd3d
@@ -1995,17 +1996,18 @@ mod tests {
 	fn test_check_transaction_multisig() {
 		let tx: Transaction = "01000000013dcd7d87904c9cb7f4b79f36b5a03f96e2e729284c09856238d5353e1182b00200000000fd5e0100483045022100deeb1f13b5927b5e32d877f3c42a4b028e2e0ce5010fdb4e7f7b5e2921c1dcd2022068631cb285e8c1be9f061d2968a18c3163b780656f30a049effee640e80d9bff01483045022100ee80e164622c64507d243bd949217d666d8b16486e153ac6a1f8e04c351b71a502203691bef46236ca2b4f5e60a82a853a33d6712d6a1e7bf9a65e575aeb7328db8c014cc9524104a882d414e478039cd5b52a92ffb13dd5e6bd4515497439dffd691a0f12af9575fa349b5694ed3155b136f09e63975a1700c9f4d4df849323dac06cf3bd6458cd41046ce31db9bdd543e72fe3039a1f1c047dab87037c36a669ff90e28da1848f640de68c2fe913d363a51154a0c62d7adea1b822d05035077418267b1a1379790187410411ffd36c70776538d079fbae117dc38effafb33304af83ce4894589747aee1ef992f63280567f52f5ba870678b4ab4ff6c8ea600bd217870a8b4f1f09f3a8e8353aeffffffff0130d90000000000001976a914569076ba39fc4ff6a2291d9ea9196d8c08f9c7ab88ac00000000".into();
 		let signer: TransactionInputSigner = tx.into();
-		let checker = TransactionSignatureChecker {
+		let mut checker = TransactionSignatureChecker {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: 0,
+			cache: None,
 		};
 		let input: Script = "00483045022100deeb1f13b5927b5e32d877f3c42a4b028e2e0ce5010fdb4e7f7b5e2921c1dcd2022068631cb285e8c1be9f061d2968a18c3163b780656f30a049effee640e80d9bff01483045022100ee80e164622c64507d243bd949217d666d8b16486e153ac6a1f8e04c351b71a502203691bef46236ca2b4f5e60a82a853a33d6712d6a1e7bf9a65e575aeb7328db8c014cc9524104a882d414e478039cd5b52a92ffb13dd5e6bd4515497439dffd691a0f12af9575fa349b5694ed3155b136f09e63975a1700c9f4d4df849323dac06cf3bd6458cd41046ce31db9bdd543e72fe3039a1f1c047dab87037c36a669ff90e28da1848f640de68c2fe913d363a51154a0c62d7adea1b822d05035077418267b1a1379790187410411ffd36c70776538d079fbae117dc38effafb33304af83ce4894589747aee1ef992f63280567f52f5ba870678b4ab4ff6c8ea600bd217870a8b4f1f09f3a8e8353ae".into();
 		let output: Script = "a9141a8b0026343166625c7475f01e48b5ede8c0252e87".into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &mut checker), Ok(()));
 	}
 
 	// https://blockchain.info/en/tx/12b5633bad1f9c167d523ad1aa1947b2732a865bf5414eab2f9e5ae5d5c191ba?show_adv=true
@@ -2013,17 +2015,18 @@ mod tests {
 	fn test_transaction_with_high_s_signature() {
 		let tx: Transaction = "010000000173805864da01f15093f7837607ab8be7c3705e29a9d4a12c9116d709f8911e590100000049483045022052ffc1929a2d8bd365c6a2a4e3421711b4b1e1b8781698ca9075807b4227abcb0221009984107ddb9e3813782b095d0d84361ed4c76e5edaf6561d252ae162c2341cfb01ffffffff0200e1f50500000000434104baa9d36653155627c740b3409a734d4eaf5dcca9fb4f736622ee18efcf0aec2b758b2ec40db18fbae708f691edb2d4a2a3775eb413d16e2e3c0f8d4c69119fd1ac009ce4a60000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000".into();
 		let signer: TransactionInputSigner = tx.into();
-		let checker = TransactionSignatureChecker {
+		let mut checker = TransactionSignatureChecker {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: 0,
+			cache: None,
 		};
 		let input: Script = "483045022052ffc1929a2d8bd365c6a2a4e3421711b4b1e1b8781698ca9075807b4227abcb0221009984107ddb9e3813782b095d0d84361ed4c76e5edaf6561d252ae162c2341cfb01".into();
 		let output: Script = "410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac".into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &mut checker), Ok(()));
 	}
 
 	// https://blockchain.info/rawtx/fb0a1d8d34fa5537e461ac384bac761125e1bfa7fec286fa72511240fa66864d
@@ -2031,17 +2034,18 @@ mod tests {
 	fn test_transaction_from_124276() {
 		let tx: Transaction = "01000000012316aac445c13ff31af5f3d1e2cebcada83e54ba10d15e01f49ec28bddc285aa000000008e4b3048022200002b83d59c1d23c08efd82ee0662fec23309c3adbcbd1f0b8695378db4b14e736602220000334a96676e58b1bb01784cb7c556dd8ce1c220171904da22e18fe1e7d1510db5014104d0fe07ff74c9ef5b00fed1104fad43ecf72dbab9e60733e4f56eacf24b20cf3b8cd945bcabcc73ba0158bf9ce769d43e94bd58c5c7e331a188922b3fe9ca1f5affffffff01c0c62d00000000001976a9147a2a3b481ca80c4ba7939c54d9278e50189d94f988ac00000000".into();
 		let signer: TransactionInputSigner = tx.into();
-		let checker = TransactionSignatureChecker {
+		let mut checker = TransactionSignatureChecker {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: 0,
+			cache: None,
 		};
 		let input: Script = "4b3048022200002b83d59c1d23c08efd82ee0662fec23309c3adbcbd1f0b8695378db4b14e736602220000334a96676e58b1bb01784cb7c556dd8ce1c220171904da22e18fe1e7d1510db5014104d0fe07ff74c9ef5b00fed1104fad43ecf72dbab9e60733e4f56eacf24b20cf3b8cd945bcabcc73ba0158bf9ce769d43e94bd58c5c7e331a188922b3fe9ca1f5a".into();
 		let output: Script = "76a9147a2a3b481ca80c4ba7939c54d9278e50189d94f988ac".into();
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &mut checker), Ok(()));
 	}
 
 	// https://blockchain.info/rawtx/54fabd73f1d20c980a0686bf0035078e07f69c58437e4d586fb29aa0bee9814f
@@ -2049,16 +2053,17 @@ mod tests {
 	fn test_arithmetic_correct_arguments_order() {
 		let tx: Transaction = "01000000010c0e314bd7bb14721b3cfd8e487cd6866173354f87ca2cf4d13c8d3feb4301a6000000004a483045022100d92e4b61452d91a473a43cde4b469a472467c0ba0cbd5ebba0834e4f4762810402204802b76b7783db57ac1f61d2992799810e173e91055938750815b6d8a675902e014fffffffff0140548900000000001976a914a86e8ee2a05a44613904e18132e49b2448adc4e688ac00000000".into();
 		let signer: TransactionInputSigner = tx.into();
-		let checker = TransactionSignatureChecker {
+		let mut checker = TransactionSignatureChecker {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: 0,
+			cache: None,
 		};
 		let input: Script = "483045022100d92e4b61452d91a473a43cde4b469a472467c0ba0cbd5ebba0834e4f4762810402204802b76b7783db57ac1f61d2992799810e173e91055938750815b6d8a675902e014f".into();
 		let output: Script = "76009f69905160a56b210378d430274f8c5ec1321338151e9f27f4c676a008bdf8638d07c0b6be9ab35c71ad6c".into();
 		let flags = VerificationFlags::default();
-		assert_eq!(verify_script(&input, &output, &flags, &checker), Ok(()));
+		assert_eq!(verify_script(&input, &output, &flags, &mut checker), Ok(()));
 	}
 
 	#[test]

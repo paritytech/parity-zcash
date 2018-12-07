@@ -358,6 +358,7 @@ impl<'a> TransactionEval<'a> {
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: self.consensus_branch_id,
+			cache: None,
 		};
 
 		for (index, input) in self.transaction.raw.inputs.iter().enumerate() {
@@ -390,7 +391,7 @@ impl<'a> TransactionEval<'a> {
 				.verify_sigpushonly(self.verify_sigpushonly)
 				.verify_cleanstack(self.verify_cleanstack);
 
-			verify_script(&input, &output, &flags, &checker)
+			verify_script(&input, &output, &flags, &mut checker)
 				.map_err(|e| TransactionError::Signature(index, e))?;
 		}
 
@@ -560,15 +561,16 @@ mod tests {
 
 		let signer: TransactionInputSigner = spending_tx.into();
 
-		let checker = TransactionSignatureChecker {
+		let mut checker = TransactionSignatureChecker {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: 0,
+			cache: None,
 		};
 
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
-		assert_eq!(verify_script(&input_script, &output_script, &flags, &checker), Ok(()));
+		assert_eq!(verify_script(&input_script, &output_script, &flags, &mut checker), Ok(()));
 	}
 }
