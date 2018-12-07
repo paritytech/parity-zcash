@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["debris <marek.kotewicz@gmail.com>"]
 
 [dependencies]
+blake2-rfc = { git = "https://github.com/gtank/blake2-rfc.git", branch = "persona" }
 rust-crypto = "0.2.36"
 siphasher = "0.1.1"
 primitives = { path = "../primitives" }

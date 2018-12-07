@@ -1,8 +1,11 @@
+extern crate blake2_rfc;
 extern crate crypto as rcrypto;
 extern crate primitives;
 extern crate siphasher;
 
 pub use rcrypto::digest::Digest;
+pub use blake2_rfc::blake2b::Blake2b;
+
 use std::hash::Hasher;
 use rcrypto::sha1::Sha1;
 use rcrypto::sha2::Sha256;
@@ -161,6 +164,14 @@ pub fn siphash24(key0: u64, key1: u64, input: &[u8]) -> u64 {
 	let mut hasher = SipHasher24::new_with_keys(key0, key1);
 	hasher.write(input);
 	hasher.finish()
+}
+
+/// Blake2b with personalization.
+#[inline]
+pub fn blake2b_personal(personalization: &[u8], input: &[u8]) -> H256 {
+	let mut hasher = Blake2b::with_params(32, &[], &[], personalization);
+	hasher.update(input);
+	hasher.finalize().as_bytes().into()
 }
 
 /// Data checksum

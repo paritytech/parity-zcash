@@ -290,6 +290,7 @@ pub struct TransactionEval<'a> {
 	verify_magnetic_anomaly_opcodes: bool,
 	verify_sigpushonly: bool,
 	verify_cleanstack: bool,
+	consensus_branch_id: u32,
 }
 
 impl<'a> TransactionEval<'a> {
@@ -313,6 +314,8 @@ impl<'a> TransactionEval<'a> {
 		let verify_sigpushonly = verify_magnetic_anomaly_opcodes;
 		let verify_cleanstack = verify_magnetic_anomaly_opcodes;
 
+		let consensus_branch_id = params.consensus_branch_id(height);
+
 		TransactionEval {
 			transaction: transaction,
 			store: store,
@@ -327,6 +330,7 @@ impl<'a> TransactionEval<'a> {
 			verify_magnetic_anomaly_opcodes: verify_magnetic_anomaly_opcodes,
 			verify_sigpushonly: verify_sigpushonly,
 			verify_cleanstack: verify_cleanstack,
+			consensus_branch_id: consensus_branch_id,
 		}
 	}
 
@@ -346,6 +350,7 @@ impl<'a> TransactionEval<'a> {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
+			consensus_branch_id: self.consensus_branch_id,
 		};
 
 		for (index, input) in self.transaction.raw.inputs.iter().enumerate() {
@@ -486,6 +491,7 @@ mod tests {
 			signer: signer,
 			input_index: 0,
 			input_amount: 0,
+			consensus_branch_id: 0,
 		};
 
 		let flags = VerificationFlags::default()

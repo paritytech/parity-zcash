@@ -1,9 +1,15 @@
 extern crate log;
 extern crate bitcrypto as crypto;
+extern crate byteorder;
 extern crate chain;
 extern crate keys;
 extern crate primitives;
 extern crate serialization as ser;
+
+#[cfg(test)]
+extern crate serde_json;
+#[cfg(test)]
+extern crate rustc_hex as hex;
 
 mod builder;
 mod error;

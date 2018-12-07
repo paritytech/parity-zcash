@@ -52,6 +52,7 @@ pub struct TransactionSignatureChecker {
 	pub signer: TransactionInputSigner,
 	pub input_index: usize,
 	pub input_amount: u64,
+	pub consensus_branch_id: u32,
 }
 
 impl SignatureChecker for TransactionSignatureChecker {
@@ -71,7 +72,13 @@ impl SignatureChecker for TransactionSignatureChecker {
 		script_code: &Script,
 		sighashtype: u32,
 	) -> bool {
-		let hash = self.signer.signature_hash(self.input_index, script_code, sighashtype);
+		let hash = self.signer.signature_hash(
+			Some(self.input_index),
+			self.input_amount,
+			script_code,
+			sighashtype,
+			self.consensus_branch_id,
+		);
 		self.verify_signature(signature, public, &hash)
 	}
 

@@ -1,6 +1,6 @@
 // https://github.com/zcash/zcash/commit/fdda3c5085199d2c2170887aa064fc42afdb0360
 
-use blake2_rfc::blake2b::Blake2b;
+use crypto::Blake2b;
 use byteorder::{BigEndian, LittleEndian, ByteOrder};
 use chain::BlockHeader;
 
@@ -54,7 +54,12 @@ pub fn verify_equihash_solution(params: &EquihashParams, input: &[u8], solution:
 		return false;
 	}
 
-	let mut context = new_blake2(params);
+	let mut personalization = [0u8; 16];
+	personalization[0..8].clone_from_slice(b"ZcashPoW");
+	personalization[8..12].clone_from_slice(&to_little_endian(params.n));
+	personalization[12..16].clone_from_slice(&to_little_endian(params.k));
+
+	let mut context = Blake2b::with_params(params.hash_output(), &[], &[], &personalization);
 	context.update(input);
 
 	// pure equihash
@@ -222,14 +227,6 @@ fn expand_array(data: &[u8], bit_len: usize, byte_pad: usize) -> Vec<u8> {
 	}
 
 	array
-}
-
-fn new_blake2(params: &EquihashParams) -> Blake2b {
-	let mut personalization = [0u8; 16];
-	personalization[0..8].clone_from_slice(b"ZcashPoW");
-	personalization[8..12].clone_from_slice(&to_little_endian(params.n));
-	personalization[12..16].clone_from_slice(&to_little_endian(params.k));
-	Blake2b::with_params(params.hash_output(), &[], &[], &personalization)
 }
 
 fn to_little_endian(num: u32) -> [u8; 4] {

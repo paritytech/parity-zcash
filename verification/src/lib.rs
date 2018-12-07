@@ -57,7 +57,6 @@ extern crate log;
 extern crate parking_lot;
 extern crate rayon;
 extern crate bellman;
-extern crate blake2_rfc;
 extern crate byteorder;
 #[macro_use]
 extern crate lazy_static;
