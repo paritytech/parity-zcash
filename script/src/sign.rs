@@ -552,7 +552,7 @@ mod tests {
 	// revision:
 	// https://github.com/zcash/zcash/blob/9cd74866c72857145952bb9e3aa8e0c04a99b711/src/test/data/sighash.json
 	#[test]
-	fn test_sighash_overwinter() {
+	fn test_signature_hash() {
 		let tests = include_bytes!("../data/sighash_tests.json");
 		let tests: Vec<Value> = from_slice(tests).unwrap();
 		for (idx, test) in tests.into_iter().skip(1).enumerate() {
