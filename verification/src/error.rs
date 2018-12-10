@@ -132,6 +132,8 @@ pub enum TransactionError {
 	DuplicateSaplingSpendNullifier(usize, usize),
 	/// Join split already declared earlier in the chain.
 	JoinSplitDeclared(H256),
+	/// Join split is not supported in the transaction version.
+	JoinSplitVersionInvalid,
 	/// Transaction sapling verification has failed.
 	InvalidSapling,
 }

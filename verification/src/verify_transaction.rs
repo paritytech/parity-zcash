@@ -380,6 +380,10 @@ impl<'a> TransactionJoinSplit<'a> {
 
 	fn check(&self) -> Result<(), TransactionError> {
 		if let Some(ref join_split) = self.transaction.raw.join_split {
+			if self.transaction.raw.version == 1 {
+				return Err(TransactionError::JoinSplitVersionInvalid);
+			}
+
 			for desc in &join_split.descriptions {
 				if desc.value_pub_old != 0 && desc.value_pub_new != 0 {
 					return Err(TransactionError::JoinSplitBothPubsNonZero)
