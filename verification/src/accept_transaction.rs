@@ -1,7 +1,7 @@
 use ser::Serializable;
 use storage::{TransactionMetaProvider, TransactionOutputProvider, Nullifier, NullifierTag, NullifierTracker};
 use network::{ConsensusParams};
-use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner};
+use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, SighashBase};
 use duplex_store::DuplexTransactionOutputProvider;
 use deployments::BlockDeployments;
 use sapling::accept_sapling;
@@ -18,11 +18,11 @@ pub struct TransactionAcceptor<'a> {
 	pub bip30: TransactionBip30<'a>,
 	pub missing_inputs: TransactionMissingInputs<'a>,
 	pub maturity: TransactionMaturity<'a>,
-	pub sapling_valid: TransactionSaplingValid<'a>,
 	pub overspent: TransactionOverspent<'a>,
 	pub double_spent: TransactionDoubleSpend<'a>,
 	pub eval: TransactionEval<'a>,
 	pub join_split: Option<JoinSplitVerification<'a>>,
+	pub sapling_valid: TransactionSaplingValid<'a>,
 }
 
 impl<'a> TransactionAcceptor<'a> {
@@ -62,10 +62,14 @@ impl<'a> TransactionAcceptor<'a> {
 		self.bip30.check()?;
 		self.missing_inputs.check()?;
 		self.maturity.check()?;
-		self.sapling_valid.check()?;
 		self.overspent.check()?;
 		self.double_spent.check()?;
-		self.eval.check()?;
+
+		// to make sure we're using the sighash-cache, let's make all sighash-related
+		// calls from single checker && pass sighash to other checkers
+		let sighash = self.eval.check()?;
+		self.sapling_valid.check(sighash)?;
+
 		Ok(())
 	}
 }
@@ -341,16 +345,9 @@ impl<'a> TransactionEval<'a> {
 		}
 	}
 
-	fn check(&self) -> Result<(), TransactionError> {
-		if self.verification_level == VerificationLevel::Header
-			|| self.verification_level == VerificationLevel::NoVerification {
-			return Ok(());
-		}
-
-		if self.transaction.raw.is_coinbase() {
-			return Ok(());
-		}
-
+	/// Returns no-input sighash for transactions that have non-empty JoinSplit
+	/// or non-empty Sapling.
+	fn check(&self) -> Result<H256, TransactionError> {
 		let signer: TransactionInputSigner = self.transaction.raw.clone().into();
 
 		let mut checker = TransactionSignatureChecker {
@@ -360,6 +357,30 @@ impl<'a> TransactionEval<'a> {
 			consensus_branch_id: self.consensus_branch_id,
 			cache: None,
 		};
+
+		// generate sighash that is not associated with a transparent input
+		let require_no_input_sighash = self.transaction.raw.join_split.is_some()
+			|| self.transaction.raw.sapling.is_some();
+		let no_input_sighash = match require_no_input_sighash {
+			true => checker.signer.signature_hash(
+				&mut checker.cache,
+				None,
+				0,
+				&From::from(vec![]),
+				SighashBase::All.into(),
+				checker.consensus_branch_id,
+			),
+			false => Default::default(),
+		};
+
+		if self.verification_level == VerificationLevel::Header
+			|| self.verification_level == VerificationLevel::NoVerification {
+			return Ok(no_input_sighash);
+		}
+
+		if self.transaction.raw.is_coinbase() {
+			return Ok(no_input_sighash);
+		}
 
 		for (index, input) in self.transaction.raw.inputs.iter().enumerate() {
 			let output = self.store.transaction_output(&input.previous_output, usize::max_value())
@@ -395,7 +416,7 @@ impl<'a> TransactionEval<'a> {
 				.map_err(|e| TransactionError::Signature(index, e))?;
 		}
 
-		Ok(())
+		Ok(no_input_sighash)
 	}
 }
 
@@ -502,9 +523,8 @@ impl<'a> TransactionSaplingValid<'a> {
 		}
 	}
 
-	fn check(&self) -> Result<(), TransactionError> {
+	fn check(&self, sighash: H256) -> Result<(), TransactionError> {
 		if let Some(sapling) = self.transaction.raw.sapling.as_ref() {
-			let sighash = Default::default(); // TODO: pass real sighash when ready
 			accept_sapling(&sighash, sapling)
 				.map_err(|_| TransactionError::InvalidSapling)?;
 		}
