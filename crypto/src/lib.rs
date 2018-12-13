@@ -3,8 +3,13 @@ extern crate crypto as rcrypto;
 extern crate primitives;
 extern crate siphasher;
 extern crate bn;
+extern crate serde;
+extern crate rustc_hex as hex;
+
+#[macro_use] extern crate serde_derive;
 
 mod pghr13;
+mod json;
 
 pub use rcrypto::digest::Digest;
 pub use blake2_rfc::blake2b::Blake2b;
