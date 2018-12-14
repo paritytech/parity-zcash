@@ -14,7 +14,7 @@ pub struct VerifyingKey {
 }
 
 impl ::std::fmt::Debug for VerifyingKey {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
 		write!(f, "[Verifying Key: TODO]")
 	}
 }
