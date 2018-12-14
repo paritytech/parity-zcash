@@ -1,5 +1,5 @@
 use hex::FromHex;
-use bn::{self, Group, Fq, AffineG1, Fq2, AffineG2};
+use bn::{self, Fq, AffineG1, Fq2, AffineG2};
 
 use std::fmt;
 
@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for G2 {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub struct VerifyingKey {
 	pub a: G2,
 	pub b: G1,
@@ -114,7 +114,6 @@ pub struct VerifyingKey {
 mod tests {
 
     extern crate serde_json;
-    use serde;
     use super::*;
 
     #[test]
