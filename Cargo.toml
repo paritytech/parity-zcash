@@ -1,5 +1,5 @@
 [package]
-name = "pbtc"
+name = "pzec"
 version = "0.1.0"
 license = "GPL-3.0"
 authors = ["Parity Technologies <admin@parity.io>"]
@@ -39,8 +39,8 @@ panic = 'abort'
 debug = true
 
 [[bin]]
-path = "pbtc/main.rs"
-name = "pbtc"
+path = "pzec/main.rs"
+name = "pzec"
 
 [workspace]
 members = ["bencher"]
