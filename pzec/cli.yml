@@ -1,7 +1,7 @@
-name: pbtc
+name: pzec
 version: "0.1.0"
 author: Parity Technologies <info@parity.io>
-about: Parity zcash client
+about: Parity Zcash client
 args:
     - testnet:
         long: testnet
