@@ -46,7 +46,7 @@ impl BlockNotifier {
 
 						let err = system(c_command.as_ptr());
 						if err != 0 {
-							error!(target: "pbtc", "Block notification command {} exited with error code {}", command, err);
+							error!(target: "pzec", "Block notification command {} exited with error code {}", command, err);
 						}
 					}
 				},
@@ -55,7 +55,7 @@ impl BlockNotifier {
 				}
 			}
 		}
-		trace!(target: "pbtc", "Block notification thread stopped");
+		trace!(target: "pzec", "Block notification thread stopped");
 	}
 }
 

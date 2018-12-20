@@ -9,7 +9,7 @@ cargo doc --no-deps\
 	-p message\
 	-p miner\
 	-p network\
-	-p pbtc\
+	-p pzec\
 	-p p2p\
 	-p primitives\
 	-p rpc\
