@@ -4,14 +4,15 @@ version = "0.1.0"
 authors = ["debris <marek.kotewicz@gmail.com>"]
 
 [dependencies]
-blake2-rfc = { git = "https://github.com/gtank/blake2-rfc.git", branch = "persona" }
+bellman = "0.1"
+blake2-rfc = { git = "https://github.com/gtank/blake2-rfc.git", rev = "7a5b5fc99ae483a0043db7547fb79a6fa44b88a9" }
+pairing = "0.14.2"
 rust-crypto = "0.2.36"
+sapling-crypto = { git = "https://github.com/zcash-hackworks/sapling-crypto.git", rev = "21084bde2019c04bd34208e63c3560fe2c02fb0e" }
+serde_json = "1.0"
 siphasher = "0.1.1"
 primitives = { path = "../primitives" }
 bn = { git = "https://github.com/paritytech/bn" }
 serde = "1.0"
 serde_derive = "1.0"
 rustc-hex = "2"
-
-[dev-dependencies]
-serde_json = "1.0"

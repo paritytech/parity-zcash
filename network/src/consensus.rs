@@ -1,5 +1,12 @@
 use {Network, Magic, Deployment, crypto};
 
+lazy_static! {
+	static ref SAPLING_SPEND_VK: crypto::Groth16VerifyingKey = crypto::load_sapling_spend_verifying_key()
+		.expect("hardcoded value should load without errors");
+	static ref SAPLING_OUTPUT_VK: crypto::Groth16VerifyingKey = crypto::load_sapling_output_verifying_key()
+		.expect("hardcoded value should load without errors");
+}
+
 #[derive(Debug, Clone)]
 /// Parameters that influence chain consensus.
 pub struct ConsensusParams {
@@ -45,6 +52,11 @@ pub struct ConsensusParams {
 
 	/// Active key for pghr13 joinsplit verification
 	pub joinsplit_verification_key: crypto::Pghr13VerifyingKey,
+
+	/// Sapling spend verification key.
+	pub sapling_spend_verifying_key: &'static crypto::Groth16VerifyingKey,
+	/// Sapling output verification key.
+	pub sapling_output_verifying_key: &'static crypto::Groth16VerifyingKey,
 }
 
 fn mainnet_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
@@ -135,6 +147,9 @@ impl ConsensusParams {
 				equihash_params: Some((200, 9)),
 
 				joinsplit_verification_key: mainnet_pghr_verification_key(),
+
+				sapling_spend_verifying_key: &SAPLING_SPEND_VK,
+				sapling_output_verifying_key: &SAPLING_OUTPUT_VK,
 			},
 			Network::Testnet => ConsensusParams {
 				network: network,
@@ -157,6 +172,9 @@ impl ConsensusParams {
 				equihash_params: Some((200, 9)),
 
 				joinsplit_verification_key: testnet_pghr_verification_key(),
+
+				sapling_spend_verifying_key: &SAPLING_SPEND_VK,
+				sapling_output_verifying_key: &SAPLING_OUTPUT_VK,
 			},
 			Network::Regtest => ConsensusParams {
 				network: network,
@@ -179,6 +197,9 @@ impl ConsensusParams {
 				equihash_params: Some((200, 9)),
 
 				joinsplit_verification_key: regtest_pghr_verification_key(),
+
+				sapling_spend_verifying_key: &SAPLING_SPEND_VK,
+				sapling_output_verifying_key: &SAPLING_OUTPUT_VK,
 			},
 			Network::Unitest => ConsensusParams {
 				network: network,
@@ -201,6 +222,9 @@ impl ConsensusParams {
 				equihash_params: None,
 
 				joinsplit_verification_key: unitest_pghr_verification_key(),
+
+				sapling_spend_verifying_key: &SAPLING_SPEND_VK,
+				sapling_output_verifying_key: &SAPLING_OUTPUT_VK,
 			},
 		}
 	}
