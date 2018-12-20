@@ -11,8 +11,8 @@ matrix:
 cache:
   apt: true
   directories:
-  - $TRAVIS_BUILD_DIR/target
-  - $HOME/.cargo
+  - "$TRAVIS_BUILD_DIR/target"
+  - "$HOME/.cargo"
 addons:
   apt:
     sources:
@@ -25,15 +25,15 @@ addons:
     - g++-4.8
     - oracle-java8-set-default
 script:
-  - echo 'Running tests' && echo -en 'travis_fold:start:tests'
-  - cargo test --all
-  - echo -en 'travis_fold:end:tests'
-  - echo 'Building in release mode' && echo -en 'travis_fold:start:build.release'
-  - cargo build --release
-  - echo -en 'travis_fold:end:build.release'
-  - echo 'Running bench from ./tools/bench.sh' && echo -en 'travis_fold:start:bench'
-  - ./tools/bench.sh
-  - echo -en 'travis_fold:end:bench'
+- echo 'Running tests' && echo -en 'travis_fold:start:tests'
+- cargo test --all
+- echo -en 'travis_fold:end:tests'
+- echo 'Building in release mode' && echo -en 'travis_fold:start:build.release'
+- cargo build --release
+- echo -en 'travis_fold:end:build.release'
+- echo 'Running bench from ./tools/bench.sh' && echo -en 'travis_fold:start:bench'
+- "./tools/bench.sh"
+- echo -en 'travis_fold:end:bench'
 after_success: |
   [ true ] &&
   [ $TRAVIS_BRANCH = master ] &&
@@ -48,5 +48,5 @@ env:
   global:
   - CXX="g++-4.8"
   - CC="gcc-4.8"
-  - secure: RPpiXGV2RgRNv/S5XICdym33pauO5PNQu06+0kIuap6acsT6rjWZDeKU0kXIkCyv7XGu6TAE3m1/N6DSFvoeObdoodzakpUnzI9ysC9UbGbX3KgFAILrsuD+Th0HR1yZ2+boXEnetl7lp87X6m3HL4dz7ccuRJOGQFCdzo4iQd4RXMJXq1nS8pXYOnOiGtWy/K6SBqHus42End303vR6ptd71iuEYmX2qL5LUpXRQ5JuvE78JL4v5e1jrLwwrIG5hr3ej+EICiEKjAtZcv3C/CYq2+V7T8mI8FQFBsVG56FxP1Qq0G1jnv6r8i/pLb342DiQapeQZ+CZ1vHv3Ruzxm4+T9VLkwIcI5kOZmbOjt/BnO1yHFMr6uslxYuyEvSLZXsvnB7Qi2cB/nFWxi8nk19CzuYy2hjrnDA/bfeii65oQ4hyqAuF6QvHgZtMmSONbea679b1mbl9K67EWt04J4k67Hfuj6HvmIOT3KF0TPXO6K4b6a4OJ43PinNSWtIOlCb4658HrfUBTUEe1XN14uC/F8dyFw8PTrw/VQKkmNEDRvI0AuWF1s+qN1u1mm+CpyJaqxcPloUR+RgVBk3KrRd/Gm6neunx07G6STv/S2mGCZ2ZRIUpbSqha7XTmHltoWZRYFeM3dhVMXe3hgEYuJfm4n7HxGvp4b1s1ckenPI=
   - RUST_BACKTRACE=1
+  - secure: 3nWI6BU/kmQe154Fq6LYeI4eNsTpu6kRw2lD1fhYgImQDDLKUJ04MHiZqxyUsOBks9m/xNvQqkLLaCmu5/JKy07xnZxc8zkPcVL7dl7fxBvszstsV/nM8fgrSqV6mN3EM83LSttU16y6JfRIlR5E/1s82z7DyCEE9fcpTB8A4Z35eL7g4NHDgG5Fh8HXUft4Yxo6tf1dk6VkiYdFC6n0Hzfm6k+kI29olp+h1aWNoo1bJk+p/t3UwqhaPWNvrl8ijn5AFiA5kE2d7g9WUh65Sp5zJAU5RVdrx1/+pz/rtzWycH3tjTMOsBs82XeRvtBq/PISEgbhK78AAkprvp/l6zes7qM9qZyrtwTnR33WhAVaqkRWE1WCx/KhWBgZErgoVh5EnCc8/8jbo6ghHy9FHOEuO7ikc5use2ODNT2x2RU3KKQaEont8kvvaMIWSxhFErp91Qj8RKx87pS1Ko7Krq6HshJbF1D91PDqdFemTvm8j1iVSX0qx4eON5xkkwy6u+I1D4SAM5C8tggqZHHaOSPIDtIsg949CgbVxTOZjK3RATE/3KmviqekE4xqE0iBo0wJgg7pi1LnKYda4utDr6ljE7kGADZABO0i0tfogV3zQwt5BQDY4EJL9UXU2MsK821T+a8KC2/ig9dSaqNHyHIb1d7FKTySKNzFe+YHMP8=
