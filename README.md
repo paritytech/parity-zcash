@@ -1,8 +1,8 @@
-# The Parity ZCash client.
+# The Parity Zcash client.
 
 [![Build Status][travis-image]][travis-url] [![Snap Status](https://build.snapcraft.io/badge/paritytech/parity-bitcoin.svg)](https://build.snapcraft.io/user/paritytech/parity-bitcoin)
 
-Gitter [![Gitter https://gitter.im/paritytech/parity-bitcoin](https://badges.gitter.im/paritytech/parity-bitcoin.svg)](https://gitter.im/paritytech/parity-bitcoin)
+Gitter [![Gitter https://gitter.im/paritytech/parity-zcash](https://badges.gitter.im/paritytech/parity-zcash.svg)](https://gitter.im/paritytech/parity-zcash)
 
 - [Installing from source](#installing-from-source)
 
@@ -12,7 +12,7 @@ Gitter [![Gitter https://gitter.im/paritytech/parity-bitcoin](https://badges.git
 
 - [Going online](#going-online)
 
-- [Importing bitcoind database](#importing-bitcoind-database)
+- [Importing bitcoind database](#importing-zcashd-database)
 
 - [Command line interface](#command-line-interface)
 
@@ -22,16 +22,13 @@ Gitter [![Gitter https://gitter.im/paritytech/parity-bitcoin](https://badges.git
 
 - [Internal Documentation](#internal-documentation)
 
-- [Project Graph][graph]
-
-[graph]: ./tools/graph.svg
-[travis-image]: https://travis-ci.com/paritytech/parity-bitcoin.svg?token=DMFvZu71iaTbUYx9UypX&branch=master
-[travis-url]: https://travis-ci.com/paritytech/parity-bitcoin
-[doc-url]: https://paritytech.github.io/parity-bitcoin/pbtc/index.html
+[travis-image]: https://api.travis-ci.org/paritytech/parity-zcash.svg?branch=master
+[travis-url]: https://travis-ci.com/paritytech/parity-zcash
+[doc-url]: https://paritytech.github.io/parity-zcash/pzec/index.html
 
 ## Installing from source
 
-Installing `pbtc` from source requires `rustc` and `cargo`.
+Installing `pzec` from source requires `rustc` and `cargo`.
 
 Minimal supported version is `rustc 1.23.0 (766bd11c8 2018-01-01)`
 
@@ -45,7 +42,7 @@ An easy way to install the stable binaries for Linux and Mac is to run this in y
 curl -sSf https://static.rust-lang.org/rustup.sh | sh
 ```
 
-Windows binaries can be downloaded from [rust-lang website](https://www.rust-lang.org/en-US/downloads.html).
+Windows binaries can be downloaded from [rust-lang website](https://forge.rust-lang.org/other-installation-methods.html#standalone).
 
 #### Install C and C++ compilers
 
@@ -56,40 +53,31 @@ sudo apt-get update
 sudo apt-get install build-essential
 ```
 
-#### Clone and build pbtc
+#### Clone and build pzec
 
-Now let's clone `pbtc` and enter it's directory:
-
-```
-git clone https://github.com/paritytech/parity-bitcoin
-cd parity-bitcoin
-```
-
-`pbtc` can be build in two modes. `--debug` and `--release`. Debug is the default.
+Now let's clone `pzec` and enter it's directory:
 
 ```
-# builds pbtc in debug mode
-cargo build -p pbtc
+git clone https://github.com/paritytech/parity-zcash
+cd parity-zcash
+
+# builds pzec in release mode
+cargo build -p pzec --release
 ```
 
-```
-# builds pbtc in release mode
-cargo build -p pbtc --release
-```
-
-`pbtc` is now available at either `./target/debug/pbtc` or `./target/release/pbtc`.
+`pzec` is now available at `./target/release/pzec`.
 
 ## Installing the snap
 
 In any of the [supported Linux distros](https://snapcraft.io/docs/core/install):
 
 ```
-sudo snap install parity-bitcoin --edge
+sudo snap install parity-zcash --edge
 ```
 
 ## Running tests
 
-`pbtc` has internal unit tests and it conforms to external integration tests.
+`pzec` has internal unit tests and it conforms to external integration tests.
 
 #### Running unit tests
 
@@ -99,84 +87,54 @@ Assuming that repository is already cloned, we can run unit tests with this comm
 cargo test --all
 ```
 
-#### Running external integration tests
-
-Running integration tests is automated, as the regtests repository is one of the submodules. Let's download it first:
-
-```
-git submodule update --init
-```
-
-Now we can run them:
-
-```
-./tools/regtests.sh
-```
-
-It's also possible to run regtests manually:
-
-```
-# let's start pbtc in regtest compatible mode
-./target/release/pbtc --btc --regtest
-
-# now in second shell window
-cd $HOME
-git clone https://github.com/TheBlueMatt/test-scripts
-cd test-scripts
-java -jar pull-tests-f56eec3.jar
-
-```
-
 ## Going online
 
-By default parity connects to bitcoind-seednodes. Full list is [here](./pbtc/seednodes.rs).
-
-Before starting synchronization, you must decide - which fork to follow - Bitcoin Core (`--btc` flag) or Bitcoin Cash (`--bch` flag). On next start, passing the same flag is optional, as the database is already bound to selected fork and won't be synchronized using other verification rules.
+By default parity connects to Zcash seednodes. Full list is [here](./pzec/seednodes.rs).
 
 To start syncing the main network, just start the client, passing selected fork flag. For example:
 
 ```
-./target/release/pbtc --btc
+./target/release/pzec
 ```
 
 To start syncing the testnet:
 
 ```
-./target/release/pbtc --btc --testnet
+./target/release/pzec --testnet
 ```
 
 To not print any syncing progress add `--quiet` flag:
 
 ```
-./target/release/pbtc --btc --quiet
+./target/release/pzec --quiet
 ```
 
-## Importing bitcoind database
+## Importing zcashd database
 
 It it is possible to import existing `bitcoind` database:
 
 ```
 # where $BITCOIND_DB is path to your bitcoind database, e.g., "/Users/user/Library/Application Support"
-./target/release/pbtc import "$BITCOIND_DB/Bitcoin/blocks"
+./target/release/pzec import "$BITCOIND_DB/Bitcoin/blocks"
 ```
 
 By default import verifies imported the blocks. You can disable this, by adding `--verification-level==none` flag.
 
 ```
-./target/release/pbtc import "#BITCOIND_DB/Bitcoin/blocks" --btc --skip-verification
+./target/release/pzec import "#BITCOIND_DB/Bitcoin/blocks" --verification-level==none
 ```
 
 ## Command line interface
 
-Full list of CLI options, which is available under `pbtc --help`:
+Full list of CLI options, which is available under `pzec --help`:
 
 ```
-pbtc 0.1.0
+pzec 0.1.0
 Parity Technologies <info@parity.io>
-Parity Bitcoin client
+Parity Zcash client
 
 USAGE:
-    pbtc [FLAGS] [OPTIONS] [SUBCOMMAND]
+    pzec [FLAGS] [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
         --bch             Use Bitcoin Cash verification rules (BCH).
@@ -216,7 +174,7 @@ The JSON-RPC interface is served on port :8332 for mainnet and :18332 for testne
 
 #### Network
 
-The Parity-bitcoin `network` interface.
+The Parity Zcash `network` interface.
 
 ##### addnode
 
@@ -340,10 +298,10 @@ This is a section only for developers and power users.
 You can enable detailed client logging by setting the environment variable `RUST_LOG`, e.g.,
 
 ```
-RUST_LOG=verification=info ./target/release/pbtc --btc
+RUST_LOG=verification=info ./target/release/pzec
 ```
 
-`pbtc` started with this environment variable will print all logs coming from `verification` module with verbosity `info` or higher. Available log levels are:
+`pzec` started with this environment variable will print all logs coming from `verification` module with verbosity `info` or higher. Available log levels are:
 
 - `error`
 - `warn`
@@ -354,15 +312,15 @@ RUST_LOG=verification=info ./target/release/pbtc --btc
 It's also possible to start logging from multiple modules in the same time:
 
 ```
-RUST_LOG=sync=trace,p2p=trace,verification=trace,db=trace ./target/release/pbtc --btc
+RUST_LOG=sync=trace,p2p=trace,verification=trace,db=trace ./target/release/pzec
 ```
 
 ## Internal documentation
 
-Once released, `pbtc` documentation will be available [here][doc-url]. Meanwhile it's only possible to build it locally:
+Once released, `pzec` documentation will be available [here][doc-url]. Meanwhile it's only possible to build it locally:
 
 ```
-cd parity-bitcoin
+cd parity-zcash
 ./tools/doc.sh
-open target/doc/pbtc/index.html
+open target/doc/pzec/index.html
 ```
