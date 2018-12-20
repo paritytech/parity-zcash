@@ -53,7 +53,7 @@ sudo apt-get update
 sudo apt-get install build-essential
 ```
 
-#### Clone and build pbtc
+#### Clone and build pzec
 
 Now let's clone `pzec` and enter it's directory:
 
@@ -61,11 +61,11 @@ Now let's clone `pzec` and enter it's directory:
 git clone https://github.com/paritytech/parity-zcash
 cd parity-zcash
 
-# builds pbtc in release mode
+# builds pzec in release mode
 cargo build -p pzec --release
 ```
 
-`pzec` is now available at either `./target/release/pbtc`.
+`pzec` is now available at `./target/release/pzec`.
 
 ## Installing the snap
 
@@ -94,7 +94,7 @@ By default parity connects to Zcash seednodes. Full list is [here](./pzec/seedno
 To start syncing the main network, just start the client, passing selected fork flag. For example:
 
 ```
-./target/release/pzec --btc
+./target/release/pzec
 ```
 
 To start syncing the testnet:
@@ -121,7 +121,7 @@ It it is possible to import existing `bitcoind` database:
 By default import verifies imported the blocks. You can disable this, by adding `--verification-level==none` flag.
 
 ```
-./target/release/pbtc import "#BITCOIND_DB/Bitcoin/blocks" --verification-level==none
+./target/release/pzec import "#BITCOIND_DB/Bitcoin/blocks" --verification-level==none
 ```
 
 ## Command line interface
@@ -135,7 +135,7 @@ This is a section only for developers and power users.
 You can enable detailed client logging by setting the environment variable `RUST_LOG`, e.g.,
 
 ```
-RUST_LOG=verification=info ./target/release/pbtc --btc
+RUST_LOG=verification=info ./target/release/pzec
 ```
 
 `pzec` started with this environment variable will print all logs coming from `verification` module with verbosity `info` or higher. Available log levels are:
