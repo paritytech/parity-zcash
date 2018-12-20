@@ -13,9 +13,8 @@ pub extern crate sapling_crypto;
 
 #[macro_use] extern crate serde_derive;
 
-mod groth16_json;
+mod json;
 mod pghr13;
-mod pghr13_json;
 
 pub use rcrypto::digest::Digest;
 pub use blake2_rfc::blake2b::Blake2b;
@@ -27,7 +26,7 @@ use rcrypto::ripemd160::Ripemd160;
 use siphasher::sip::SipHasher24;
 use primitives::hash::{H32, H160, H256};
 
-pub use groth16_json::{
+pub use json::groth16::{
 	load_sapling_spend_verifying_key, load_sapling_output_verifying_key,
 };
 

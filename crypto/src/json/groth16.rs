@@ -4,19 +4,19 @@ use bellman::groth16::{prepare_verifying_key, VerifyingKey as BellmanVerifyingKe
 use pairing::{EncodedPoint, bls12_381::{Bls12, G1Uncompressed, G2Uncompressed}};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 
-use pghr13_json::clean_0x;
+use json::pghr13::clean_0x;
 use Groth16VerifyingKey;
 
 /// Load Sapling spend verification key.
 pub fn load_sapling_spend_verifying_key() -> Result<Groth16VerifyingKey, String> {
-	let spend_vk_json = include_bytes!("../../res/sapling-spend-verifying-key.json");
+	let spend_vk_json = include_bytes!("../../../res/sapling-spend-verifying-key.json");
 	let spend_vk = serde_json::from_slice::<VerifyingKey>(&spend_vk_json[..]).unwrap();
 	Ok(Groth16VerifyingKey(prepare_verifying_key(&spend_vk.into())))
 }
 
 /// Load Sapling output verification key.
 pub fn load_sapling_output_verifying_key() -> Result<Groth16VerifyingKey, String> {
-	let output_vk_json = include_bytes!("../../res/sapling-output-verifying-key.json");
+	let output_vk_json = include_bytes!("../../../res/sapling-output-verifying-key.json");
 	let output_vk = serde_json::from_slice::<VerifyingKey>(&output_vk_json[..]).unwrap();
 	Ok(Groth16VerifyingKey(prepare_verifying_key(&output_vk.into())))
 }
@@ -143,13 +143,13 @@ mod tests {
 
 	#[test]
 	fn output_key() {
-		let output_vk_json = include_bytes!("../../res/sapling-output-verifying-key.json");
+		let output_vk_json = include_bytes!("../../../res/sapling-output-verifying-key.json");
 		serde_json::from_slice::<VerifyingKey>(&output_vk_json[..]).unwrap();
 	}
 
 	#[test]
 	fn spend_key() {
-		let spend_vk_json = include_bytes!("../../res/sapling-spend-verifying-key.json");
+		let spend_vk_json = include_bytes!("../../../res/sapling-spend-verifying-key.json");
 		serde_json::from_slice::<VerifyingKey>(&spend_vk_json[..]).unwrap();
 	}
 }
