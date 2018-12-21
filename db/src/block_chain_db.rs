@@ -7,7 +7,7 @@ use bytes::Bytes;
 use primitives::compact::Compact;
 use chain::{
 	IndexedBlock, IndexedBlockHeader, IndexedTransaction, BlockHeader, Block, Transaction,
-	OutPoint, TransactionOutput, SAPLING_TX_VERSION_GROUP_ID,
+	OutPoint, TransactionOutput,
 };
 use ser::{
 	deserialize, serialize, List
@@ -287,15 +287,13 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 		}
 
 		for tx in block.transactions.iter().skip(1) {
-			let is_sapling_group = tx.raw.version_group_id == SAPLING_TX_VERSION_GROUP_ID;
-
 			modified_meta.insert(tx.hash.clone(), TransactionMeta::new(new_best_block.number, tx.raw.outputs.len()));
 
 			if let Some(ref js) = tx.raw.join_split {
 				for js_descriptor in js.descriptions.iter() {
 					for nullifier in &js_descriptor.nullifiers[..] {
 						let nullifier_key = Nullifier::new(
-							if is_sapling_group { NullifierTag::Sapling } else { NullifierTag::Sprout },
+							NullifierTag::Sprout,
 							H256::from(&nullifier[..])
 						);
 						if self.contains_nullifier(nullifier_key) {
@@ -304,6 +302,20 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 						}
 						update.insert(KeyValue::Nullifier(nullifier_key));
 					}
+				}
+			}
+
+			if let Some(ref sapling) = tx.raw.sapling {
+				for spend in &sapling.spends {
+					let nullifier_key = Nullifier::new(
+						NullifierTag::Sapling,
+						H256::from(&spend.nullifier[..])
+					);
+					if self.contains_nullifier(nullifier_key) {
+						trace!(target: "db", "Duplicate nullifer during canonization: {:?}", nullifier_key);
+						return Err(Error::CannotCanonize);
+					}
+					update.insert(KeyValue::Nullifier(nullifier_key));
 				}
 			}
 
@@ -363,12 +375,11 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 
 		let mut modified_meta: HashMap<H256, TransactionMeta> = HashMap::new();
 		for tx in block.transactions.iter().skip(1) {
-			let is_sapling_group = tx.raw.version_group_id == SAPLING_TX_VERSION_GROUP_ID;
 			if let Some(ref js) = tx.raw.join_split {
 				for js_descriptor in js.descriptions.iter() {
 					for nullifier in &js_descriptor.nullifiers[..] {
 						let nullifier_key = Nullifier::new(
-							if is_sapling_group { NullifierTag::Sapling } else { NullifierTag::Sprout },
+							NullifierTag::Sprout,
 							H256::from(&nullifier[..])
 						);
 						if !self.contains_nullifier(nullifier_key) {
@@ -377,6 +388,20 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 						}
 						update.delete(Key::Nullifier(nullifier_key));
 					}
+				}
+			}
+
+			if let Some(ref sapling) = tx.raw.sapling {
+				for spend in &sapling.spends {
+					let nullifier_key = Nullifier::new(
+						NullifierTag::Sapling,
+						H256::from(&spend.nullifier[..])
+					);
+					if !self.contains_nullifier(nullifier_key) {
+						warn!(target: "db", "cannot decanonize, no nullifier: {:?}", nullifier_key);
+						return Err(Error::CannotDecanonize);
+					}
+					update.delete(Key::Nullifier(nullifier_key));
 				}
 			}
 
