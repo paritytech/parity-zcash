@@ -1,4 +1,5 @@
 use ser::Serializable;
+use crypto::Groth16VerifyingKey;
 use storage::{TransactionMetaProvider, TransactionOutputProvider, Nullifier, NullifierTag, NullifierTracker};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, SighashBase};
@@ -47,7 +48,11 @@ impl<'a> TransactionAcceptor<'a> {
 			bip30: TransactionBip30::new_for_sync(transaction, meta_store),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
-			sapling_valid: TransactionSaplingValid::new(transaction),
+			sapling_valid: TransactionSaplingValid::new(
+				consensus.sapling_spend_verifying_key,
+				consensus.sapling_output_verifying_key,
+				transaction,
+			),
 			overspent: TransactionOverspent::new(transaction, output_store),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, deployments),
@@ -513,19 +518,27 @@ impl<'a> Nullifiers<'a> {
 
 /// Checks that sapling signatures/proofs are valid.
 pub struct TransactionSaplingValid<'a> {
+	spend_vk: &'a Groth16VerifyingKey,
+	output_vk: &'a Groth16VerifyingKey,
 	transaction: CanonTransaction<'a>,
 }
 
 impl<'a> TransactionSaplingValid<'a> {
-	fn new(transaction: CanonTransaction<'a>) -> Self {
+	fn new(
+		spend_vk: &'a Groth16VerifyingKey,
+		output_vk: &'a Groth16VerifyingKey,
+		transaction: CanonTransaction<'a>,
+	) -> Self {
 		TransactionSaplingValid {
+			spend_vk,
+			output_vk,
 			transaction: transaction,
 		}
 	}
 
 	fn check(&self, sighash: H256) -> Result<(), TransactionError> {
 		if let Some(sapling) = self.transaction.raw.sapling.as_ref() {
-			accept_sapling(&sighash, sapling)
+			accept_sapling(self.spend_vk, self.output_vk, &sighash, sapling)
 				.map_err(|_| TransactionError::InvalidSapling)?;
 		}
 

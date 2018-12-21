@@ -1,15 +1,20 @@
 extern crate blake2_rfc;
 extern crate crypto as rcrypto;
 extern crate primitives;
+extern crate serde_json;
 extern crate siphasher;
 extern crate bn;
 extern crate serde;
 extern crate rustc_hex as hex;
 
+pub extern crate bellman;
+pub extern crate pairing;
+pub extern crate sapling_crypto;
+
 #[macro_use] extern crate serde_derive;
 
-mod pghr13;
 mod json;
+mod pghr13;
 
 pub use rcrypto::digest::Digest;
 pub use blake2_rfc::blake2b::Blake2b;
@@ -21,10 +26,16 @@ use rcrypto::ripemd160::Ripemd160;
 use siphasher::sip::SipHasher24;
 use primitives::hash::{H32, H160, H256};
 
+pub use json::groth16::{
+	load_sapling_spend_verifying_key, load_sapling_output_verifying_key,
+};
+
 pub use pghr13::{
 	VerifyingKey as Pghr13VerifyingKey, Proof as Pghr13Proof, verify as pghr13_verify,
 	G1, G2, Fr, Group,
 };
+
+pub struct Groth16VerifyingKey(pub bellman::groth16::PreparedVerifyingKey<pairing::bls12_381::Bls12>);
 
 pub struct DHash160 {
 	sha256: Sha256,
@@ -193,6 +204,12 @@ pub fn checksum(data: &[u8]) -> H32 {
 	let mut result = H32::default();
 	result.copy_from_slice(&dhash256(data)[0..4]);
 	result
+}
+
+impl ::std::fmt::Debug for Groth16VerifyingKey {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+		f.write_str("Groth16VerifyingKey")
+	}
 }
 
 #[cfg(test)]
