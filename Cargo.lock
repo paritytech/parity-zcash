@@ -807,6 +807,7 @@ version = "0.1.0"
 dependencies = [
  "bitcrypto 0.1.0",
  "chain 0.1.0",
+ "keys 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "primitives 0.1.0",
  "rustc-hex 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1585,6 +1586,7 @@ dependencies = [
  "byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "chain 0.1.0",
  "db 0.1.0",
+ "keys 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "network 0.1.0",

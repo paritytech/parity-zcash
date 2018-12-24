@@ -1,6 +1,7 @@
+use keys::Address;
 use network::{ConsensusParams};
 use storage::{TransactionOutputProvider, BlockHeaderProvider};
-use script;
+use script::{self, Builder};
 use sigops::{transaction_sigops};
 use work::block_reward_satoshi;
 use duplex_store::DuplexTransactionOutputProvider;
@@ -16,6 +17,7 @@ pub struct BlockAcceptor<'a> {
 	pub sigops: BlockSigops<'a>,
 	pub coinbase_claim: BlockCoinbaseClaim<'a>,
 	pub coinbase_script: BlockCoinbaseScript<'a>,
+	pub founders_reward: BlockFoundersReward<'a>,
 }
 
 impl<'a> BlockAcceptor<'a> {
@@ -33,6 +35,7 @@ impl<'a> BlockAcceptor<'a> {
 			coinbase_script: BlockCoinbaseScript::new(block, consensus, height),
 			coinbase_claim: BlockCoinbaseClaim::new(block, store, height),
 			sigops: BlockSigops::new(block, store, consensus),
+			founders_reward: BlockFoundersReward::new(block, consensus, height),
 		}
 	}
 
@@ -42,6 +45,7 @@ impl<'a> BlockAcceptor<'a> {
 		self.serialized_size.check()?;
 		self.coinbase_claim.check()?;
 		self.coinbase_script.check()?;
+		self.founders_reward.check()?;
 		Ok(())
 	}
 }
@@ -257,6 +261,39 @@ impl<'a> BlockCoinbaseScript<'a> {
 		} else {
 			Err(Error::CoinbaseScript)
 		}
+	}
+}
+
+pub struct BlockFoundersReward<'a> {
+	block: CanonBlock<'a>,
+	founder_address: Option<Address>,
+	founder_reward: u64,
+}
+
+impl<'a> BlockFoundersReward<'a> {
+	fn new(block: CanonBlock<'a>, consensus_params: &ConsensusParams, height: u32) -> Self {
+		BlockFoundersReward {
+			block: block,
+			founder_address: consensus_params.founder_address(height),
+			founder_reward: consensus_params.founder_subsidy(height),
+		}
+	}
+
+	fn check(&self) -> Result<(), Error> {
+		if let Some(ref founder_address) = self.founder_address {
+			let script = Builder::build_p2sh(&founder_address.hash);
+			let has_founders_reward = self.block.transactions.first()
+				.map(|tx| tx.raw.outputs.iter().any(|output|
+					**output.script_pubkey == *script &&
+					output.value == self.founder_reward))
+				.unwrap_or(false);
+
+			if !has_founders_reward {
+				return Err(Error::MissingFoundersReward);
+			}
+		}
+
+		Ok(())
 	}
 }
 

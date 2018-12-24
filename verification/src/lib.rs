@@ -65,6 +65,7 @@ extern crate rustc_hex as hex;
 
 extern crate storage;
 extern crate chain;
+extern crate keys;
 extern crate network;
 extern crate primitives;
 extern crate serialization as ser;
