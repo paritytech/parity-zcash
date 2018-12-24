@@ -40,10 +40,10 @@ after_success: |
   [ $TRAVIS_PULL_REQUEST = false ] &&
   [ $TRAVIS_RUST_VERSION = stable ] &&
   ./tools/doc.sh &&
-  echo '<meta http-equiv=refresh content=0;url=pbtc/index.html>' > target/doc/index.html &&
+  echo '<meta http-equiv=refresh content=0;url=pzec/index.html>' > target/doc/index.html &&
   pip install --user ghp-import &&
   /home/travis/.local/bin/ghp-import -n target/doc &&
-  git push -fq https://${GH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git gh-pages
+  git push -fq https://${TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git gh-pages
 env:
   global:
   - CXX="g++-4.8"
