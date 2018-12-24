@@ -118,6 +118,7 @@ impl BackwardsCompatibleChainVerifier {
 		let tx_acceptor = MemoryPoolTransactionAcceptor::new(
 			self.store.as_transaction_meta_provider(),
 			output_store,
+			self.store.as_nullifier_tracker(),
 			&self.consensus,
 			canon_tx,
 			height,

@@ -8,13 +8,16 @@ use deployments::BlockDeployments;
 use sapling::accept_sapling;
 use sigops::transaction_sigops;
 use canon::CanonTransaction;
+use chain::{OVERWINTER_TX_VERSION, SAPLING_TX_VERSION, OVERWINTER_TX_VERSION_GROUP_ID, SAPLING_TX_VERSION_GROUP_ID};
 use constants::COINBASE_MATURITY;
 use error::TransactionError;
 use primitives::hash::H256;
 use VerificationLevel;
 
 pub struct TransactionAcceptor<'a> {
+	pub version: TransactionVersion<'a>,
 	pub size: TransactionSize<'a>,
+	pub expiry: TransactionExpiry<'a>,
 	pub bip30: TransactionBip30<'a>,
 	pub missing_inputs: TransactionMissingInputs<'a>,
 	pub maturity: TransactionMaturity<'a>,
@@ -43,7 +46,9 @@ impl<'a> TransactionAcceptor<'a> {
 	) -> Self {
 		trace!(target: "verification", "Tx verification {}", transaction.hash.to_reversed_str());
 		TransactionAcceptor {
+			version: TransactionVersion::new(transaction, consensus, height),
 			size: TransactionSize::new(transaction, consensus, height),
+			expiry: TransactionExpiry::new(transaction, consensus, height),
 			bip30: TransactionBip30::new_for_sync(transaction, meta_store),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
@@ -61,7 +66,9 @@ impl<'a> TransactionAcceptor<'a> {
 	}
 
 	pub fn check(&self) -> Result<(), TransactionError> {
+		self.version.check()?;
 		self.size.check()?;
+		self.expiry.check()?;
 		self.bip30.check()?;
 		self.missing_inputs.check()?;
 		self.maturity.check()?;
@@ -79,12 +86,17 @@ impl<'a> TransactionAcceptor<'a> {
 }
 
 pub struct MemoryPoolTransactionAcceptor<'a> {
+	pub version: TransactionVersion<'a>,
+	pub size: TransactionSize<'a>,
+	pub expiry: TransactionExpiry<'a>,
 	pub missing_inputs: TransactionMissingInputs<'a>,
 	pub maturity: TransactionMaturity<'a>,
 	pub overspent: TransactionOverspent<'a>,
 	pub sigops: TransactionSigops<'a>,
 	pub double_spent: TransactionDoubleSpend<'a>,
 	pub eval: TransactionEval<'a>,
+	pub join_split: JoinSplitVerification<'a>,
+	pub sapling: SaplingVerification<'a>,
 }
 
 impl<'a> MemoryPoolTransactionAcceptor<'a> {
@@ -93,6 +105,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 		meta_store: &'a TransactionMetaProvider,
 		// in case of memory pool it should be db and memory pool
 		output_store: DuplexTransactionOutputProvider<'a>,
+		nullifier_tracker: &'a NullifierTracker,
 		consensus: &'a ConsensusParams,
 		transaction: CanonTransaction<'a>,
 		height: u32,
@@ -103,24 +116,43 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 		let transaction_index = 0;
 		let max_block_sigops = consensus.max_block_sigops();
 		MemoryPoolTransactionAcceptor {
+			version: TransactionVersion::new(transaction, consensus, height),
+			size: TransactionSize::new(transaction, consensus, height),
+			expiry: TransactionExpiry::new(transaction, consensus, height),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
 			overspent: TransactionOverspent::new(transaction, output_store),
 			sigops: TransactionSigops::new(transaction, output_store, consensus, max_block_sigops, time),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, VerificationLevel::Full, height, time, deployments),
+			join_split: JoinSplitVerification::new(transaction, nullifier_tracker),
+			sapling: SaplingVerification::new(
+				nullifier_tracker,
+				consensus.sapling_spend_verifying_key,
+				consensus.sapling_output_verifying_key,
+				transaction,
+			),
 		}
 	}
 
 	pub fn check(&self) -> Result<(), TransactionError> {
 		// Bip30 is not checked because we don't need to allow tx pool acceptance of an unspent duplicate.
 		// Tx pool validation is not strinctly a matter of consensus.
-		try!(self.missing_inputs.check());
-		try!(self.maturity.check());
-		try!(self.overspent.check());
-		try!(self.sigops.check());
-		try!(self.double_spent.check());
-		try!(self.eval.check());
+		self.version.check()?;
+		self.size.check()?;
+		self.expiry.check()?;
+		self.missing_inputs.check()?;
+		self.maturity.check()?;
+		self.overspent.check()?;
+		self.sigops.check()?;
+		self.double_spent.check()?;
+
+		// to make sure we're using the sighash-cache, let's make all sighash-related
+		// calls from single checker && pass sighash to other checkers
+		let sighash = self.eval.check()?;
+		self.join_split.check()?;
+		self.sapling.check(sighash)?;
+
 		Ok(())
 	}
 }
@@ -474,6 +506,86 @@ impl<'a> TransactionSize<'a> {
 	}
 }
 
+/// Check that transaction isn't expired.
+pub struct TransactionExpiry<'a> {
+	transaction: CanonTransaction<'a>,
+	is_overwinter_active: bool,
+	height: u32,
+}
+
+impl<'a> TransactionExpiry<'a> {
+	fn new(transaction: CanonTransaction<'a>, consensus: &'a ConsensusParams, height: u32) -> Self {
+		TransactionExpiry {
+			transaction,
+			is_overwinter_active: consensus.is_overwinter_active(height),
+			height,
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		if self.is_overwinter_active {
+			if self.transaction.raw.expiry_height != 0 && !self.transaction.raw.is_coinbase() {
+				if self.height > self.transaction.raw.expiry_height {
+					return Err(TransactionError::Expired);
+				}
+			}
+		}
+
+		Ok(())
+	}
+}
+
+/// Check that transaction version is correct.
+pub struct TransactionVersion<'a> {
+	transaction: CanonTransaction<'a>,
+	is_overwinter_active: bool,
+	is_sapling_active: bool,
+}
+
+impl<'a> TransactionVersion<'a> {
+	fn new(transaction: CanonTransaction<'a>, consensus: &'a ConsensusParams, height: u32) -> Self {
+		TransactionVersion {
+			transaction,
+			is_overwinter_active: consensus.is_overwinter_active(height),
+			is_sapling_active: consensus.is_sapling_active(height),
+		}
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		// overwintered must be set to true when overwinter is active
+		// overwintered must be set to false when overwinter is not active
+		let required_overwintered_flag = self.is_overwinter_active;
+		if self.transaction.raw.overwintered != required_overwintered_flag {
+			return Err(TransactionError::InvalidOverwintered);
+		}
+
+		if self.is_overwinter_active {
+			// when sapling is active, version group id must be set to sapling
+			// when sapling is inactive, version group id must be set to overwinter
+			let required_version_group_id = if self.is_sapling_active {
+				SAPLING_TX_VERSION_GROUP_ID
+			} else {
+				OVERWINTER_TX_VERSION_GROUP_ID
+			};
+			if self.transaction.raw.version_group_id != required_version_group_id {
+				return Err(TransactionError::InvalidVersionGroup);
+			}
+
+			// check tx version
+			let maximal_tx_version = if self.is_sapling_active {
+				SAPLING_TX_VERSION
+			} else {
+				OVERWINTER_TX_VERSION
+			};
+			if self.transaction.raw.version > maximal_tx_version {
+				return Err(TransactionError::InvalidVersion);
+			}
+		}
+
+		Ok(())
+	}
+}
+
 /// Check the joinsplit proof of the transaction
 pub struct JoinSplitProof<'a> {
 	_transaction: CanonTransaction<'a>,
@@ -623,9 +735,12 @@ impl<'a> SaplingVerification<'a> {
 
 #[cfg(test)]
 mod tests {
+	extern crate test_data;
 
-	use chain::{Transaction, Sapling};
+
+	use chain::{BTC_TX_VERSION, Transaction, Sapling};
 	use db::BlockChainDatabase;
+	use network::{Network, ConsensusParams};
 	use script::{Script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, verify_script};
 	use super::*;
 
@@ -688,4 +803,143 @@ mod tests {
 			Err(TransactionError::SaplingDeclared(Default::default()))
 		);
 	}
+
+	#[test]
+	fn transaction_expiry_works() {
+		let consensus = ConsensusParams::new(Network::Mainnet);
+
+		// when overwinter isn't active, expiry height is ignored
+		let tx = test_data::TransactionBuilder::overwintered().set_expiry_height(1).into();
+		assert_eq!(TransactionExpiry::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height - 1
+		).check(), Ok(()));
+
+		// when overwinter is active && we check coinbase tx, expiry height is ignored
+		let tx = test_data::TransactionBuilder::coinbase()
+			.set_overwintered(true)
+			.set_expiry_height(1).into();
+		assert_eq!(TransactionExpiry::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height + 1
+		).check(), Ok(()));
+
+		// when overwinter is active && expiry height check passes
+		let tx = test_data::TransactionBuilder::overwintered()
+			.set_expiry_height(consensus.overwinter_height + 100).into();
+		assert_eq!(TransactionExpiry::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height + 1
+		).check(), Ok(()));
+
+		// when overwinter is active && expiry height check fails
+		let tx = test_data::TransactionBuilder::overwintered()
+			.set_expiry_height(consensus.overwinter_height + 1).into();
+		assert_eq!(TransactionExpiry::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height + 100
+		).check(), Err(TransactionError::Expired));
+	}
+
+	#[test]
+	fn transaction_version_works() {
+		let consensus = ConsensusParams::new(Network::Mainnet);
+
+		// when overwinter is active, but transaction isn't overwintered
+		let tx = test_data::TransactionBuilder::default().into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height + 1
+		).check(), Err(TransactionError::InvalidOverwintered));
+
+		// when overwinter isn't active, but transaction is overwintered
+		let tx = test_data::TransactionBuilder::overwintered().into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height - 1
+		).check(), Err(TransactionError::InvalidOverwintered));
+
+		// when sapling is active, but version group id isn't set to sapling
+		let tx = test_data::TransactionBuilder::overwintered().into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.sapling_height + 1
+		).check(), Err(TransactionError::InvalidVersionGroup));
+
+		// when overwinter is active, but version group id isn't set to overwinter
+		let tx = test_data::TransactionBuilder::overwintered().into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height + 1
+		).check(), Err(TransactionError::InvalidVersionGroup));
+
+		// when sapling is active, but version is post-sapling
+		let tx = test_data::TransactionBuilder::overwintered()
+			.set_version_group_id(SAPLING_TX_VERSION_GROUP_ID)
+			.set_version(SAPLING_TX_VERSION + 1)
+			.into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.sapling_height + 1
+		).check(), Err(TransactionError::InvalidVersion));
+
+		// when overwinter is active, but version is post-overwinter
+		let tx = test_data::TransactionBuilder::overwintered()
+			.set_version_group_id(OVERWINTER_TX_VERSION_GROUP_ID)
+			.set_version(OVERWINTER_TX_VERSION + 1)
+			.into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height + 1
+		).check(), Err(TransactionError::InvalidVersion));
+
+		// sprout tx passes check
+		let tx = test_data::TransactionBuilder::default().set_version(BTC_TX_VERSION).into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height - 1
+		).check(), Ok(()));
+
+		// overwinter tx passes check
+		let tx = test_data::TransactionBuilder::overwintered()
+			.set_version(OVERWINTER_TX_VERSION)
+			.set_version_group_id(OVERWINTER_TX_VERSION_GROUP_ID)
+			.into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.overwinter_height + 1
+		).check(), Ok(()));
+
+		// sapling tx passes check
+		let tx = test_data::TransactionBuilder::overwintered()
+			.set_version(SAPLING_TX_VERSION)
+			.set_version_group_id(SAPLING_TX_VERSION_GROUP_ID)
+			.into();
+		assert_eq!(TransactionVersion::new(
+			CanonTransaction::new(&tx), &consensus, consensus.sapling_height + 1
+		).check(), Ok(()));
+	}
 }
+/*
+		let is_sprout_active = !self.is_overwinter_active;
+
+		// overwintered must be set to true when overwinter is active
+		// overwintered must be set to false when overwinter is not active
+		let required_overwintered_flag = self.is_overwinter_active;
+		if self.transaction.raw.overwintered != required_overwintered_flag {
+			return Err(TransactionError::InvalidOverwintered);
+		}
+
+		if self.is_overwinter_active {
+			// when sapling is active, version group id must be set to sapling
+			// when sapling is inactive, version group id must be set to overwinter
+			let required_version_group_id = if self.is_sapling_active {
+				SAPLING_TX_VERSION_GROUP_ID
+			} else {
+				OVERWINTER_TX_VERSION_GROUP_ID
+			};
+			if self.transaction.raw.version_group_id != required_version_group_id {
+				return Err(TransactionError::InvalidVersionGroup);
+			}
+
+			// check tx version
+			let maximal_tx_version = if self.is_sapling_active {
+				SAPLING_TX_VERSION
+			} else {
+				OVERWINTER_TX_VERSION
+			};
+			if self.transaction.raw.version > maximal_tx_version {
+				return Err(TransactionError::InvalidVersion);
+			}
+		}
+
+		Ok(())
+*/

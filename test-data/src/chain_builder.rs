@@ -96,6 +96,11 @@ impl TransactionBuilder {
 		builder.add_input(&self.transaction, output_index)
 	}
 
+	pub fn set_overwintered(mut self, overwintered: bool) -> TransactionBuilder {
+		self.transaction.overwintered = overwintered;
+		self
+	}
+
 	pub fn set_version(mut self, version: i32) -> TransactionBuilder {
 		self.transaction.version = version;
 		self
