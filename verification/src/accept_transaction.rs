@@ -908,38 +908,3 @@ mod tests {
 		).check(), Ok(()));
 	}
 }
-/*
-		let is_sprout_active = !self.is_overwinter_active;
-
-		// overwintered must be set to true when overwinter is active
-		// overwintered must be set to false when overwinter is not active
-		let required_overwintered_flag = self.is_overwinter_active;
-		if self.transaction.raw.overwintered != required_overwintered_flag {
-			return Err(TransactionError::InvalidOverwintered);
-		}
-
-		if self.is_overwinter_active {
-			// when sapling is active, version group id must be set to sapling
-			// when sapling is inactive, version group id must be set to overwinter
-			let required_version_group_id = if self.is_sapling_active {
-				SAPLING_TX_VERSION_GROUP_ID
-			} else {
-				OVERWINTER_TX_VERSION_GROUP_ID
-			};
-			if self.transaction.raw.version_group_id != required_version_group_id {
-				return Err(TransactionError::InvalidVersionGroup);
-			}
-
-			// check tx version
-			let maximal_tx_version = if self.is_sapling_active {
-				SAPLING_TX_VERSION
-			} else {
-				OVERWINTER_TX_VERSION
-			};
-			if self.transaction.raw.version > maximal_tx_version {
-				return Err(TransactionError::InvalidVersion);
-			}
-		}
-
-		Ok(())
-*/
