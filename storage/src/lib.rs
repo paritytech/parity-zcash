@@ -36,4 +36,16 @@ pub use error::Error;
 pub use store::{AsSubstore, Store, SharedStore, CanonStore, ConfigStore};
 pub use transaction_meta::TransactionMeta;
 pub use transaction_provider::{TransactionProvider, TransactionOutputProvider, TransactionMetaProvider};
-pub use nullifier::{Nullifier, NullifierTracker, Tag as NullifierTag};
+pub use nullifier::{Nullifier, NullifierTracker};
+
+/// Epoch tag.
+///
+/// Sprout and Sapling nullifiers/commitments are considered disjoint,
+/// even if they have the same bit pattern.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum EpochTag {
+	/// Sprout nullifier.
+	Sprout,
+	/// Sapling nullifier.
+	Sapling,
+}

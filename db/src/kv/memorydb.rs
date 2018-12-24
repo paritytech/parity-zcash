@@ -7,7 +7,7 @@ use bytes::Bytes;
 use ser::List;
 use chain::{Transaction as ChainTransaction, BlockHeader};
 use kv::{Transaction, Key, KeyState, Operation, Value, KeyValueDatabase, KeyValue};
-use storage::{TransactionMeta, NullifierTag};
+use storage::{TransactionMeta, EpochTag};
 
 #[derive(Default, Debug)]
 struct InnerDatabase {
@@ -84,8 +84,8 @@ impl KeyValueDatabase for MemoryDatabase {
 					KeyValue::BlockNumber(key, value) => { db.block_number.insert(key, KeyState::Insert(value)); },
 					KeyValue::Configuration(key, value) => { db.configuration.insert(key, KeyState::Insert(value)); },
 					KeyValue::Nullifier(key) => match key.tag() {
-						NullifierTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
-						NullifierTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
+						EpochTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
+						EpochTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
 					},
 				},
 				Operation::Delete(delete) => match delete {
@@ -98,8 +98,8 @@ impl KeyValueDatabase for MemoryDatabase {
 					Key::BlockNumber(key) => { db.block_number.insert(key, KeyState::Delete); }
 					Key::Configuration(key) => { db.configuration.insert(key, KeyState::Delete); }
 					Key::Nullifier(key) => match key.tag() {
-						NullifierTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Delete); },
-						NullifierTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Delete); },
+						EpochTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Delete); },
+						EpochTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Delete); },
 					},
 				},
 			}
@@ -119,8 +119,8 @@ impl KeyValueDatabase for MemoryDatabase {
 			Key::BlockNumber(ref key) => db.block_number.get(key).cloned().unwrap_or_default().map(Value::BlockNumber),
 			Key::Configuration(ref key) => db.configuration.get(key).cloned().unwrap_or_default().map(Value::Configuration),
 			Key::Nullifier(ref key) => match key.tag() {
-				NullifierTag::Sprout => db.sprout_nullifiers.get(key.hash()).cloned().unwrap_or_default().map(|_| Value::Empty),
-				NullifierTag::Sapling => db.sapling_nullifiers.get(key.hash()).cloned().unwrap_or_default().map(|_| Value::Empty),
+				EpochTag::Sprout => db.sprout_nullifiers.get(key.hash()).cloned().unwrap_or_default().map(|_| Value::Empty),
+				EpochTag::Sapling => db.sapling_nullifiers.get(key.hash()).cloned().unwrap_or_default().map(|_| Value::Empty),
 			}
 		};
 

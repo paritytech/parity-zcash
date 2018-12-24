@@ -25,7 +25,7 @@ use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
 	TransactionMetaProvider, TransactionProvider, TransactionOutputProvider, BlockChain, Store,
 	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock, NullifierTracker, Nullifier,
-	NullifierTag,
+	EpochTag,
 };
 
 const KEY_BEST_BLOCK_NUMBER: &'static str = "best_block_number";
@@ -293,7 +293,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 				for js_descriptor in js.descriptions.iter() {
 					for nullifier in &js_descriptor.nullifiers[..] {
 						let nullifier_key = Nullifier::new(
-							NullifierTag::Sprout,
+							EpochTag::Sprout,
 							H256::from(&nullifier[..])
 						);
 						if self.contains_nullifier(nullifier_key) {
@@ -308,7 +308,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 			if let Some(ref sapling) = tx.raw.sapling {
 				for spend in &sapling.spends {
 					let nullifier_key = Nullifier::new(
-						NullifierTag::Sapling,
+						EpochTag::Sapling,
 						H256::from(&spend.nullifier[..])
 					);
 					if self.contains_nullifier(nullifier_key) {
@@ -379,7 +379,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 				for js_descriptor in js.descriptions.iter() {
 					for nullifier in &js_descriptor.nullifiers[..] {
 						let nullifier_key = Nullifier::new(
-							NullifierTag::Sprout,
+							EpochTag::Sprout,
 							H256::from(&nullifier[..])
 						);
 						if !self.contains_nullifier(nullifier_key) {
@@ -394,7 +394,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 			if let Some(ref sapling) = tx.raw.sapling {
 				for spend in &sapling.spends {
 					let nullifier_key = Nullifier::new(
-						NullifierTag::Sapling,
+						EpochTag::Sapling,
 						H256::from(&spend.nullifier[..])
 					);
 					if !self.contains_nullifier(nullifier_key) {

@@ -1,21 +1,10 @@
 use hash::H256;
-
-/// Nullifier epoch (tag).
-///
-/// Sprout and Sapling nullifiers are considered disjoint,
-/// even if they have the same bit pattern.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Tag {
-    /// Sprout nullifier.
-    Sprout,
-    /// Sapling nullifier.
-    Sapling,
-}
+use EpochTag;
 
 /// Nullifier.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Nullifier {
-    tag: Tag,
+    tag: EpochTag,
     hash: H256,
 }
 
@@ -26,7 +15,7 @@ pub trait NullifierTracker : Sync {
 
 impl Nullifier {
     /// New nullifer.
-    pub fn new(tag: Tag, hash: H256) -> Self {
+    pub fn new(tag: EpochTag, hash: H256) -> Self {
         Nullifier {
             tag: tag,
             hash: hash,
@@ -34,7 +23,7 @@ impl Nullifier {
     }
 
     /// Nullifer tag
-    pub fn tag(&self) -> Tag {
+    pub fn tag(&self) -> EpochTag {
         self.tag
     }
 
@@ -44,8 +33,8 @@ impl Nullifier {
     }
 }
 
-impl From<(Tag, H256)> for Nullifier {
-    fn from(tuple: (Tag, H256)) -> Self {
+impl From<(EpochTag, H256)> for Nullifier {
+    fn from(tuple: (EpochTag, H256)) -> Self {
         Nullifier {
             tag: tuple.0,
             hash: tuple.1,
