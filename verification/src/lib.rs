@@ -56,15 +56,12 @@ extern crate time;
 extern crate log;
 extern crate parking_lot;
 extern crate rayon;
-extern crate bellman;
 extern crate byteorder;
 #[macro_use]
 extern crate lazy_static;
 #[cfg(test)]
 extern crate rand;
 extern crate rustc_hex as hex;
-extern crate pairing;
-extern crate sapling_crypto;
 
 extern crate storage;
 extern crate chain;
@@ -75,6 +72,10 @@ extern crate script;
 extern crate bitcrypto as crypto;
 #[cfg(test)]
 extern crate db;
+
+#[cfg(test)]
+#[macro_use]
+extern crate assert_matches;
 
 pub mod constants;
 mod canon;

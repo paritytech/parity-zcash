@@ -10,7 +10,7 @@ pub struct G1(bn::G1);
 
 struct G1Visitor;
 
-fn clean_0x(s: &str) -> &str {
+pub(crate) fn clean_0x(s: &str) -> &str {
 	if s.starts_with("0x") {
 		&s[2..]
 	} else {
@@ -120,8 +120,6 @@ pub struct VerifyingKey {
 
 #[cfg(test)]
 mod tests {
-
-	extern crate serde_json;
 	use super::*;
 
 	#[test]

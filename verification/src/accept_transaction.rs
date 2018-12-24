@@ -1,4 +1,5 @@
 use ser::Serializable;
+use crypto::Groth16VerifyingKey;
 use storage::{TransactionMetaProvider, TransactionOutputProvider, Nullifier, NullifierTag, NullifierTracker};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, SighashBase};
@@ -10,7 +11,6 @@ use canon::CanonTransaction;
 use constants::COINBASE_MATURITY;
 use error::TransactionError;
 use primitives::hash::H256;
-use chain::SAPLING_TX_VERSION_GROUP_ID;
 use VerificationLevel;
 
 pub struct TransactionAcceptor<'a> {
@@ -21,8 +21,8 @@ pub struct TransactionAcceptor<'a> {
 	pub overspent: TransactionOverspent<'a>,
 	pub double_spent: TransactionDoubleSpend<'a>,
 	pub eval: TransactionEval<'a>,
-	pub join_split: Option<JoinSplitVerification<'a>>,
-	pub sapling_valid: TransactionSaplingValid<'a>,
+	pub join_split: JoinSplitVerification<'a>,
+	pub sapling: SaplingVerification<'a>,
 }
 
 impl<'a> TransactionAcceptor<'a> {
@@ -47,13 +47,16 @@ impl<'a> TransactionAcceptor<'a> {
 			bip30: TransactionBip30::new_for_sync(transaction, meta_store),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
-			sapling_valid: TransactionSaplingValid::new(transaction),
 			overspent: TransactionOverspent::new(transaction, output_store),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, deployments),
-			join_split: transaction.join_split().map(|js| {
-				JoinSplitVerification::new(transaction.raw.version_group_id, js, nullifier_tracker)
-			}),
+			join_split: JoinSplitVerification::new(transaction, nullifier_tracker),
+			sapling: SaplingVerification::new(
+				nullifier_tracker,
+				consensus.sapling_spend_verifying_key,
+				consensus.sapling_output_verifying_key,
+				transaction,
+			),
 		}
 	}
 
@@ -68,7 +71,8 @@ impl<'a> TransactionAcceptor<'a> {
 		// to make sure we're using the sighash-cache, let's make all sighash-related
 		// calls from single checker && pass sighash to other checkers
 		let sighash = self.eval.check()?;
-		self.sapling_valid.check(sighash)?;
+		self.join_split.check()?;
+		self.sapling.check(sighash)?;
 
 		Ok(())
 	}
@@ -472,11 +476,11 @@ impl<'a> TransactionSize<'a> {
 
 /// Check the joinsplit proof of the transaction
 pub struct JoinSplitProof<'a> {
-	_join_split: &'a chain::JoinSplit,
+	_transaction: CanonTransaction<'a>,
 }
 
 impl<'a> JoinSplitProof<'a> {
-	fn new(join_split: &'a chain::JoinSplit) -> Self { JoinSplitProof { _join_split: join_split }}
+	fn new(transaction: CanonTransaction<'a>) -> Self { JoinSplitProof { _transaction: transaction }}
 
 	fn check(&self) -> Result<(), TransactionError> {
 		// TODO: Zero-knowledge proof
@@ -484,49 +488,28 @@ impl<'a> JoinSplitProof<'a> {
 	}
 }
 
-/// Check if nullifiers are unique
-pub struct Nullifiers<'a> {
-	tag: NullifierTag,
+/// Check if join split nullifiers are unique
+pub struct JoinSplitNullifiers<'a> {
 	tracker: &'a NullifierTracker,
-	join_split: &'a chain::JoinSplit,
-}
-
-impl<'a> Nullifiers<'a> {
-	fn new(tag: NullifierTag, tracker: &'a NullifierTracker, join_split: &'a chain::JoinSplit) -> Self {
-		Nullifiers { tag: tag, tracker: tracker, join_split: join_split }
-	}
-
-	fn check(&self) -> Result<(), TransactionError> {
-		for description in self.join_split.descriptions.iter() {
-			for nullifier in &description.nullifiers[..] {
-				let check = Nullifier::new(self.tag, H256::from(&nullifier[..]));
-
-				if self.tracker.contains_nullifier(check) {
-					return Err(TransactionError::JoinSplitDeclared(*check.hash()))
-				}
-			}
-		}
-
-		Ok(())
-	}
-}
-
-/// Checks that sapling signatures/proofs are valid.
-pub struct TransactionSaplingValid<'a> {
 	transaction: CanonTransaction<'a>,
 }
 
-impl<'a> TransactionSaplingValid<'a> {
-	fn new(transaction: CanonTransaction<'a>) -> Self {
-		TransactionSaplingValid {
-			transaction: transaction,
-		}
+impl<'a> JoinSplitNullifiers<'a> {
+	fn new(tracker: &'a NullifierTracker, transaction: CanonTransaction<'a>) -> Self {
+		JoinSplitNullifiers { tracker: tracker, transaction: transaction }
 	}
 
-	fn check(&self, sighash: H256) -> Result<(), TransactionError> {
-		if let Some(sapling) = self.transaction.raw.sapling.as_ref() {
-			accept_sapling(&sighash, sapling)
-				.map_err(|_| TransactionError::InvalidSapling)?;
+	fn check(&self) -> Result<(), TransactionError> {
+		if let Some(ref join_split) = self.transaction.raw.join_split {
+			for description in join_split.descriptions.iter() {
+				for nullifier in &description.nullifiers[..] {
+					let check = Nullifier::new(NullifierTag::Sprout, H256::from(&nullifier[..]));
+
+					if self.tracker.contains_nullifier(check) {
+						return Err(TransactionError::JoinSplitDeclared(*check.hash()))
+					}
+				}
+			}
 		}
 
 		Ok(())
@@ -536,19 +519,16 @@ impl<'a> TransactionSaplingValid<'a> {
 /// Join split verification
 pub struct JoinSplitVerification<'a> {
 	proof: JoinSplitProof<'a>,
-	nullifiers: Nullifiers<'a>,
+	nullifiers: JoinSplitNullifiers<'a>,
 }
 
 impl<'a> JoinSplitVerification<'a> {
-	pub fn new(tx_version_group: u32, join_split: &'a chain::JoinSplit, tracker: &'a NullifierTracker)
+	pub fn new(transaction: CanonTransaction<'a>, tracker: &'a NullifierTracker)
 		-> Self
 	{
-		let tag = if tx_version_group == SAPLING_TX_VERSION_GROUP_ID
-			{ NullifierTag::Sapling } else { NullifierTag::Sprout };
-
 		JoinSplitVerification {
-			proof: JoinSplitProof::new(join_split),
-			nullifiers: Nullifiers::new(tag, tracker, join_split),
+			proof: JoinSplitProof::new(transaction),
+			nullifiers: JoinSplitNullifiers::new(tracker, transaction),
 		}
 	}
 
@@ -558,11 +538,96 @@ impl<'a> JoinSplitVerification<'a> {
 	}
 }
 
+/// Check if Sapling nullifiers are unique
+pub struct SaplingNullifiers<'a> {
+	tracker: &'a NullifierTracker,
+	transaction: CanonTransaction<'a>,
+}
+
+impl<'a> SaplingNullifiers<'a> {
+	fn new(tracker: &'a NullifierTracker, transaction: CanonTransaction<'a>) -> Self {
+		SaplingNullifiers { tracker: tracker, transaction: transaction }
+	}
+
+	fn check(&self) -> Result<(), TransactionError> {
+		if let Some(ref sapling) = self.transaction.raw.sapling {
+			for spend in &sapling.spends {
+				let check = Nullifier::new(NullifierTag::Sapling, H256::from(&spend.nullifier[..]));
+
+				if self.tracker.contains_nullifier(check) {
+					return Err(TransactionError::SaplingDeclared(*check.hash()))
+				}
+			}
+		}
+
+		Ok(())
+	}
+}
+
+
+/// Checks that sapling signatures/proofs are valid.
+pub struct SaplingProof<'a> {
+	spend_vk: &'a Groth16VerifyingKey,
+	output_vk: &'a Groth16VerifyingKey,
+	transaction: CanonTransaction<'a>,
+}
+
+impl<'a> SaplingProof<'a> {
+	fn new(
+		spend_vk: &'a Groth16VerifyingKey,
+		output_vk: &'a Groth16VerifyingKey,
+		transaction: CanonTransaction<'a>,
+	) -> Self {
+		SaplingProof {
+			spend_vk,
+			output_vk,
+			transaction: transaction,
+		}
+	}
+
+	fn check(&self, sighash: H256) -> Result<(), TransactionError> {
+		if let Some(sapling) = self.transaction.raw.sapling.as_ref() {
+			accept_sapling(self.spend_vk, self.output_vk, &sighash, sapling)
+				.map_err(|_| TransactionError::InvalidSapling)?;
+		}
+
+		Ok(())
+	}
+}
+
+/// Sapling verification
+pub struct SaplingVerification<'a> {
+	proof: SaplingProof<'a>,
+	nullifiers: SaplingNullifiers<'a>,
+}
+
+impl<'a> SaplingVerification<'a> {
+	pub fn new(
+		tracker: &'a NullifierTracker,
+		spend_vk: &'a Groth16VerifyingKey,
+		output_vk: &'a Groth16VerifyingKey,
+		transaction: CanonTransaction<'a>
+	) -> Self
+	{
+		SaplingVerification {
+			proof: SaplingProof::new(spend_vk, output_vk, transaction),
+			nullifiers: SaplingNullifiers::new(tracker, transaction),
+		}
+	}
+
+	pub fn check(&self, sighash: H256) -> Result<(), TransactionError> {
+		self.proof.check(sighash)?;
+		self.nullifiers.check()
+	}
+}
+
 #[cfg(test)]
 mod tests {
 
-	use chain::Transaction;
+	use chain::{Transaction, Sapling};
+	use db::BlockChainDatabase;
 	use script::{Script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, verify_script};
+	use super::*;
 
 	#[test]
 	fn join_split() {
@@ -592,5 +657,35 @@ mod tests {
 		let flags = VerificationFlags::default()
 			.verify_p2sh(true);
 		assert_eq!(verify_script(&input_script, &output_script, &flags, &mut checker), Ok(()));
+	}
+
+	#[test]
+	fn sapling_nullifiers_works() {
+		let storage = BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]);
+
+		let tx: Transaction = test_data::TransactionBuilder::with_sapling(Sapling {
+			spends: vec![Default::default()],
+			..Default::default()
+		}).into();
+		let block = test_data::block_builder()
+			.header().parent(test_data::genesis().hash()).build()
+			.transaction().coinbase().build()
+			.with_transaction(tx.clone())
+			.build();
+		let tx = tx.into();
+		let block_hash = block.hash();
+
+		// when nullifier is not in the db
+		assert_eq!(SaplingNullifiers::new(&storage, CanonTransaction::new(&tx)).check(), Ok(()));
+
+		// insert nullifier into db
+		storage.insert(block.into()).unwrap();
+		storage.canonize(&block_hash).unwrap();
+
+		// when nullifier is in the db
+		assert_eq!(
+			SaplingNullifiers::new(&storage, CanonTransaction::new(&tx)).check(),
+			Err(TransactionError::SaplingDeclared(Default::default()))
+		);
 	}
 }

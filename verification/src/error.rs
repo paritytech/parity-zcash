@@ -136,5 +136,7 @@ pub enum TransactionError {
 	JoinSplitVersionInvalid,
 	/// Transaction sapling verification has failed.
 	InvalidSapling,
+	/// Sapling nullifier already revealed earlier in the chain.
+	SaplingDeclared(H256),
 }
 
