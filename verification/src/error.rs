@@ -138,5 +138,9 @@ pub enum TransactionError {
 	InvalidSapling,
 	/// Sapling nullifier already revealed earlier in the chain.
 	SaplingDeclared(H256),
+	/// Transaction is expired.
+	Expired,
+	/// Transaction overwintered flag is invalid.
+	InvalidOverwintered,
 }
 

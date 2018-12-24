@@ -277,6 +277,14 @@ impl ConsensusParams {
 		500_000_000
 	}
 
+	pub fn is_overwinter_active(&self, height: u32) -> bool {
+		height >= self.overwinter_height
+	}
+
+	pub fn is_sapling_active(&self, height: u32) -> bool {
+		height >= self.sapling_height
+	}
+
 	pub fn consensus_branch_id(&self, height: u32) -> u32 {
 		// sapling upgrade
 		if height >= self.sapling_height {
