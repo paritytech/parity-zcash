@@ -23,7 +23,7 @@ Gitter [![Gitter https://gitter.im/paritytech/parity-zcash](https://badges.gitte
 - [Internal Documentation](#internal-documentation)
 
 [travis-image]: https://api.travis-ci.org/paritytech/parity-zcash.svg?branch=master
-[travis-url]: https://travis-ci.com/paritytech/parity-zcash
+[travis-url]: https://travis-ci.org/paritytech/parity-zcash
 [doc-url]: https://paritytech.github.io/parity-zcash/pzec/index.html
 
 ## Installing from source
