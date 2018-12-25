@@ -5,6 +5,7 @@ extern crate chain;
 extern crate primitives;
 extern crate serialization;
 extern crate bitcrypto as crypto;
+extern crate keys;
 extern crate rustc_hex as hex;
 
 mod consensus;

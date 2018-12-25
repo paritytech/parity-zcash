@@ -264,7 +264,8 @@ pub mod tests {
 	use std::collections::{HashSet, HashMap};
 	use db::BlockChainDatabase;
 	use network::{Network, ConsensusParams};
-	use verification::{VerificationLevel, BackwardsCompatibleChainVerifier as ChainVerifier, Error as VerificationError};
+	use verification::{VerificationLevel, BackwardsCompatibleChainVerifier as ChainVerifier, Error as VerificationError, TransactionError};
+	use script::Error as ScriptError;
 	use synchronization_client_core::CoreVerificationSink;
 	use synchronization_executor::tests::DummyTaskExecutor;
 	use primitives::hash::H256;
@@ -371,13 +372,15 @@ pub mod tests {
 
 	#[test]
 	fn verification_level_header_accept_incorrect_transaction() {
+		let consensus = ConsensusParams::new(Network::Unitest);
 		let mut blocks: Vec<IndexedBlock> = vec![test_data::genesis().into()];
 		let mut rolling_hash = blocks[0].hash().clone();
 		for i in 1..101 {
 			let next_block = test_data::block_builder()
 				.transaction()
 					.coinbase()
-					.version(i)
+					.founder_reward(&consensus, i)
+					.version(i as i32)
 					.output().value(5000000000).build()
 					.build()
 				.merkled_header()
@@ -394,7 +397,10 @@ pub mod tests {
 		let storage: StorageRef = Arc::new(BlockChainDatabase::init_test_chain(blocks));
 		let verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest)));
 		let bad_transaction_block: IndexedBlock = test_data::block_builder()
-			.transaction().coinbase().output().value(50).build().build()
+			.transaction().coinbase()
+				.founder_reward(&consensus, 101)
+				.output().value(50).build()
+				.build()
 			.transaction()
 				.input().hash(coinbase_transaction_hash).build()
 				.output().value(1000).build()
@@ -414,12 +420,11 @@ pub mod tests {
 		assert_eq!(wrapper.verify_block(&bad_transaction_block), Ok(()));
 
 		// Error when tx script is checked
-		/* TODO: fixme
 		let wrapper = ChainVerifierWrapper::new(verifier, &storage, VerificationParameters {
 			verification_level: VerificationLevel::Full,
 			verification_edge: 1.into(),
 		});
-		assert_eq!(wrapper.verify_block(&bad_transaction_block), Err(VerificationError::Transaction(1, TransactionError::Signature(0, ScriptError::InvalidStackOperation))));*/
+		assert_eq!(wrapper.verify_block(&bad_transaction_block), Err(VerificationError::Transaction(1, TransactionError::Signature(0, ScriptError::InvalidStackOperation))));
 	}
 
 	#[test]

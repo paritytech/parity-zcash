@@ -59,6 +59,8 @@ pub enum Error {
 	InvalidEquihashSolution,
 	/// Invalid block version
 	InvalidVersion,
+	/// Block' coinbase is missing founders reward output.
+	MissingFoundersReward,
 }
 
 impl From<DBError> for Error {

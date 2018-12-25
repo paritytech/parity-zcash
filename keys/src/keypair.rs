@@ -92,17 +92,15 @@ mod tests {
 	use super::KeyPair;
 
 	/// Tests from:
-	/// https://github.com/bitcoin/bitcoin/blob/a6a860796a44a2805a58391a009ba22752f64e32/src/test/key_tests.cpp
-	const SECRET_0: &'static str = "5KSCKP8NUyBZPCCQusxRwgmz9sfvJQEgbGukmmHepWw5Bzp95mu";
+	/// https://github.com/zcash/zcash/blob/66e39a0dd6ffd77bcbede1943195dd456f859cd6/src/test/key_tests.cpp#L25
 	const SECRET_1: &'static str = "5HxWvvfubhXpYYpS3tJkw6fq9jE9j18THftkZjHHfmFiWtmAbrj";
 	const SECRET_2: &'static str = "5KC4ejrDjv152FGwP386VD1i2NYc5KkfSMyv1nGy1VGDxGHqVY3";
 	const SECRET_1C: &'static str = "Kwr371tjA9u2rFSMZjTNun2PXXP3WPZu2afRHTcta6KxEUdm1vEw";
 	const SECRET_2C: &'static str = "L3Hq7a8FEQwJkW1M2GNKDW28546Vp5miewcCzSqUD9kCAXrJdS3g";
-	const ADDRESS_0: &'static str = "16meyfSoQV6twkAAxPe51RtMVz7PGRmWna";
-	const ADDRESS_1: &'static str = "1QFqqMUD55ZV3PJEJZtaKCsQmjLT6JkjvJ";
-	const ADDRESS_2: &'static str = "1F5y5E5FMc5YzdJtB9hLaUe43GDxEKXENJ";
-	const ADDRESS_1C: &'static str = "1NoJrossxPBKfCHuJXT4HadJrXRE9Fxiqs";
-	const ADDRESS_2C: &'static str = "1CRj2HyM1CXWzHAXLQtiGLyggNT9WQqsDs";
+	const ADDRESS_1: &'static str = "t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe";
+	const ADDRESS_2: &'static str = "t1Xxa5ZVPKvs9bGMn7aWTiHjyHvR31XkUst";
+	const ADDRESS_1C: &'static str = "t1ffus9J1vhxvFqLoExGBRPjE7BcJxiSCTC";
+	const ADDRESS_2C: &'static str = "t1VJL2dPUyXK7avDRGqhqQA5bw2eEMdhyg6";
 	const SIGN_1: &'static str = "304402205dbbddda71772d95ce91cd2d14b592cfbc1dd0aabd6a394b6c2d377bbe59d31d022014ddda21494a4e221f0824f0b8b924c43fa43c0ad57dccdaa11f81a6bd4582f6";
 	const SIGN_2: &'static str = "3044022052d8a32079c11e79db95af63bb9600c5b04f21a9ca33dc129c2bfa8ac9dc1cd5022061d8ae5e0f6c1a16bde3719c64c2fd70e404b6428ab9a69566962e8771b5944d";
 	const SIGN_COMPACT_1: &'static str = "1c5dbbddda71772d95ce91cd2d14b592cfbc1dd0aabd6a394b6c2d377bbe59d31d14ddda21494a4e221f0824f0b8b924c43fa43c0ad57dccdaa11f81a6bd4582f6";
@@ -148,7 +146,6 @@ mod tests {
 
 	#[test]
 	fn test_keypair_address() {
-		assert!(check_addresses(SECRET_0, ADDRESS_0));
 		assert!(check_addresses(SECRET_1, ADDRESS_1));
 		assert!(check_addresses(SECRET_2, ADDRESS_2));
 		assert!(check_addresses(SECRET_1C, ADDRESS_1C));
@@ -157,7 +154,6 @@ mod tests {
 
 	#[test]
 	fn test_keypair_is_compressed() {
-		assert!(check_compressed(SECRET_0, false));
 		assert!(check_compressed(SECRET_1, false));
 		assert!(check_compressed(SECRET_2, false));
 		assert!(check_compressed(SECRET_1C, true));
@@ -197,7 +193,6 @@ mod tests {
 	#[test]
 	fn test_recover_compact() {
 		let message = b"Very deterministic message";
-		assert!(check_recover_compact(SECRET_0, message));
 		assert!(check_recover_compact(SECRET_1, message));
 		assert!(check_recover_compact(SECRET_1C, message));
 		assert!(check_recover_compact(SECRET_2, message));

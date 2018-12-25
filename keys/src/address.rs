@@ -13,7 +13,7 @@ use crypto::checksum;
 use network::Network;
 use {DisplayLayout, Error, AddressHash};
 
-/// There are two address formats currently in use.
+/// There are two transparent address formats currently in use.
 /// https://bitcoin.org/en/developer-reference#address-conversion
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Type {
@@ -38,7 +38,7 @@ pub struct Address {
 	pub hash: AddressHash,
 }
 
-pub struct AddressDisplayLayout([u8; 25]);
+pub struct AddressDisplayLayout([u8; 26]);
 
 impl Deref for AddressDisplayLayout {
 	type Target = [u8];
@@ -52,41 +52,41 @@ impl DisplayLayout for Address {
 	type Target = AddressDisplayLayout;
 
 	fn layout(&self) -> Self::Target {
-		let mut result = [0u8; 25];
+		let mut result = [0u8; 26];
 
-		result[0] = match (self.network, self.kind) {
-			(Network::Mainnet, Type::P2PKH) => 0,
-			(Network::Mainnet, Type::P2SH) => 5,
-			(Network::Testnet, Type::P2PKH) => 111,
-			(Network::Testnet, Type::P2SH) => 196,
-		};
+		result[..2].copy_from_slice(&match (self.network, self.kind) {
+			(Network::Mainnet, Type::P2PKH) => [0x1C, 0xB8],
+			(Network::Testnet, Type::P2PKH) => [0x1D, 0x25],
+			(Network::Mainnet, Type::P2SH) => [0x1C, 0xBD],
+			(Network::Testnet, Type::P2SH) => [0x1C, 0xBA],
+		});
 
-		result[1..21].copy_from_slice(&*self.hash);
-		let cs = checksum(&result[0..21]);
-		result[21..25].copy_from_slice(&*cs);
+		result[2..22].copy_from_slice(&*self.hash);
+		let cs = checksum(&result[0..22]);
+		result[22..].copy_from_slice(&*cs);
 		AddressDisplayLayout(result)
 	}
 
 	fn from_layout(data: &[u8]) -> Result<Self, Error> where Self: Sized {
-		if data.len() != 25 {
+		if data.len() != 26 {
 			return Err(Error::InvalidAddress);
 		}
 
-		let cs = checksum(&data[0..21]);
-		if &data[21..] != &*cs {
+		let cs = checksum(&data[..22]);
+		if &data[22..] != &*cs {
 			return Err(Error::InvalidChecksum);
 		}
 
-		let (network, kind) = match data[0] {
-			0 => (Network::Mainnet, Type::P2PKH),
-			5 => (Network::Mainnet, Type::P2SH),
-			111 => (Network::Testnet, Type::P2PKH),
-			196 => (Network::Testnet, Type::P2SH),
+		let (network, kind) = match (data[0], data[1]) {
+			(0x1C, 0xB8) => (Network::Mainnet, Type::P2PKH),
+			(0x1C, 0xBD) => (Network::Mainnet, Type::P2SH),
+			(0x1D, 0x25) => (Network::Testnet, Type::P2PKH),
+			(0x1C, 0xBA) => (Network::Testnet, Type::P2SH),
 			_ => return Err(Error::InvalidAddress),
 		};
 
 		let mut hash = AddressHash::default();
-		hash.copy_from_slice(&data[1..21]);
+		hash.copy_from_slice(&data[2..22]);
 
 		let address = Address {
 			kind: kind,
@@ -129,10 +129,10 @@ mod tests {
 		let address = Address {
 			kind: Type::P2PKH,
 			network: Network::Mainnet,
-			hash: "3f4aa1fedf1f54eeb03b759deadb36676b184911".into(),
+			hash: "ff197b14e502ab41f3bc8ccb48c4abac9eab35bc".into(),
 		};
 
-		assert_eq!("16meyfSoQV6twkAAxPe51RtMVz7PGRmWna".to_owned(), address.to_string());
+		assert_eq!("t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe".to_owned(), address.to_string());
 	}
 
 	#[test]
@@ -140,9 +140,9 @@ mod tests {
 		let address = Address {
 			kind: Type::P2PKH,
 			network: Network::Mainnet,
-			hash: "3f4aa1fedf1f54eeb03b759deadb36676b184911".into(),
+			hash: "ff197b14e502ab41f3bc8ccb48c4abac9eab35bc".into(),
 		};
 
-		assert_eq!(address, "16meyfSoQV6twkAAxPe51RtMVz7PGRmWna".into());
+		assert_eq!(address, "t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe".into());
 	}
 }
