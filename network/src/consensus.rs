@@ -48,11 +48,21 @@ pub struct ConsensusParams {
 	/// Optimal blocks interval (in seconds).
 	pub pow_target_spacing: u32,
 
-	/// 
-	pub subsidy_slow_start_interval: u32,
-	/// 
-	pub subsidy_halving_interval: u32,
+	/// 'Slow start' interval parameter.
 	///
+	/// For details on how (and why) ZCash 'slow start' works, refer to:
+	/// https://z.cash/support/faq/#what-is-slow-start-mining
+	/// https://github.com/zcash/zcash/issues/762
+	pub subsidy_slow_start_interval: u32,
+	/// Block subsidy halving interval.
+	///
+	/// Block subsidy is halved every `subsidy_halving_interval` blocks.
+	/// There are 64 halving intervals in total.
+	pub subsidy_halving_interval: u32,
+	/// The vector of addresses where founders reward goes.
+	///
+	/// For details on what's founders' reward, refer to:
+	/// https://z.cash/support/faq/#founders-reward
 	pub founders_addresses: Vec<Address>,
 
 	/// Equihash (N, K) parameters.
@@ -411,6 +421,33 @@ impl ConsensusParams {
 		height >= self.sapling_height
 	}
 
+	/// Block reward (goes to miner) at given height.
+	pub fn miner_reward(&self, height: u32) -> u64 {
+		let mut reward = 1_250_000_000u64;
+		if height < self.subsidy_slow_start_interval / 2 {
+			reward /= self.subsidy_slow_start_interval as u64;
+			reward *= height as u64;
+		} else if height < self.subsidy_slow_start_interval {
+			reward /= self.subsidy_slow_start_interval as u64;
+			reward *= height as u64 + 1;
+		} else {
+			let halvings = (height - self.subsidy_slow_start_interval / 2) / self.subsidy_halving_interval;
+			if halvings >= 64 {
+				return 0;
+			}
+
+			reward >>= halvings as u64;
+		}
+
+		reward
+	}
+
+	/// Founders reward (goes to founders) at given height.
+	pub fn founder_reward(&self, height: u32) -> u64 {
+		self.miner_reward(height) / 5
+	}
+
+	/// Address (transparent) where founders reward goes at given height.
 	pub fn founder_address(&self, height: u32) -> Option<Address> {
 		let last_founders_reward_block_height = self.subsidy_halving_interval + self.subsidy_slow_start_interval / 2 - 1;
 		if height == 0 || height > last_founders_reward_block_height {
@@ -421,26 +458,6 @@ impl ConsensusParams {
 		let address_change_interval = (last_founders_reward_block_height + founders_len) / founders_len;
 		let address_index = height / address_change_interval;
 		Some(self.founders_addresses[address_index as usize].clone())
-	}
-
-	pub fn founder_subsidy(&self, height: u32) -> u64 {
-		let mut subsidy = 1250000000u64;
-		if height < self.subsidy_slow_start_interval / 2 {
-			subsidy /= self.subsidy_slow_start_interval as u64;
-			subsidy *= height as u64;
-		} else if height < self.subsidy_slow_start_interval {
-			subsidy /= self.subsidy_slow_start_interval as u64;
-			subsidy *= height as u64 + 1;
-		} else {
-			let halvings = (height - self.subsidy_slow_start_interval / 2) / self.subsidy_halving_interval;
-			if halvings >= 64 {
-				return 0;
-			}
-
-			subsidy >>= halvings as u64;
-		}
-
-		subsidy / 5
 	}
 
 	pub fn consensus_branch_id(&self, height: u32) -> u32 {
@@ -456,5 +473,29 @@ impl ConsensusParams {
 
 		// sprout
 		0
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn miner_reward() {
+/*		let consensus = ConsensusParams::new(Network::Mainnet);
+		assert_eq!(consensus.miner_reward(1), 21_000_000 * 100_000_000);
+		assert_eq!(consensus.miner_reward(10_000), 5000000000);
+		assert_eq!(consensus.miner_reward(20_000), 5000000000);
+		assert_eq!(consensus.miner_reward(1_000_000), 5000000000);
+		assert_eq!(consensus.miner_reward(2_000_000), 5000000000);
+		assert_eq!(consensus.miner_reward(3_000_000), 5000000000);
+		assert_eq!(consensus.miner_reward(4_000_000), 5000000000);
+		assert_eq!(block_reward_satoshi(209999), 5000000000);
+		assert_eq!(block_reward_satoshi(210000), 2500000000);
+		assert_eq!(block_reward_satoshi(420000), 1250000000);
+		assert_eq!(block_reward_satoshi(420001), 1250000000);
+		assert_eq!(block_reward_satoshi(629999), 1250000000);
+		assert_eq!(block_reward_satoshi(630000), 625000000);
+		assert_eq!(block_reward_satoshi(630001), 625000000);*/
 	}
 }

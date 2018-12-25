@@ -48,26 +48,3 @@ pub fn work_required(parent_hash: H256, height: u32, store: &BlockHeaderProvider
 		raw: parent_header
 	}, store, consensus, max_bits)
 }
-
-pub fn block_reward_satoshi(block_height: u32) -> u64 {
-	let mut res = 50 * 100 * 1000 * 1000;
-	for _ in 0..block_height / 210000 { res /= 2 }
-	res
-}
-
-#[cfg(test)]
-mod tests {
-	use super::{block_reward_satoshi};
-
-	#[test]
-	fn reward() {
-		assert_eq!(block_reward_satoshi(0), 5000000000);
-		assert_eq!(block_reward_satoshi(209999), 5000000000);
-		assert_eq!(block_reward_satoshi(210000), 2500000000);
-		assert_eq!(block_reward_satoshi(420000), 1250000000);
-		assert_eq!(block_reward_satoshi(420001), 1250000000);
-		assert_eq!(block_reward_satoshi(629999), 1250000000);
-		assert_eq!(block_reward_satoshi(630000), 625000000);
-		assert_eq!(block_reward_satoshi(630001), 625000000);
-	}
-}

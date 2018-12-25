@@ -3,7 +3,6 @@ use network::{ConsensusParams};
 use storage::{TransactionOutputProvider, BlockHeaderProvider};
 use script::{self, Builder};
 use sigops::{transaction_sigops};
-use work::block_reward_satoshi;
 use duplex_store::DuplexTransactionOutputProvider;
 use deployments::BlockDeployments;
 use canon::CanonBlock;
@@ -15,9 +14,9 @@ pub struct BlockAcceptor<'a> {
 	pub finality: BlockFinality<'a>,
 	pub serialized_size: BlockSerializedSize<'a>,
 	pub sigops: BlockSigops<'a>,
-	pub coinbase_claim: BlockCoinbaseClaim<'a>,
+	pub miner_reward: BlockCoinbaseMinerReward<'a>,
+	pub founder_reward: BlockFounderReward<'a>,
 	pub coinbase_script: BlockCoinbaseScript<'a>,
-	pub founders_reward: BlockFoundersReward<'a>,
 }
 
 impl<'a> BlockAcceptor<'a> {
@@ -33,9 +32,9 @@ impl<'a> BlockAcceptor<'a> {
 			finality: BlockFinality::new(block, height, deployments, headers),
 			serialized_size: BlockSerializedSize::new(block, consensus),
 			coinbase_script: BlockCoinbaseScript::new(block, consensus, height),
-			coinbase_claim: BlockCoinbaseClaim::new(block, store, height),
+			miner_reward: BlockCoinbaseMinerReward::new(block, store, consensus, height),
+			founder_reward: BlockFounderReward::new(block, consensus, height),
 			sigops: BlockSigops::new(block, store, consensus),
-			founders_reward: BlockFoundersReward::new(block, consensus, height),
 		}
 	}
 
@@ -43,9 +42,9 @@ impl<'a> BlockAcceptor<'a> {
 		self.finality.check()?;
 		self.sigops.check()?;
 		self.serialized_size.check()?;
-		self.coinbase_claim.check()?;
+		self.miner_reward.check()?;
+		self.founder_reward.check()?;
 		self.coinbase_script.check()?;
-		self.founders_reward.check()?;
 		Ok(())
 	}
 }
@@ -148,22 +147,23 @@ impl<'a> BlockSigops<'a> {
 	}
 }
 
-pub struct BlockCoinbaseClaim<'a> {
+pub struct BlockCoinbaseMinerReward<'a> {
 	block: CanonBlock<'a>,
 	store: &'a TransactionOutputProvider,
-	height: u32,
+	max_reward: u64,
 }
 
-impl<'a> BlockCoinbaseClaim<'a> {
+impl<'a> BlockCoinbaseMinerReward<'a> {
 	fn new(
 		block: CanonBlock<'a>,
 		store: &'a TransactionOutputProvider,
+		consensus: &ConsensusParams,
 		height: u32,
 	) -> Self {
-		BlockCoinbaseClaim {
+		BlockCoinbaseMinerReward {
 			block: block,
 			store: store,
-			height: height,
+			max_reward: consensus.miner_reward(height),
 		}
 	}
 
@@ -214,13 +214,13 @@ impl<'a> BlockCoinbaseClaim<'a> {
 
 		let claim = self.block.transactions[0].raw.total_spends();
 
-		let (reward, overflow) = fees.overflowing_add(block_reward_satoshi(self.height));
+		let (max_reward, overflow) = fees.overflowing_add(self.max_reward);
 		if overflow {
 			return Err(Error::TransactionFeeAndRewardOverflow);
 		}
 
-		if claim > reward {
-			Err(Error::CoinbaseOverspend { expected_max: reward, actual: claim })
+		if claim > max_reward {
+			Err(Error::CoinbaseOverspend { expected_max: max_reward, actual: claim })
 		} else {
 			Ok(())
 		}
@@ -264,18 +264,18 @@ impl<'a> BlockCoinbaseScript<'a> {
 	}
 }
 
-pub struct BlockFoundersReward<'a> {
+pub struct BlockFounderReward<'a> {
 	block: CanonBlock<'a>,
 	founder_address: Option<Address>,
 	founder_reward: u64,
 }
 
-impl<'a> BlockFoundersReward<'a> {
+impl<'a> BlockFounderReward<'a> {
 	fn new(block: CanonBlock<'a>, consensus_params: &ConsensusParams, height: u32) -> Self {
-		BlockFoundersReward {
+		BlockFounderReward {
 			block: block,
 			founder_address: consensus_params.founder_address(height),
-			founder_reward: consensus_params.founder_subsidy(height),
+			founder_reward: consensus_params.founder_reward(height),
 		}
 	}
 

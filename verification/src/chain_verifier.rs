@@ -434,7 +434,7 @@ mod tests {
 		let block: IndexedBlock = test_data::block_builder()
 			.transaction()
 				.coinbase()
-				.output().value(5000000001).build()
+				.output().value(1250000001).build()
 				.build()
 			.merkled_header().parent(genesis.hash()).build()
 			.build()
@@ -443,8 +443,8 @@ mod tests {
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 
 		let expected = Err(Error::CoinbaseOverspend {
-			expected_max: 5000000000,
-			actual: 5000000001
+			expected_max: 1250000000,
+			actual: 1250000001,
 		});
 
 		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
