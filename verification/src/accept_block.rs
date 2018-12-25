@@ -282,13 +282,13 @@ impl<'a> BlockFounderReward<'a> {
 	fn check(&self) -> Result<(), Error> {
 		if let Some(ref founder_address) = self.founder_address {
 			let script = Builder::build_p2sh(&founder_address.hash);
-			let has_founders_reward = self.block.transactions.first()
+			let has_founder_reward = self.block.transactions.first()
 				.map(|tx| tx.raw.outputs.iter().any(|output|
 					**output.script_pubkey == *script &&
 					output.value == self.founder_reward))
 				.unwrap_or(false);
 
-			if !has_founders_reward {
+			if !has_founder_reward {
 				return Err(Error::MissingFoundersReward);
 			}
 		}

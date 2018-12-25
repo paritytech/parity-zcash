@@ -449,13 +449,13 @@ impl ConsensusParams {
 
 	/// Address (transparent) where founders reward goes at given height.
 	pub fn founder_address(&self, height: u32) -> Option<Address> {
-		let last_founders_reward_block_height = self.subsidy_halving_interval + self.subsidy_slow_start_interval / 2 - 1;
-		if height == 0 || height > last_founders_reward_block_height {
+		let last_founder_reward_block_height = self.subsidy_halving_interval + self.subsidy_slow_start_interval / 2 - 1;
+		if height == 0 || height > last_founder_reward_block_height {
 			return None;
 		}
 
 		let founders_len = self.founders_addresses.len() as u32;
-		let address_change_interval = (last_founders_reward_block_height + founders_len) / founders_len;
+		let address_change_interval = (last_founder_reward_block_height + founders_len) / founders_len;
 		let address_index = height / address_change_interval;
 		Some(self.founders_addresses[address_index as usize].clone())
 	}

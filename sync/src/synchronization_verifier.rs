@@ -379,7 +379,7 @@ pub mod tests {
 			let next_block = test_data::block_builder()
 				.transaction()
 					.coinbase()
-					.founders_reward(&consensus, i)
+					.founder_reward(&consensus, i)
 					.version(i as i32)
 					.output().value(5000000000).build()
 					.build()
@@ -398,7 +398,7 @@ pub mod tests {
 		let verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest)));
 		let bad_transaction_block: IndexedBlock = test_data::block_builder()
 			.transaction().coinbase()
-				.founders_reward(&consensus, 101)
+				.founder_reward(&consensus, 101)
 				.output().value(50).build()
 				.build()
 			.transaction()

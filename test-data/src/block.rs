@@ -332,8 +332,8 @@ impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
 		self.input().coinbase().build()
 	}
 
-	pub fn founders_reward(self, consensus: &ConsensusParams, height: u32) -> Self {
-		self.output().founders_reward(consensus, height).build()
+	pub fn founder_reward(self, consensus: &ConsensusParams, height: u32) -> Self {
+		self.output().founder_reward(consensus, height).build()
 	}
 
 	pub fn output(self) -> TransactionOutputBuilder<Self> {
@@ -475,7 +475,7 @@ impl<F> TransactionOutputBuilder<F> where F: Invoke<chain::TransactionOutput> {
 		}
 	}
 
-	pub fn founders_reward(mut self, consensus: &ConsensusParams, height: u32) -> Self {
+	pub fn founder_reward(mut self, consensus: &ConsensusParams, height: u32) -> Self {
 		self.script_pubkey = ScriptBuilder::build_p2sh(&consensus.founder_address(height).unwrap().hash).into();
 		self.value = consensus.founder_reward(height);
 		self
