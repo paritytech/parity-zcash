@@ -482,20 +482,15 @@ mod tests {
 
 	#[test]
 	fn miner_reward() {
-/*		let consensus = ConsensusParams::new(Network::Mainnet);
-		assert_eq!(consensus.miner_reward(1), 21_000_000 * 100_000_000);
-		assert_eq!(consensus.miner_reward(10_000), 5000000000);
-		assert_eq!(consensus.miner_reward(20_000), 5000000000);
-		assert_eq!(consensus.miner_reward(1_000_000), 5000000000);
-		assert_eq!(consensus.miner_reward(2_000_000), 5000000000);
-		assert_eq!(consensus.miner_reward(3_000_000), 5000000000);
-		assert_eq!(consensus.miner_reward(4_000_000), 5000000000);
-		assert_eq!(block_reward_satoshi(209999), 5000000000);
-		assert_eq!(block_reward_satoshi(210000), 2500000000);
-		assert_eq!(block_reward_satoshi(420000), 1250000000);
-		assert_eq!(block_reward_satoshi(420001), 1250000000);
-		assert_eq!(block_reward_satoshi(629999), 1250000000);
-		assert_eq!(block_reward_satoshi(630000), 625000000);
-		assert_eq!(block_reward_satoshi(630001), 625000000);*/
+		let consensus = ConsensusParams::new(Network::Mainnet);
+		assert_eq!(consensus.miner_reward(1), 62_500);
+		assert_eq!(consensus.miner_reward(10_000), 625_062_500);
+		assert_eq!(consensus.miner_reward(20_000), 1_250_000_000);
+		assert_eq!(consensus.miner_reward(1_000_000), 625_000_000);
+		assert_eq!(consensus.miner_reward(2_000_000), 312_500_000);
+		assert_eq!(consensus.miner_reward(3_000_000), 156_250_000);
+		assert_eq!(consensus.miner_reward(4_000_000), 78_125_000);
+		assert_eq!(consensus.miner_reward(20_000_000), 149);
+		assert_eq!(consensus.miner_reward(30_000_000), 0);
 	}
 }
