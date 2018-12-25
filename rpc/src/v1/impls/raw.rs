@@ -222,7 +222,7 @@ pub mod tests {
 			{
 				"jsonrpc": "2.0",
 				"method": "createrawtransaction",
-				"params": [[{"txid":"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b","vout":0}],{"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa":0.01}],
+				"params": [[{"txid":"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b","vout":0}],{"t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi":0.01}],
 				"id": 1
 			}"#)
 		).unwrap();
@@ -240,7 +240,7 @@ pub mod tests {
 			{
 				"jsonrpc": "2.0",
 				"method": "createrawtransaction",
-				"params": [[{"txid":"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b","vout":0}],{"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa":0.01}],
+				"params": [[{"txid":"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b","vout":0}],{"t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi":0.01}],
 				"id": 1
 			}"#)
 		).unwrap();

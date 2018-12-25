@@ -66,13 +66,13 @@ mod tests {
 
 	#[test]
 	fn address_serialize() {
-		let test = TestStruct::new("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into());
-		assert_eq!(serde_json::to_string(&test).unwrap(), r#"{"address":"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"}"#);
+		let test = TestStruct::new("t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into());
+		assert_eq!(serde_json::to_string(&test).unwrap(), r#"{"address":"t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi"}"#);
 	}
 
 	#[test]
 	fn address_deserialize() {
-		let test = TestStruct::new("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into());
-		assert_eq!(serde_json::from_str::<TestStruct>(r#"{"address":"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"}"#).unwrap(), test);
+		let test = TestStruct::new("t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into());
+		assert_eq!(serde_json::from_str::<TestStruct>(r#"{"address":"t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi"}"#).unwrap(), test);
 	}
 }

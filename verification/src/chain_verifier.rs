@@ -185,6 +185,7 @@ mod tests {
 
 	#[test]
 	fn coinbase_maturity() {
+		let consensus = ConsensusParams::new(Network::Unitest);
 		let genesis = test_data::block_builder()
 			.transaction()
 				.coinbase()
@@ -199,6 +200,7 @@ mod tests {
 		let block = test_data::block_builder()
 			.transaction()
 				.coinbase()
+				.founders_reward(&consensus, 1)
 				.output().value(1).build()
 				.build()
 			.transaction()
@@ -208,7 +210,7 @@ mod tests {
 			.merkled_header().parent(genesis.hash()).build()
 			.build();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
+		let verifier = ChainVerifier::new(Arc::new(storage), consensus);
 
 		let expected = Err(Error::Transaction(
 			1,
@@ -220,6 +222,8 @@ mod tests {
 
 	#[test]
 	fn non_coinbase_happy() {
+		let consensus = ConsensusParams::new(Network::Unitest);
+
 		let genesis = test_data::block_builder()
 			.transaction()
 				.coinbase()
@@ -237,6 +241,7 @@ mod tests {
 		let block = test_data::block_builder()
 			.transaction()
 				.coinbase()
+				.founders_reward(&consensus, 1)
 				.output().value(2).build()
 				.build()
 			.transaction()
@@ -246,12 +251,14 @@ mod tests {
 			.merkled_header().parent(genesis.hash()).build()
 			.build();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
+		let verifier = ChainVerifier::new(Arc::new(storage), consensus);
 		assert_eq!(verifier.verify(VerificationLevel::Full, &block.into()), Ok(()));
 	}
 
 	#[test]
 	fn transaction_references_same_block_happy() {
+		let consensus = ConsensusParams::new(Network::Unitest);
+
 		let genesis = test_data::block_builder()
 			.transaction()
 				.coinbase()
@@ -269,6 +276,7 @@ mod tests {
 		let block = test_data::block_builder()
 			.transaction()
 				.coinbase()
+				.founders_reward(&consensus, 1)
 				.output().value(2).build()
 				.build()
 			.transaction()
@@ -282,7 +290,7 @@ mod tests {
 			.merkled_header().parent(genesis.hash()).build()
 			.build();
 
-		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
+		let verifier = ChainVerifier::new(Arc::new(storage), consensus);
 		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
 	}
 

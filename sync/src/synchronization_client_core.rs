@@ -2230,6 +2230,8 @@ pub mod tests {
 
 	#[test]
 	fn when_transaction_double_spends_during_reorg() {
+		let consensus = ConsensusParams::new(Network::Unitest);
+
 		let b0 = test_data::block_builder().header().build()
 			.transaction().coinbase()
 				.output().value(10).build()
@@ -2250,7 +2252,7 @@ pub mod tests {
 
 		// in-storage spends b0[1] && b0[2]
 		let b1 = test_data::block_builder()
-			.transaction().coinbase()
+			.transaction().coinbase().founders_reward(&consensus, 1)
 				.output().value(50).build()
 				.build()
 			.transaction().version(10)
@@ -2280,7 +2282,7 @@ pub mod tests {
 
 		// in-storage [side] spends b0[3]
 		let b2 = test_data::block_builder().header().parent(b0.hash()).build()
-			.transaction().coinbase()
+			.transaction().coinbase().founders_reward(&consensus, 1)
 				.output().value(5555).build()
 				.build()
 			.transaction().version(20)
@@ -2290,7 +2292,8 @@ pub mod tests {
 			.build();
 		// in-storage [causes reorg to b2 + b3] spends b0[1]
 		let b3 = test_data::block_builder()
-			.transaction().coinbase().version(40)
+			.transaction().coinbase().founders_reward(&consensus, 2)
+				.version(40)
 				.output().value(50).build()
 				.build()
 			.transaction().version(30)

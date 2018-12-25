@@ -40,12 +40,12 @@ mod tests {
 				hex: Bytes::new(vec![1, 2, 3, 4]),
 				req_sigs: 777,
 				script_type: ScriptType::Multisig,
-				addresses: vec!["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(), "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into()],
+				addresses: vec!["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(), "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into()],
 			},
 			version: 33,
 			coinbase: false,
 		};
-		assert_eq!(serde_json::to_string(&txout).unwrap(), r#"{"bestblock":"5600000000000000000000000000000000000000000000000000000000000000","confirmations":777,"value":100000.56,"scriptPubKey":{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa","1H5m1XzvHsjWX3wwU781ubctznEpNACrNC"]},"version":33,"coinbase":false}"#);
+		assert_eq!(serde_json::to_string(&txout).unwrap(), r#"{"bestblock":"5600000000000000000000000000000000000000000000000000000000000000","confirmations":777,"value":100000.56,"scriptPubKey":{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi","t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543"]},"version":33,"coinbase":false}"#);
 	}
 
 	#[test]
@@ -59,13 +59,13 @@ mod tests {
 				hex: Bytes::new(vec![1, 2, 3, 4]),
 				req_sigs: 777,
 				script_type: ScriptType::Multisig,
-				addresses: vec!["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(), "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into()],
+				addresses: vec!["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(), "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into()],
 			},
 			version: 33,
 			coinbase: false,
 		};
 		assert_eq!(
-			serde_json::from_str::<GetTxOutResponse>(r#"{"bestblock":"5600000000000000000000000000000000000000000000000000000000000000","confirmations":777,"value":100000.56,"scriptPubKey":{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa","1H5m1XzvHsjWX3wwU781ubctznEpNACrNC"]},"version":33,"coinbase":false}"#).unwrap(),
+			serde_json::from_str::<GetTxOutResponse>(r#"{"bestblock":"5600000000000000000000000000000000000000000000000000000000000000","confirmations":777,"value":100000.56,"scriptPubKey":{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi","t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543"]},"version":33,"coinbase":false}"#).unwrap(),
 			txout);
 	}
 }

@@ -440,7 +440,7 @@ impl ConsensusParams {
 			subsidy >>= halvings as u64;
 		}
 
-		subsidy
+		subsidy / 5
 	}
 
 	pub fn consensus_branch_id(&self, height: u32) -> u32 {

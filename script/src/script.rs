@@ -617,7 +617,7 @@ OP_ADD
 
 	#[test]
 	fn test_extract_destinations_pub_key_hash() {
-		let address = Address::from("13NMTpfNVVJQTNH4spP4UeqBGqLdqDo27S").hash;
+		let address = Address::from("t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi").hash;
 		let script = Builder::build_p2pkh(&address);
 		assert_eq!(script.script_type(), ScriptType::PubKeyHash);
 		assert_eq!(script.extract_destinations(), Ok(vec![
@@ -627,7 +627,7 @@ OP_ADD
 
 	#[test]
 	fn test_extract_destinations_script_hash() {
-		let address = Address::from("13NMTpfNVVJQTNH4spP4UeqBGqLdqDo27S").hash;
+		let address = Address::from("t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi").hash;
 		let script = Builder::build_p2sh(&address);
 		assert_eq!(script.script_type(), ScriptType::ScriptHash);
 		assert_eq!(script.extract_destinations(), Ok(vec![
