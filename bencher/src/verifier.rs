@@ -25,6 +25,7 @@ pub fn main(benchmark: &mut Benchmark) {
 
 	// test setup
 	let genesis = test_data::genesis();
+	let consensus = ConsensusParams::new(Network::Unitest);
 
 	let mut rolling_hash = genesis.hash();
 	let mut blocks: Vec<IndexedBlock> = Vec::new();
@@ -44,6 +45,7 @@ pub fn main(benchmark: &mut Benchmark) {
 			.merkled_header()
 				.parent(rolling_hash.clone())
 				.nonce((x as u8).into())
+				.time(consensus.pow_target_spacing * 7 * (x as u32))
 				.build()
 			.build();
 		rolling_hash = next_block.hash();
@@ -88,6 +90,7 @@ pub fn main(benchmark: &mut Benchmark) {
 			builder
 				.merkled_header()
 					.parent(rolling_hash.clone())
+					.time(consensus.pow_target_spacing * 7 * ((b + BLOCKS_INITIAL) as u32))
 					.build()
 				.build()
 			.into());
@@ -96,7 +99,7 @@ pub fn main(benchmark: &mut Benchmark) {
 
 	assert_eq!(store.best_block().hash, rolling_hash);
 
-	let chain_verifier = ChainVerifier::new(store.clone(), ConsensusParams::new(Network::Unitest));
+	let chain_verifier = ChainVerifier::new(store.clone(), consensus);
 
 	// bench
 	benchmark.start();
