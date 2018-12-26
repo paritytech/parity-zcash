@@ -252,7 +252,7 @@ impl BlockAssembler {
 		let best_block = store.best_block();
 		let previous_header_hash = best_block.hash;
 		let height = best_block.number + 1;
-		let bits = work_required(previous_header_hash.clone(), height, store.as_block_header_provider(), consensus);
+		let bits = work_required(previous_header_hash.clone(), time, height, store.as_block_header_provider(), consensus);
 		let version = BLOCK_VERSION;
 
 		// TODO: sync with ZCash RPC - need to return founder reward?

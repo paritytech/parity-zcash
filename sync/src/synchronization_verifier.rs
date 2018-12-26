@@ -386,6 +386,7 @@ pub mod tests {
 				.merkled_header()
 					.parent(rolling_hash.clone())
 					.bits(Network::Unitest.max_bits().into())
+					.time(consensus.pow_target_spacing * 7 * i)
 					.build()
 				.build();
 			rolling_hash = next_block.hash();
@@ -408,6 +409,7 @@ pub mod tests {
 			.merkled_header()
 				.parent(last_block_hash)
 				.bits(Network::Unitest.max_bits().into())
+				.time(consensus.pow_target_spacing * 7 * 102)
 				.build()
 			.build().into();
 

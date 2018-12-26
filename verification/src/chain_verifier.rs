@@ -54,7 +54,7 @@ impl BackwardsCompatibleChainVerifier {
 				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
 				let canon_block = CanonBlock::new(block);
 				let chain_acceptor = ChainAcceptor::new(self.store.as_store(), &self.consensus, verification_level,
-					canon_block, block_number, &deployments);
+					canon_block, block_number, block.header.raw.time, &deployments);
 				chain_acceptor.check()?;
 			},
 			BlockOrigin::SideChain(origin) => {
@@ -64,7 +64,7 @@ impl BackwardsCompatibleChainVerifier {
 				let fork = self.store.fork(origin)?;
 				let canon_block = CanonBlock::new(block);
 				let chain_acceptor = ChainAcceptor::new(fork.store(), &self.consensus, verification_level, canon_block,
-					block_number, &deployments);
+					block_number, block.header.raw.time, &deployments);
 				chain_acceptor.check()?;
 			},
 			BlockOrigin::SideChainBecomingCanonChain(origin) => {
@@ -74,7 +74,7 @@ impl BackwardsCompatibleChainVerifier {
 				let fork = self.store.fork(origin)?;
 				let canon_block = CanonBlock::new(block);
 				let chain_acceptor = ChainAcceptor::new(fork.store(), &self.consensus, verification_level, canon_block,
-					block_number, &deployments);
+					block_number, block.header.raw.time, &deployments);
 				chain_acceptor.check()?;
 			},
 		}
