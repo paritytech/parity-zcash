@@ -1,6 +1,5 @@
 use EpochTag;
 use hash::H256;
-use crypto::{Sha256, Digest};
 
 /// Trait to query sequence of blockchain commitments;
 pub trait CommitmentProvider : Sync {

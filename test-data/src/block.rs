@@ -6,6 +6,7 @@ use primitives::bytes::Bytes;
 use primitives::compact::Compact;
 use ser::{Serializable, serialized_list_size};
 use chain;
+use network::ConsensusParams;
 use script::{Builder as ScriptBuilder, Opcode};
 use invoke::{Invoke, Identity};
 use super::genesis;
@@ -331,6 +332,10 @@ impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
 		self.input().coinbase().build()
 	}
 
+	pub fn founder_reward(self, consensus: &ConsensusParams, height: u32) -> Self {
+		self.output().founder_reward(consensus, height).build()
+	}
+
 	pub fn output(self) -> TransactionOutputBuilder<Self> {
 		TransactionOutputBuilder::with_callback(self)
 	}
@@ -468,6 +473,12 @@ impl<F> TransactionOutputBuilder<F> where F: Invoke<chain::TransactionOutput> {
 			script_pubkey: ScriptBuilder::default().push_opcode(Opcode::OP_1).into_script().into(),
 			value: 0,
 		}
+	}
+
+	pub fn founder_reward(mut self, consensus: &ConsensusParams, height: u32) -> Self {
+		self.script_pubkey = ScriptBuilder::build_p2sh(&consensus.founder_address(height).unwrap().hash).into();
+		self.value = consensus.founder_reward(height);
+		self
 	}
 
 	pub fn value(mut self, value: u64) -> Self {

@@ -18,11 +18,12 @@ impl<'a> HeaderAcceptor<'a> {
 		consensus: &'a ConsensusParams,
 		header: CanonHeader<'a>,
 		height: u32,
+		time: u32,
 		deployments: D,
 	) -> Self {
 		let csv_active = deployments.as_ref().csv(height, store, consensus);
 		HeaderAcceptor {
-			work: HeaderWork::new(header, store, height, consensus),
+			work: HeaderWork::new(header, store, height, time, consensus),
 			median_timestamp: HeaderMedianTimestamp::new(header, store, csv_active),
 			version: HeaderVersion::new(header, height, consensus),
 		}
@@ -66,22 +67,24 @@ pub struct HeaderWork<'a> {
 	header: CanonHeader<'a>,
 	store: &'a BlockHeaderProvider,
 	height: u32,
+	time: u32,
 	consensus: &'a ConsensusParams,
 }
 
 impl<'a> HeaderWork<'a> {
-	fn new(header: CanonHeader<'a>, store: &'a BlockHeaderProvider, height: u32, consensus: &'a ConsensusParams) -> Self {
+	fn new(header: CanonHeader<'a>, store: &'a BlockHeaderProvider, height: u32, time: u32, consensus: &'a ConsensusParams) -> Self {
 		HeaderWork {
 			header: header,
 			store: store,
 			height: height,
+			time: time,
 			consensus: consensus,
 		}
 	}
 
 	fn check(&self) -> Result<(), Error> {
 		let previous_header_hash = self.header.raw.previous_header_hash.clone();
-		let work = work_required(previous_header_hash, self.height, self.store, self.consensus);
+		let work = work_required(previous_header_hash, self.time, self.height, self.store, self.consensus);
 		if work == self.header.raw.bits {
 			Ok(())
 		} else {

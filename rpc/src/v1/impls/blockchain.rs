@@ -310,7 +310,7 @@ pub mod tests {
 					hex: Bytes::new(vec![1, 2, 3, 4]),
 					req_sigs: 777,
 					script_type: ScriptType::Multisig,
-					addresses: vec!["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(), "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into()],
+					addresses: vec!["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(), "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into()],
 				},
 				version: 33,
 				coinbase: false,
@@ -615,7 +615,7 @@ pub mod tests {
 				"id": 1
 			}"#)).unwrap();
 
-		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":{"bestblock":"0000000000000000000000000000000000000000000000000000000000000056","coinbase":false,"confirmations":777,"scriptPubKey":{"addresses":["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa","1H5m1XzvHsjWX3wwU781ubctznEpNACrNC"],"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig"},"value":100000.56,"version":33},"id":1}"#);
+		assert_eq!(&sample, r#"{"jsonrpc":"2.0","result":{"bestblock":"0000000000000000000000000000000000000000000000000000000000000056","coinbase":false,"confirmations":777,"scriptPubKey":{"addresses":["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi","t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543"],"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig"},"value":100000.56,"version":33},"id":1}"#);
 	}
 
 	#[test]

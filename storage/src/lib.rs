@@ -8,7 +8,6 @@ extern crate display_derive;
 extern crate primitives;
 extern crate serialization as ser;
 extern crate chain;
-extern crate bitcrypto as crypto;
 
 mod best_block;
 mod block_ancestors;

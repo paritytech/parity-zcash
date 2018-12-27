@@ -253,11 +253,11 @@ mod tests {
 		let txout = TransactionOutputs {
 			outputs: vec![
 				TransactionOutput::Address(TransactionOutputWithAddress {
-					address: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(),
+					address: "t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(),
 					amount: 123.45,
 				}),
 				TransactionOutput::Address(TransactionOutputWithAddress {
-					address: "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into(),
+					address: "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into(),
 					amount: 67.89,
 				}),
 				TransactionOutput::ScriptData(TransactionOutputWithScriptData {
@@ -268,7 +268,7 @@ mod tests {
 				}),
 			]
 		};
-		assert_eq!(serde_json::to_string(&txout).unwrap(), r#"{"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa":123.45,"1H5m1XzvHsjWX3wwU781ubctznEpNACrNC":67.89,"data":"01020304","data":"05060708"}"#);
+		assert_eq!(serde_json::to_string(&txout).unwrap(), r#"{"t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi":123.45,"t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543":67.89,"data":"01020304","data":"05060708"}"#);
 	}
 
 	#[test]
@@ -276,11 +276,11 @@ mod tests {
 		let txout = TransactionOutputs {
 			outputs: vec![
 				TransactionOutput::Address(TransactionOutputWithAddress {
-					address: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(),
+					address: "t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(),
 					amount: 123.45,
 				}),
 				TransactionOutput::Address(TransactionOutputWithAddress {
-					address: "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into(),
+					address: "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into(),
 					amount: 67.89,
 				}),
 				TransactionOutput::ScriptData(TransactionOutputWithScriptData {
@@ -292,7 +292,7 @@ mod tests {
 			]
 		};
 		assert_eq!(
-			serde_json::from_str::<TransactionOutputs>(r#"{"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa":123.45,"1H5m1XzvHsjWX3wwU781ubctznEpNACrNC":67.89,"data":"01020304","data":"05060708"}"#).unwrap(),
+			serde_json::from_str::<TransactionOutputs>(r#"{"t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi":123.45,"t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543":67.89,"data":"01020304","data":"05060708"}"#).unwrap(),
 			txout);
 	}
 
@@ -323,9 +323,9 @@ mod tests {
 			hex: Bytes::new(vec![1, 2, 3, 4]),
 			req_sigs: 777,
 			script_type: ScriptType::Multisig,
-			addresses: vec!["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(), "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into()],
+			addresses: vec!["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(), "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into()],
 		};
-		assert_eq!(serde_json::to_string(&txout).unwrap(), r#"{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa","1H5m1XzvHsjWX3wwU781ubctznEpNACrNC"]}"#);
+		assert_eq!(serde_json::to_string(&txout).unwrap(), r#"{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi","t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543"]}"#);
 	}
 
 	#[test]
@@ -335,11 +335,11 @@ mod tests {
 			hex: Bytes::new(vec![1, 2, 3, 4]),
 			req_sigs: 777,
 			script_type: ScriptType::Multisig,
-			addresses: vec!["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(), "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into()],
+			addresses: vec!["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(), "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into()],
 		};
 
 		assert_eq!(
-			serde_json::from_str::<TransactionOutputScript>(r#"{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa","1H5m1XzvHsjWX3wwU781ubctznEpNACrNC"]}"#).unwrap(),
+			serde_json::from_str::<TransactionOutputScript>(r#"{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi","t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543"]}"#).unwrap(),
 			txout);
 	}
 
@@ -383,10 +383,10 @@ mod tests {
 				hex: Bytes::new(vec![1, 2, 3, 4]),
 				req_sigs: 777,
 				script_type: ScriptType::Multisig,
-				addresses: vec!["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(), "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into()],
+				addresses: vec!["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(), "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into()],
 			},
 		};
-		assert_eq!(serde_json::to_string(&txout).unwrap(), r#"{"value":777.79,"n":12,"scriptPubKey":{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa","1H5m1XzvHsjWX3wwU781ubctznEpNACrNC"]}}"#);
+		assert_eq!(serde_json::to_string(&txout).unwrap(), r#"{"value":777.79,"n":12,"scriptPubKey":{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi","t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543"]}}"#);
 	}
 
 	#[test]
@@ -399,11 +399,11 @@ mod tests {
 				hex: Bytes::new(vec![1, 2, 3, 4]),
 				req_sigs: 777,
 				script_type: ScriptType::Multisig,
-				addresses: vec!["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into(), "1H5m1XzvHsjWX3wwU781ubctznEpNACrNC".into()],
+				addresses: vec!["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi".into(), "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543".into()],
 			},
 		};
 		assert_eq!(
-			serde_json::from_str::<SignedTransactionOutput>(r#"{"value":777.79,"n":12,"scriptPubKey":{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa","1H5m1XzvHsjWX3wwU781ubctznEpNACrNC"]}}"#).unwrap(),
+			serde_json::from_str::<SignedTransactionOutput>(r#"{"value":777.79,"n":12,"scriptPubKey":{"asm":"Hello, world!!!","hex":"01020304","reqSigs":777,"type":"multisig","addresses":["t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi","t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543"]}}"#).unwrap(),
 			txout);
 	}
 

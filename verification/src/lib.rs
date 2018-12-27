@@ -65,6 +65,7 @@ extern crate rustc_hex as hex;
 
 extern crate storage;
 extern crate chain;
+extern crate keys;
 extern crate network;
 extern crate primitives;
 extern crate serialization as ser;
@@ -87,7 +88,6 @@ mod sapling;
 mod sigops;
 mod timestamp;
 mod work;
-mod work_zcash;
 
 // pre-verification
 mod verify_block;
@@ -121,7 +121,7 @@ pub use chain_verifier::BackwardsCompatibleChainVerifier;
 pub use error::{Error, TransactionError};
 pub use sigops::transaction_sigops;
 pub use timestamp::{median_timestamp, median_timestamp_inclusive};
-pub use work::{work_required, is_valid_proof_of_work, is_valid_proof_of_work_hash, block_reward_satoshi};
+pub use work::{work_required, is_valid_proof_of_work, is_valid_proof_of_work_hash};
 pub use deployments::Deployments;
 
 #[derive(Debug, Clone, Copy, PartialEq)]

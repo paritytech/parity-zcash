@@ -17,14 +17,14 @@ pub struct ChainAcceptor<'a> {
 }
 
 impl<'a> ChainAcceptor<'a> {
-	pub fn new(store: &'a Store, consensus: &'a ConsensusParams, verification_level: VerificationLevel, block: CanonBlock<'a>, height: u32, deployments: &'a BlockDeployments) -> Self {
+	pub fn new(store: &'a Store, consensus: &'a ConsensusParams, verification_level: VerificationLevel, block: CanonBlock<'a>, height: u32, time: u32, deployments: &'a BlockDeployments) -> Self {
 		trace!(target: "verification", "Block verification {}", block.hash().to_reversed_str());
 		let output_store = DuplexTransactionOutputProvider::new(store.as_transaction_output_provider(), block.raw());
 		let headers = store.as_block_header_provider();
 
 		ChainAcceptor {
 			block: BlockAcceptor::new(store.as_transaction_output_provider(), consensus, block, height, deployments, headers),
-			header: HeaderAcceptor::new(headers, consensus, block.header(), height, deployments),
+			header: HeaderAcceptor::new(headers, consensus, block.header(), height, time, deployments),
 			transactions: block.transactions()
 				.into_iter()
 				.enumerate()

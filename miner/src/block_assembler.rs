@@ -5,7 +5,7 @@ use chain::{OutPoint, TransactionOutput, IndexedTransaction};
 use storage::{SharedStore, TransactionOutputProvider};
 use network::ConsensusParams;
 use memory_pool::{MemoryPool, OrderingStrategy, Entry};
-use verification::{work_required, block_reward_satoshi, transaction_sigops};
+use verification::{work_required, transaction_sigops};
 
 const BLOCK_VERSION: u32 = 0x20000000;
 const BLOCK_HEADER_SIZE: u32 = 4 + 32 + 32 + 4 + 4 + 4;
@@ -252,10 +252,11 @@ impl BlockAssembler {
 		let best_block = store.best_block();
 		let previous_header_hash = best_block.hash;
 		let height = best_block.number + 1;
-		let bits = work_required(previous_header_hash.clone(), height, store.as_block_header_provider(), consensus);
+		let bits = work_required(previous_header_hash.clone(), time, height, store.as_block_header_provider(), consensus);
 		let version = BLOCK_VERSION;
 
-		let mut coinbase_value = block_reward_satoshi(height);
+		// TODO: sync with ZCash RPC - need to return founder reward?
+		let mut miner_reward = consensus.miner_reward(height);
 		let mut transactions = Vec::new();
 
 		let mempool_iter = mempool.iter(OrderingStrategy::ByTransactionScore);
@@ -270,7 +271,7 @@ impl BlockAssembler {
 		for entry in tx_iter {
 			// miner_fee is i64, but we can safely cast it to u64
 			// memory pool should restrict miner fee to be positive
-			coinbase_value += entry.miner_fee as u64;
+			miner_reward += entry.miner_fee as u64;
 			let tx = IndexedTransaction::new(entry.hash.clone(), entry.transaction.clone());
 			transactions.push(tx);
 		}
@@ -282,7 +283,7 @@ impl BlockAssembler {
 			bits: bits,
 			height: height,
 			transactions: transactions,
-			coinbase_value: coinbase_value,
+			coinbase_value: miner_reward,
 			size_limit: self.max_block_size,
 			sigop_limit: self.max_block_sigops,
 		}
