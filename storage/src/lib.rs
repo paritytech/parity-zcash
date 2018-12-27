@@ -8,6 +8,7 @@ extern crate display_derive;
 extern crate primitives;
 extern crate serialization as ser;
 extern crate chain;
+extern crate bitcrypto as crypto;
 
 mod best_block;
 mod block_ancestors;
@@ -22,6 +23,7 @@ mod store;
 mod transaction_meta;
 mod transaction_provider;
 mod nullifier;
+mod commitments;
 
 pub use primitives::{hash, bytes};
 

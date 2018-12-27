@@ -44,3 +44,6 @@ name = "pzec"
 
 [workspace]
 members = ["bencher"]
+
+[patch.crates-io]
+rust-crypto = { path = "./../rust-crypto" }
