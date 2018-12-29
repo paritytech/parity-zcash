@@ -40,6 +40,7 @@ pub use store::{AsSubstore, Store, SharedStore, CanonStore, ConfigStore};
 pub use transaction_meta::TransactionMeta;
 pub use transaction_provider::{TransactionProvider, TransactionOutputProvider, TransactionMetaProvider};
 pub use nullifier::{Nullifier, NullifierTracker};
+pub use tree_state::{TreeState, H32 as H32TreeDim, Dim as TreeDim, RegularTreeState};
 
 /// Epoch tag.
 ///

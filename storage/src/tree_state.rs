@@ -76,14 +76,6 @@ pub trait Dim {
 	fn height() -> u32;
 }
 
-pub struct H4;
-
-impl Dim for H4 {
-	fn height() -> u32 {
-		4
-	}
-}
-
 pub struct H32;
 
 impl Dim for H32 {
@@ -100,7 +92,7 @@ pub struct TreeState<D: Dim> {
 }
 
 impl<D: Dim> TreeState<D> {
-	fn new() -> Self {
+	pub fn new() -> Self {
 		TreeState {
 			_phantom: ::std::marker::PhantomData,
 			left: None,
@@ -109,7 +101,7 @@ impl<D: Dim> TreeState<D> {
 		}
 	}
 
-	fn append(&mut self, hash: H256) -> Result<(), &'static str> {
+	pub fn append(&mut self, hash: H256) -> Result<(), &'static str> {
 		if self.left.is_none() {
 			self.left = Some(hash);
 		} else if self.right.is_none() {
@@ -139,7 +131,7 @@ impl<D: Dim> TreeState<D> {
 		Ok(())
 	}
 
-	fn root(&self) -> H256 {
+	pub fn root(&self) -> H256 {
 		let left = self.left.as_ref().unwrap_or(&EMPTY_ROOTS[0]);
 		let right = self.right.as_ref().unwrap_or(&EMPTY_ROOTS[0]);
 
@@ -156,7 +148,6 @@ impl<D: Dim> TreeState<D> {
 	}
 }
 
-pub type TestTreeState = TreeState<H4>;
 pub type RegularTreeState = TreeState<H32>;
 
 impl<D: Dim> serialization::Serializable for TreeState<D> {
@@ -184,7 +175,16 @@ impl<D: Dim> serialization::Deserializable for TreeState<D> {
 mod tests {
 
 	use super::*;
-	use EpochTag;
+
+	pub struct H4;
+
+	impl Dim for H4 {
+		fn height() -> u32 {
+			4
+		}
+	}
+
+	type TestTreeState = TreeState<H4>;
 
 	pub struct H1;
 
