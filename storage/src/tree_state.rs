@@ -112,15 +112,16 @@ impl<D: Dim> TreeState<D> {
 
 			let mut combined = sha256_compress(&*former_left, &*former_right);
 			for i in 0..D::HEIGHT-1 {
-				let parent_slot = self.parents.get_mut(i as usize)
-					.expect("Vector is at least self.height in size");
+				let parent_slot = &mut self.parents[i as usize];
 
-				if parent_slot.is_none() {
-					*parent_slot = Some(combined);
-					return Ok(());
-				} else {
-					let former_parent_slot = parent_slot.take().expect("None variant checked above; qed");
-					combined = sha256_compress(&*former_parent_slot, &*combined);
+				match parent_slot.take() {
+					None => {
+						*parent_slot = Some(combined);
+						return Ok(());
+					},
+					Some(former) => {
+						combined = sha256_compress(&*former, &*combined)
+					},
 				}
 			}
 
