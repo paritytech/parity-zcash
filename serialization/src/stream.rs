@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 use compact_integer::CompactInteger;
 use bytes::Bytes;
 
-pub fn serialize<T>(t: &T) -> Bytes where T: Serializable{
+pub fn serialize<T>(t: &T) -> Bytes where T: Serializable {
 	let mut stream = Stream::new();
 	stream.append(t);
 	stream.out()

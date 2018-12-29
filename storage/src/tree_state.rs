@@ -72,21 +72,40 @@ lazy_static! {
 	].to_vec();
 }
 
-struct TreeState {
-	height: u32,
+pub trait Dim {
+	fn height() -> u32;
+}
+
+pub struct H4;
+
+impl Dim for H4 {
+	fn height() -> u32 {
+		4
+	}
+}
+
+pub struct H32;
+
+impl Dim for H32 {
+	fn height() -> u32 {
+		32
+	}
+}
+
+pub struct TreeState<D: Dim> {
+	_phantom: ::std::marker::PhantomData<D>,
 	left: Option<H256>,
 	right: Option<H256>,
 	parents: Vec<Option<H256>>,
 }
 
-impl TreeState {
-
-	fn new(height: u32) -> Self {
+impl<D: Dim> TreeState<D> {
+	fn new() -> Self {
 		TreeState {
-			height: height,
+			_phantom: ::std::marker::PhantomData,
 			left: None,
 			right: None,
-			parents: vec![None; height as usize],
+			parents: vec![None; D::height() as usize],
 		}
 	}
 
@@ -102,7 +121,7 @@ impl TreeState {
 				.expect("none variant is handled in the branch above; qed");
 
 			let mut combined = sha256_compress(&*former_left, &*former_right);
-			for i in 0..self.height {
+			for i in 0..D::height() {
 				let parent_slot = self.parents.get_mut(i as usize)
 					.expect("Vector is at least self.height in size");
 
@@ -126,7 +145,7 @@ impl TreeState {
 
 		let mut root = sha256_compress(&**left, &**right);
 
-		for i in 1..self.height {
+		for i in 1..D::height() {
 			match &self.parents[i as usize] {
 				&None => { root = sha256_compress(&*root, &*EMPTY_ROOTS[i as usize]); },
 				&Some(ref parent) => { root = sha256_compress(&**parent, &*root); }
@@ -137,15 +156,55 @@ impl TreeState {
 	}
 }
 
+pub type TestTreeState = TreeState<H4>;
+pub type RegularTreeState = TreeState<H32>;
+
+impl<D: Dim> serialization::Serializable for TreeState<D> {
+	fn serialize(&self, stream: &mut serialization::Stream) {
+		stream.append(&self.left);
+		stream.append(&self.right);
+		stream.append_list(&self.parents);
+	}
+}
+
+impl<D: Dim> serialization::Deserializable for TreeState<D> {
+	fn deserialize<R: ::std::io::Read>(reader: &mut serialization::Reader<R>)
+		-> Result<Self, serialization::Error>
+	{
+		let mut tree_state = TreeState::<D>::new();
+		tree_state.left = reader.read()?;
+		tree_state.right = reader.read()?;
+		tree_state.parents = reader.read_list()?;
+
+		Ok(tree_state)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 
 	use super::*;
 	use EpochTag;
 
+	pub struct H1;
+
+	impl Dim for H1 {
+		fn height() -> u32 {
+			1
+		}
+	}
+
+	pub struct H2;
+
+	impl Dim for H2 {
+		fn height() -> u32 {
+			2
+		}
+	}
+
 	#[test]
 	fn single_root() {
-		let mut tree = TreeState::new(1);
+		let mut tree = TreeState::<H1>::new();
 		tree.append(EMPTY_ROOTS[0].clone()).unwrap();
 
 		assert_eq!(
@@ -156,7 +215,7 @@ mod tests {
 
 	#[test]
 	fn single_elem_in_double_tree() {
-		let mut tree = TreeState::new(2);
+		let mut tree = TreeState::<H2>::new();
 		tree.append(EMPTY_ROOTS[0].clone()).unwrap();
 
 		assert_eq!(
@@ -167,7 +226,7 @@ mod tests {
 
 	#[test]
 	fn commitment_1() {
-		let mut tree = TreeState::new(4);
+		let mut tree = TestTreeState::new();
 		tree.append(H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
 			.unwrap();
 
@@ -179,7 +238,7 @@ mod tests {
 
 	#[test]
 	fn commitment_2() {
-		let mut tree = TreeState::new(4);
+		let mut tree = TestTreeState::new();
 		tree.append(H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
 			.unwrap();
 		tree.append(H256::from_reversed_str("43c9a4b21555b832a79fc12ce27a97d4f4eca1638e7161a780db1d5ebc35eb68"))
@@ -189,5 +248,72 @@ mod tests {
 			tree.root(),
 			H256::from("73f18d3f9cd11010aa01d4f444039e566f14ef282109df9649b2eb75e7a53ed1")
 		);
+	}
+
+	#[test]
+	fn glass() {
+		let mut tree = TestTreeState::new();
+		tree.append(H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
+			.unwrap();
+		tree.append(H256::from_reversed_str("43c9a4b21555b832a79fc12ce27a97d4f4eca1638e7161a780db1d5ebc35eb68"))
+			.unwrap();
+		tree.append(H256::from_reversed_str("fb92a6142315bb3396b693222bf2d0e260b448cda74e189063cf774048456083"))
+			.unwrap();
+
+		assert_eq!(
+			tree.root(),
+			H256::from("73f18d3f9cd11010aa01d4f444039e566f14ef282109df9649b2eb75e7a53ed1")
+		);
+	}
+
+	#[test]
+	fn commitments_full() {
+		let commitments_list = [
+			H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"),
+			H256::from_reversed_str("43c9a4b21555b832a79fc12ce27a97d4f4eca1638e7161a780db1d5ebc35eb68"),
+			H256::from_reversed_str("fb92a6142315bb3396b693222bf2d0e260b448cda74e189063cf774048456083"),
+			H256::from_reversed_str("e44a57cd544018937680d385817be3a3e35bb5b87ceeea93d536ea95828a4992"),
+			H256::from_reversed_str("43f48bfb9ab6f12ef91ce83e8f9190ce5dff2721784c90e08a50a67403367cff"),
+			H256::from_reversed_str("fce910561c3c7ebf14ed5d712e6838cdc6f1145c87eec256b7181f9df6d0c468"),
+			H256::from_reversed_str("b1e7016392805b227b11e58ba629f9a6684a0b4c34306e85e47548c43ecd168b"),
+			H256::from_reversed_str("2d9a49d9425449a449cc62d16febaf9c7f8b32349752ecc39191c36130b4c050"),
+			H256::from_reversed_str("53969b31a862b893dde857b8b7d4f53ce0e2c21a0f70d48ba1aef3a05fddff70"),
+			H256::from_reversed_str("17f8fabd440fdf9e2eafd75a3407e8bbde048d2d2232cd803d5763004af61ed8"),
+			H256::from_reversed_str("9b7805cb5e8ef337c13c73cab58ee719bf33a4a80ecc161bfe714269eca4928b"),
+			H256::from_reversed_str("a3ebada94d4329899ae136391604799d8cea39c0c331f9aaaa4a1e73ab63e904"),
+			H256::from_reversed_str("12091a20c9ebe67c2793bb71a6fdddb0ffe3ca781fcf1e192428161f186c3fbe"),
+			H256::from_reversed_str("e9c65749638df548b8909c0ea1d0f79079a6bb3235c649a8806322c87f968018"),
+			H256::from_reversed_str("8e8fddf0438a4263bc926fcfa6733dc201633959f294103533a2cb9328bb65c4"),
+			H256::from_reversed_str("206a202bd08dd31f77afc7114b17850192b83948cff5828df0d638cbe734c884")
+		];
+
+		let root_list = [
+			H256::from("95bf71d8e803b8601c14b5949d0f92690181154ef9d82eb3e24852266823317a"),
+			H256::from("73f18d3f9cd11010aa01d4f444039e566f14ef282109df9649b2eb75e7a53ed1"),
+			H256::from("dcde8a273c9672bee1a894d7f7f4abb81078f52b498e095f2a87d0aec5addf25"),
+			H256::from("4677d481ec6d1e97969afbc530958d1cbb4f1c047af6fdad4687cd10830e02bd"),
+			H256::from("74cd9d82de30c4222a06d420b75522ae1273729c1d8419446adf1184df61dc69"),
+			H256::from("2ff57f5468c6afdad30ec0fb6c2cb67289f12584e2c20c4e0065f66748697d77"),
+			H256::from("27e4ce010670801911c5765a003b15f75cde31d7378bd36540f593c8a44b3011"),
+			H256::from("62231ef2ec8c4da461072871ab7bc9de10253fcb40e164ddbad05b47e0b7fb69"),
+			H256::from("733a4ce688fdf07efb9e9f5a4b2dafff87cfe198fbe1dff71e028ef4cdee1f1b"),
+			H256::from("df39ed31924facdd69a93db07311d45fceac7a4987c091648044f37e6ecbb0d2"),
+			H256::from("87795c069bdb55281c666b9cb872d13174334ce135c12823541e9536489a9107"),
+			H256::from("438c80f532903b283230446514e400c329b29483db4fe9e279fdfc79e8f4347d"),
+			H256::from("08afb2813eda17e94aba1ab28ec191d4af99283cd4f1c5a04c0c2bc221bc3119"),
+			H256::from("a8b3ab3284f3288f7caa21bd2b69789a159ab4188b0908825b34723305c1228c"),
+			H256::from("db9b289e620de7dca2ae8fdac96808752e32e7a2c6d97ce0755dcebaa03123ab"),
+			H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc"),
+		];
+
+		let mut tree = TestTreeState::new();
+
+		for i in 0..commitments_list.len() {
+			tree.append(commitments_list[i].clone()).expect(&format!("Failed to add commitment #{}", i));
+			assert_eq!(&tree.root(), &root_list[i]);
+		}
+
+		// should return error because tree is full
+		assert!(tree.append(H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc")).is_err());
 	}
 }

@@ -247,6 +247,28 @@ impl Deserializable for Compact {
 	}
 }
 
+impl<T: Serializable + Sized> Serializable for Option<T> {
+	fn serialize(&self, stream: &mut Stream) {
+		match *self {
+			None => { stream.append(&false); },
+			Some(ref t) => { stream.append(&true); stream.append(t); },
+		}
+	}
+}
+
+impl<T: Deserializable + Sized> Deserializable for Option<T> {
+	fn deserialize<R>(reader: &mut Reader<R>) -> Result<Self, Error> where R: io::Read {
+		let has_value = reader.read::<bool>()?;
+		Ok(
+			if has_value {
+				Some(reader.read::<T>()?)
+			} else {
+				None
+			}
+		)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use bytes::Bytes;

@@ -24,7 +24,7 @@ mod store;
 mod transaction_meta;
 mod transaction_provider;
 mod nullifier;
-mod commitments;
+mod tree_state;
 
 pub use primitives::{hash, bytes};
 
