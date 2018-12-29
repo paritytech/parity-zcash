@@ -287,6 +287,44 @@ mod tests {
 			tree.root(),
 			H256::from("dcde8a273c9672bee1a894d7f7f4abb81078f52b498e095f2a87d0aec5addf25")
 		);
+
+		tree.append(H256::from_reversed_str("e44a57cd544018937680d385817be3a3e35bb5b87ceeea93d536ea95828a4992"))
+			.unwrap();
+
+		// left should be unaffeted
+		assert_eq!(tree.left, Some(H256::from_reversed_str("fb92a6142315bb3396b693222bf2d0e260b448cda74e189063cf774048456083")));
+
+		// right should be last added hash
+		assert_eq!(tree.right, Some(H256::from_reversed_str("e44a57cd544018937680d385817be3a3e35bb5b87ceeea93d536ea95828a4992")));
+
+		// *** FINAL ROUND ***
+		tree.append(H256::from_reversed_str("43f48bfb9ab6f12ef91ce83e8f9190ce5dff2721784c90e08a50a67403367cff"))
+			.unwrap();
+
+		// left should be last added hash
+		assert_eq!(tree.left, Some(H256::from_reversed_str("43f48bfb9ab6f12ef91ce83e8f9190ce5dff2721784c90e08a50a67403367cff")));
+
+		// right should be none now
+		assert_eq!(tree.right, None);
+
+		// parent #0 should be None
+		assert_eq!(tree.parents[0], None);
+
+		// parent #1 should be combined what?
+		assert_eq!(tree.parents[1], Some(
+			sha256_compress(
+				// this was parent[0]
+				&*sha256_compress(
+					&*H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"),
+					&*H256::from_reversed_str("43c9a4b21555b832a79fc12ce27a97d4f4eca1638e7161a780db1d5ebc35eb68")
+				),
+				// this is left and right
+				&*sha256_compress(
+					&*H256::from_reversed_str("fb92a6142315bb3396b693222bf2d0e260b448cda74e189063cf774048456083"),
+					&*H256::from_reversed_str("e44a57cd544018937680d385817be3a3e35bb5b87ceeea93d536ea95828a4992")
+				),
+			)
+		));
 	}
 
 	#[test]
