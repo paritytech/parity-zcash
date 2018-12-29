@@ -73,15 +73,13 @@ lazy_static! {
 }
 
 pub trait Dim {
-	fn height() -> u32;
+	const HEIGHT: usize;
 }
 
 pub struct H32;
 
 impl Dim for H32 {
-	fn height() -> u32 {
-		32
-	}
+	const HEIGHT: usize = 32;
 }
 
 pub struct TreeState<D: Dim> {
@@ -97,7 +95,7 @@ impl<D: Dim> TreeState<D> {
 			_phantom: ::std::marker::PhantomData,
 			left: None,
 			right: None,
-			parents: vec![None; D::height() as usize - 1],
+			parents: vec![None; D::HEIGHT - 1],
 		}
 	}
 
@@ -113,7 +111,7 @@ impl<D: Dim> TreeState<D> {
 				.expect("none variant is handled in the branch above; qed");
 
 			let mut combined = sha256_compress(&*former_left, &*former_right);
-			for i in 0..D::height()-1 {
+			for i in 0..D::HEIGHT-1 {
 				let parent_slot = self.parents.get_mut(i as usize)
 					.expect("Vector is at least self.height in size");
 
@@ -137,7 +135,7 @@ impl<D: Dim> TreeState<D> {
 
 		let mut root = sha256_compress(&**left, &**right);
 
-		for i in 0..D::height()-1 {
+		for i in 0..D::HEIGHT-1 {
 			match &self.parents[i as usize] {
 				&Some(ref parent) => { root = sha256_compress(&**parent, &*root); }
 				&None => { root = sha256_compress(&*root, &*EMPTY_ROOTS[i as usize + 1]); },
@@ -179,9 +177,7 @@ mod tests {
 	pub struct H4;
 
 	impl Dim for H4 {
-		fn height() -> u32 {
-			4
-		}
+		const HEIGHT: usize = 4;
 	}
 
 	type TestTreeState = TreeState<H4>;
@@ -189,17 +185,13 @@ mod tests {
 	pub struct H1;
 
 	impl Dim for H1 {
-		fn height() -> u32 {
-			1
-		}
+		const HEIGHT: usize = 1;
 	}
 
 	pub struct H2;
 
 	impl Dim for H2 {
-		fn height() -> u32 {
-			2
-		}
+		const HEIGHT: usize = 2;
 	}
 
 	#[test]
