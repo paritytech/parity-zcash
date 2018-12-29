@@ -105,7 +105,7 @@ impl<D: Dim> TreeState<D> {
 			_phantom: ::std::marker::PhantomData,
 			left: None,
 			right: None,
-			parents: vec![None; D::height() as usize],
+			parents: vec![None; D::height() as usize - 1],
 		}
 	}
 
@@ -121,13 +121,13 @@ impl<D: Dim> TreeState<D> {
 				.expect("none variant is handled in the branch above; qed");
 
 			let mut combined = sha256_compress(&*former_left, &*former_right);
-			for i in 0..D::height() {
+			for i in 0..D::height()-1 {
 				let parent_slot = self.parents.get_mut(i as usize)
 					.expect("Vector is at least self.height in size");
 
 				if parent_slot.is_none() {
 					*parent_slot = Some(combined);
-					break;
+					return Ok(());
 				} else {
 					let former_parent_slot = parent_slot.take().expect("None variant checked above; qed");
 					combined = sha256_compress(&*former_parent_slot, &*combined);
@@ -145,10 +145,10 @@ impl<D: Dim> TreeState<D> {
 
 		let mut root = sha256_compress(&**left, &**right);
 
-		for i in 1..D::height() {
+		for i in 0..D::height()-1 {
 			match &self.parents[i as usize] {
-				&None => { root = sha256_compress(&*root, &*EMPTY_ROOTS[i as usize]); },
 				&Some(ref parent) => { root = sha256_compress(&**parent, &*root); }
+				&None => { root = sha256_compress(&*root, &*EMPTY_ROOTS[i as usize + 1]); },
 			}
 		}
 
@@ -260,9 +260,32 @@ mod tests {
 		tree.append(H256::from_reversed_str("fb92a6142315bb3396b693222bf2d0e260b448cda74e189063cf774048456083"))
 			.unwrap();
 
+		// left should be last added hash
+		assert_eq!(tree.left, Some(H256::from_reversed_str("fb92a6142315bb3396b693222bf2d0e260b448cda74e189063cf774048456083")));
+
+		// right should be none
+		assert_eq!(tree.right, None);
+
+		// parent#0 should 1st and 2nd combined
+		assert_eq!(
+			tree.parents[0],
+			Some(
+				sha256_compress(
+					&*H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"),
+					&*H256::from_reversed_str("43c9a4b21555b832a79fc12ce27a97d4f4eca1638e7161a780db1d5ebc35eb68")
+				)
+			)
+		);
+
+		// parent#1 should not be set
+		assert_eq!(
+			tree.parents[1],
+			None,
+		);
+
 		assert_eq!(
 			tree.root(),
-			H256::from("73f18d3f9cd11010aa01d4f444039e566f14ef282109df9649b2eb75e7a53ed1")
+			H256::from("dcde8a273c9672bee1a894d7f7f4abb81078f52b498e095f2a87d0aec5addf25")
 		);
 	}
 
