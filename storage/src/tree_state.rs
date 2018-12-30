@@ -320,9 +320,8 @@ mod tests {
 		));
 	}
 
-	#[test]
-	fn commitments_full() {
-		let commitments_list = [
+	lazy_static! {
+		static ref TEST_COMMITMENTS: Vec<H256> = [
 			H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"),
 			H256::from_reversed_str("43c9a4b21555b832a79fc12ce27a97d4f4eca1638e7161a780db1d5ebc35eb68"),
 			H256::from_reversed_str("fb92a6142315bb3396b693222bf2d0e260b448cda74e189063cf774048456083"),
@@ -339,7 +338,11 @@ mod tests {
 			H256::from_reversed_str("e9c65749638df548b8909c0ea1d0f79079a6bb3235c649a8806322c87f968018"),
 			H256::from_reversed_str("8e8fddf0438a4263bc926fcfa6733dc201633959f294103533a2cb9328bb65c4"),
 			H256::from_reversed_str("206a202bd08dd31f77afc7114b17850192b83948cff5828df0d638cbe734c884")
-		];
+		].to_vec();
+	}
+
+	#[test]
+	fn commitments_full() {
 
 		let root_list = [
 			H256::from("95bf71d8e803b8601c14b5949d0f92690181154ef9d82eb3e24852266823317a"),
@@ -362,12 +365,32 @@ mod tests {
 
 		let mut tree = TestTreeState::new();
 
-		for i in 0..commitments_list.len() {
-			tree.append(commitments_list[i].clone()).expect(&format!("Failed to add commitment #{}", i));
+		for i in 0..TEST_COMMITMENTS.len() {
+			tree.append(TEST_COMMITMENTS[i].clone()).expect(&format!("Failed to add commitment #{}", i));
 			assert_eq!(&tree.root(), &root_list[i]);
 		}
 
 		// should return error because tree is full
 		assert!(tree.append(H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc")).is_err());
+	}
+
+	#[test]
+	fn serde() {
+		let mut tree = TestTreeState::new();
+		for i in 0..TEST_COMMITMENTS.len() {
+			tree.append(TEST_COMMITMENTS[i].clone()).expect(&format!("Failed to add commitment #{}", i));
+		}
+
+		assert_eq!(tree.root(), H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc"));
+
+		let mut stream = serialization::Stream::new();
+		stream.append(&tree);
+
+		let bytes = stream.out();
+
+		let mut reader = serialization::Reader::new(&bytes[..]);
+		let deserialized_tree: TestTreeState = reader.read().expect("Failed to deserialize");
+
+		assert_eq!(deserialized_tree.root(), H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc"));
 	}
 }
