@@ -207,6 +207,14 @@ mod tests {
 	}
 
 	#[test]
+	fn empty_32_root() {
+		assert_eq!(
+			RegularTreeState::new().root(),
+			H256::from("ac58cd1388fec290d398f1944b564449a63c815880566bd1d189f7839e3b0c8c"),
+		)
+	}
+
+	#[test]
 	fn single_elem_in_double_tree() {
 		let mut tree = TreeState::<H2>::new();
 		tree.append(EMPTY_ROOTS[0].clone()).unwrap();
