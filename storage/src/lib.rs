@@ -25,7 +25,7 @@ mod transaction_meta;
 mod transaction_provider;
 mod nullifier;
 mod tree_state;
-mod anchors;
+mod anchor;
 
 pub use primitives::{hash, bytes};
 
@@ -42,7 +42,7 @@ pub use transaction_meta::TransactionMeta;
 pub use transaction_provider::{TransactionProvider, TransactionOutputProvider, TransactionMetaProvider};
 pub use nullifier::{Nullifier, NullifierTracker};
 pub use tree_state::{TreeState, H32 as H32TreeDim, Dim as TreeDim, RegularTreeState};
-pub use anchors::AnchorProvider;
+pub use anchor::AnchorProvider;
 
 /// Epoch tag.
 ///

@@ -14,4 +14,3 @@ pub trait AnchorProvider {
 			)
 	}
 }
-
