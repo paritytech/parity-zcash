@@ -12,3 +12,5 @@ primitives = { path = "../primitives" }
 serialization = { path = "../serialization" }
 chain = { path = "../chain" }
 display_derive = "0.0.0"
+bitcrypto = { path = "../crypto" }
+lazy_static = "*"

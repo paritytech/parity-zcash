@@ -2,7 +2,7 @@ use bytes::Bytes;
 use hash::H256;
 use ser::{serialize, List, deserialize};
 use chain::{Transaction as ChainTransaction, BlockHeader};
-use storage::{TransactionMeta, Nullifier, NullifierTag};
+use storage::{TransactionMeta, Nullifier, EpochTag};
 
 pub const COL_COUNT: u32 = 16;
 pub const COL_META: u32 = 0;
@@ -233,8 +233,8 @@ impl<'a> From<&'a KeyValue> for RawKeyValue {
 			KeyValue::Transaction(ref key, ref value) => (COL_TRANSACTIONS, serialize(key), serialize(value)),
 			KeyValue::TransactionMeta(ref key, ref value) => (COL_TRANSACTIONS_META, serialize(key), serialize(value)),
 			KeyValue::Nullifier(ref key) => match key.tag() {
-				NullifierTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash()), Bytes::new()),
-				NullifierTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash()), Bytes::new()),
+				EpochTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash()), Bytes::new()),
+				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash()), Bytes::new()),
 			},
 			KeyValue::BlockNumber(ref key, ref value) => (COL_BLOCK_NUMBERS, serialize(key), serialize(value)),
 			KeyValue::Configuration(ref key, ref value) => (COL_CONFIGURATION, serialize(key), serialize(value)),
@@ -272,8 +272,8 @@ impl<'a> From<&'a Key> for RawKey {
 			Key::Transaction(ref key) => (COL_TRANSACTIONS, serialize(key)),
 			Key::TransactionMeta(ref key) => (COL_TRANSACTIONS_META, serialize(key)),
 			Key::Nullifier(ref key) => match key.tag() {
-				NullifierTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash())),
-				NullifierTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash())),
+				EpochTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash())),
+				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash())),
 			},
 			Key::BlockNumber(ref key) => (COL_BLOCK_NUMBERS, serialize(key)),
 			Key::Configuration(ref key) => (COL_CONFIGURATION, serialize(key)),
