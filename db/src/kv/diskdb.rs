@@ -104,7 +104,7 @@ pub struct DatabaseIterator {
 impl<'a> Iterator for DatabaseIterator {
 	type Item = (Box<[u8]>, Box<[u8]>);
 
-    fn next(&mut self) -> Option<Self::Item> {
+	fn next(&mut self) -> Option<Self::Item> {
 		self.iter.next()
 	}
 }

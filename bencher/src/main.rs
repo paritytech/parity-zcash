@@ -41,10 +41,10 @@ impl Benchmark {
 }
 
 fn decimal_mark(s: String) -> String {
-    let bytes: Vec<_> = s.bytes().rev().collect();
-    let chunks: Vec<_> = bytes.chunks(3).map(|chunk| str::from_utf8(chunk).unwrap()).collect();
-    let result: Vec<_> = chunks.join(",").bytes().rev().collect();
-    String::from_utf8(result).unwrap()
+	let bytes: Vec<_> = s.bytes().rev().collect();
+	let chunks: Vec<_> = bytes.chunks(3).map(|chunk| str::from_utf8(chunk).unwrap()).collect();
+	let result: Vec<_> = chunks.join(",").bytes().rev().collect();
+	String::from_utf8(result).unwrap()
 }
 
 
@@ -65,9 +65,9 @@ fn run_benchmark<F>(name: &str, f: F) where F: FnOnce(&mut Benchmark) {
 }
 
 macro_rules! benchmark {
-    ($t:expr) => {
-    	run_benchmark(stringify!($t), $t);
-    };
+	($t:expr) => {
+		run_benchmark(stringify!($t), $t);
+	};
 }
 
 fn main() {

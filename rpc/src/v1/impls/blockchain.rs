@@ -178,9 +178,9 @@ impl<T> BlockChain for BlockChainClient<T> where T: BlockChainClientCoreApi {
 		Ok(self.core.best_block_hash().reversed().into())
 	}
 
-    fn block_count(&self) -> Result<u32, Error> {
-        Ok(self.core.block_count())
-    }
+	fn block_count(&self) -> Result<u32, Error> {
+		Ok(self.core.block_count())
+	}
 
 	fn block_hash(&self, height: u32) -> Result<H256, Error> {
 		self.core.block_hash(height)
