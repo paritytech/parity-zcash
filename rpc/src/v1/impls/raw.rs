@@ -5,10 +5,14 @@ use v1::traits::Raw;
 use v1::types::{RawTransaction, TransactionInput, TransactionOutput, TransactionOutputs, Transaction, GetRawTransactionResponse};
 use v1::types::H256;
 use v1::helpers::errors::{execution, invalid_params};
-use chain::Transaction as GlobalTransaction;
+use chain::{SAPLING_TX_VERSION, SAPLING_TX_VERSION_GROUP_ID, Transaction as GlobalTransaction};
 use primitives::bytes::Bytes as GlobalBytes;
 use primitives::hash::H256 as GlobalH256;
 use sync;
+
+/// Default expiry height delta (best blocks number + height in blocks) for transactions
+/// created by `createrawtransaction` RPC.
+const DEFAULT_TX_EXPIRY_DELTA: u32 = 20;
 
 pub struct RawClient<T: RawClientCoreApi> {
 	core: T,
@@ -16,7 +20,13 @@ pub struct RawClient<T: RawClientCoreApi> {
 
 pub trait RawClientCoreApi: Send + Sync + 'static {
 	fn accept_transaction(&self, transaction: GlobalTransaction) -> Result<GlobalH256, String>;
-	fn create_raw_transaction(&self, inputs: Vec<TransactionInput>, outputs: TransactionOutputs, lock_time: Trailing<u32>) -> Result<GlobalTransaction, String>;
+	fn create_raw_transaction(
+		&self,
+		inputs: Vec<TransactionInput>,
+		outputs: TransactionOutputs,
+		lock_time: Trailing<u32>,
+		expiry_height: Trailing<u32>,
+	) -> Result<GlobalTransaction, String>;
 }
 
 pub struct RawClientCore {
@@ -30,14 +40,28 @@ impl RawClientCore {
 		}
 	}
 
-	pub fn do_create_raw_transaction(inputs: Vec<TransactionInput>, outputs: TransactionOutputs, lock_time: Trailing<u32>) -> Result<GlobalTransaction, String> {
+	pub fn do_create_raw_transaction(
+		best_block_number: u32,
+		inputs: Vec<TransactionInput>,
+		outputs: TransactionOutputs,
+		lock_time: Trailing<u32>,
+		expiry_height: Trailing<u32>,
+	) -> Result<GlobalTransaction, String> {
 		use chain;
 		use keys;
 		use global_script::Builder as ScriptBuilder;
 
+		// overwinter is active atm => assume that all new transactions are created for sapling era
+		let version = SAPLING_TX_VERSION;
+		let version_group_id = SAPLING_TX_VERSION_GROUP_ID;
+
 		// to make lock_time work at least one input must have sequnce < SEQUENCE_FINAL
 		let lock_time = lock_time.unwrap_or_default();
 		let default_sequence = if lock_time != 0 { chain::constants::SEQUENCE_FINAL - 1 } else { chain::constants::SEQUENCE_FINAL };
+
+		// by default we're creating transactions that are expired in DEFAULT_TX_EXPIRY_DELTA blocks
+		let expiry_height = expiry_height
+			.unwrap_or_else(|| best_block_number + DEFAULT_TX_EXPIRY_DELTA);
 
 		// prepare inputs
 		let inputs: Vec<_> = inputs.into_iter()
@@ -79,11 +103,14 @@ impl RawClientCore {
 
 		// now construct && serialize transaction
 		let transaction = GlobalTransaction {
-			version: 1,
+			overwintered: true,
+			version: version,
+			version_group_id: version_group_id,
 			inputs: inputs,
 			outputs: outputs,
 			lock_time: lock_time,
-			..Default::default() // TODO
+			expiry_height: expiry_height,
+			..Default::default()
 		};
 
 		Ok(transaction)
@@ -95,8 +122,20 @@ impl RawClientCoreApi for RawClientCore {
 		self.local_sync_node.accept_transaction(transaction)
 	}
 
-	fn create_raw_transaction(&self, inputs: Vec<TransactionInput>, outputs: TransactionOutputs, lock_time: Trailing<u32>) -> Result<GlobalTransaction, String> {
-		RawClientCore::do_create_raw_transaction(inputs, outputs, lock_time)
+	fn create_raw_transaction(
+		&self,
+		inputs: Vec<TransactionInput>,
+		outputs: TransactionOutputs,
+		lock_time: Trailing<u32>,
+		expiry_height: Trailing<u32>,
+	) -> Result<GlobalTransaction, String> {
+		RawClientCore::do_create_raw_transaction(
+			self.local_sync_node.best_block_number(),
+			inputs,
+			outputs,
+			lock_time,
+			expiry_height,
+		)
 	}
 }
 
@@ -117,7 +156,13 @@ impl<T> Raw for RawClient<T> where T: RawClientCoreApi {
 			.map_err(|e| execution(e))
 	}
 
-	fn create_raw_transaction(&self, inputs: Vec<TransactionInput>, outputs: TransactionOutputs, lock_time: Trailing<u32>) -> Result<RawTransaction, Error> {
+	fn create_raw_transaction(
+		&self,
+		inputs: Vec<TransactionInput>,
+		outputs: TransactionOutputs,
+		lock_time: Trailing<u32>,
+		expiry_height: Trailing<u32>,
+	) -> Result<RawTransaction, Error> {
 		// reverse hashes of inputs
 		let inputs: Vec<_> = inputs.into_iter()
 			.map(|mut input| {
@@ -125,7 +170,8 @@ impl<T> Raw for RawClient<T> where T: RawClientCoreApi {
 				input
 			}).collect();
 
-		let transaction = try!(self.core.create_raw_transaction(inputs, outputs, lock_time).map_err(|e| execution(e)));
+		let transaction = self.core.create_raw_transaction(inputs, outputs, lock_time, expiry_height)
+			.map_err(|e| execution(e))?;
 		let transaction = serialize(&transaction);
 		Ok(transaction.into())
 	}
@@ -159,7 +205,13 @@ pub mod tests {
 			Ok(transaction.hash())
 		}
 
-		fn create_raw_transaction(&self, _inputs: Vec<TransactionInput>, _outputs: TransactionOutputs, _lock_time: Trailing<u32>) -> Result<Transaction, String> {
+		fn create_raw_transaction(
+			&self,
+			_inputs: Vec<TransactionInput>,
+			_outputs: TransactionOutputs,
+			_lock_time: Trailing<u32>,
+			_expiry_height: Trailing<u32>,
+		) -> Result<Transaction, String> {
 			Ok("0100000001ad9d38823d95f31dc6c0cb0724c11a3cf5a466ca4147254a10cd94aade6eb5b3230000006b483045022100b7683165c3ecd57b0c44bf6a0fb258dc08c328458321c8fadc2b9348d4e66bd502204fd164c58d1a949a4d39bb380f8f05c9f6b3e9417f06bf72e5c068428ca3578601210391c35ac5ee7cf82c5015229dcff89507f83f9b8c952b8fecfa469066c1cb44ccffffffff0170f30500000000001976a914801da3cb2ed9e44540f4b982bde07cd3fbae264288ac00000000".into())
 		}
 	}
@@ -169,7 +221,13 @@ pub mod tests {
 			Err("error".to_owned())
 		}
 
-		fn create_raw_transaction(&self, _inputs: Vec<TransactionInput>, _outputs: TransactionOutputs, _lock_time: Trailing<u32>) -> Result<Transaction, String> {
+		fn create_raw_transaction(
+			&self,
+			_inputs: Vec<TransactionInput>,
+			_outputs: TransactionOutputs,
+			_lock_time: Trailing<u32>,
+			_expiry_height: Trailing<u32>,
+		) -> Result<Transaction, String> {
 			Err("error".to_owned())
 		}
 	}
@@ -223,6 +281,24 @@ pub mod tests {
 				"jsonrpc": "2.0",
 				"method": "createrawtransaction",
 				"params": [[{"txid":"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b","vout":0}],{"t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi":0.01}],
+				"id": 1
+			}"#)
+		).unwrap();
+
+		assert_eq!(r#"{"jsonrpc":"2.0","result":"0100000001ad9d38823d95f31dc6c0cb0724c11a3cf5a466ca4147254a10cd94aade6eb5b3230000006b483045022100b7683165c3ecd57b0c44bf6a0fb258dc08c328458321c8fadc2b9348d4e66bd502204fd164c58d1a949a4d39bb380f8f05c9f6b3e9417f06bf72e5c068428ca3578601210391c35ac5ee7cf82c5015229dcff89507f83f9b8c952b8fecfa469066c1cb44ccffffffff0170f30500000000001976a914801da3cb2ed9e44540f4b982bde07cd3fbae264288ac00000000","id":1}"#, &sample);
+	}
+
+	#[test]
+	fn createrawtransaction_with_expiry_height_success() {
+		let client = RawClient::new(SuccessRawClientCore::default());
+		let mut handler = IoHandler::new();
+		handler.extend_with(client.to_delegate());
+
+		let sample = handler.handle_request_sync(&(r#"
+			{
+				"jsonrpc": "2.0",
+				"method": "createrawtransaction",
+				"params": [[{"txid":"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b","vout":0}],{"t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi":0.01}, 100, 200],
 				"id": 1
 			}"#)
 		).unwrap();
