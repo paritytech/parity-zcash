@@ -6,7 +6,7 @@ extern crate serde_json;
 extern crate serde_derive;
 extern crate jsonrpc_core;
 #[macro_use]
-extern crate jsonrpc_macros;
+extern crate jsonrpc_derive;
 extern crate jsonrpc_http_server;
 extern crate tokio_core;
 extern crate sync;
@@ -26,7 +26,6 @@ pub mod v1;
 pub mod rpc_server;
 
 pub use jsonrpc_core::{MetaIoHandler, Compatibility, Error};
-pub use jsonrpc_http_server::tokio_core::reactor::{Remote};
 
 pub use jsonrpc_http_server::Server;
 pub use rpc_server::start_http;

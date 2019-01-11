@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use rpc_apis::{self, ApiSet};
-use ethcore_rpc::{Server, start_http, MetaIoHandler, Compatibility, Remote};
+use ethcore_rpc::{Server, start_http, MetaIoHandler, Compatibility};
 use network::Network;
 use std::io;
 use sync;
@@ -13,7 +13,6 @@ pub struct Dependencies {
 	pub local_sync_node: sync::LocalNodeRef,
 	pub storage: storage::SharedStore,
 	pub p2p_context: Arc<p2p::Context>,
-	pub remote: Remote,
 }
 
 #[derive(Debug, PartialEq)]

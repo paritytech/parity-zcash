@@ -1,5 +1,4 @@
 use jsonrpc_core::Error;
-use jsonrpc_macros::Trailing;
 use ser::{Reader, serialize, deserialize};
 use v1::traits::Raw;
 use v1::types::{RawTransaction, TransactionInput, TransactionOutput, TransactionOutputs, Transaction, GetRawTransactionResponse};
@@ -24,8 +23,8 @@ pub trait RawClientCoreApi: Send + Sync + 'static {
 		&self,
 		inputs: Vec<TransactionInput>,
 		outputs: TransactionOutputs,
-		lock_time: Trailing<u32>,
-		expiry_height: Trailing<u32>,
+		lock_time: Option<u32>,
+		expiry_height: Option<u32>,
 	) -> Result<GlobalTransaction, String>;
 }
 
@@ -44,8 +43,8 @@ impl RawClientCore {
 		best_block_number: u32,
 		inputs: Vec<TransactionInput>,
 		outputs: TransactionOutputs,
-		lock_time: Trailing<u32>,
-		expiry_height: Trailing<u32>,
+		lock_time: Option<u32>,
+		expiry_height: Option<u32>,
 	) -> Result<GlobalTransaction, String> {
 		use chain;
 		use keys;
@@ -126,8 +125,8 @@ impl RawClientCoreApi for RawClientCore {
 		&self,
 		inputs: Vec<TransactionInput>,
 		outputs: TransactionOutputs,
-		lock_time: Trailing<u32>,
-		expiry_height: Trailing<u32>,
+		lock_time: Option<u32>,
+		expiry_height: Option<u32>,
 	) -> Result<GlobalTransaction, String> {
 		RawClientCore::do_create_raw_transaction(
 			self.local_sync_node.best_block_number(),
@@ -160,8 +159,8 @@ impl<T> Raw for RawClient<T> where T: RawClientCoreApi {
 		&self,
 		inputs: Vec<TransactionInput>,
 		outputs: TransactionOutputs,
-		lock_time: Trailing<u32>,
-		expiry_height: Trailing<u32>,
+		lock_time: Option<u32>,
+		expiry_height: Option<u32>,
 	) -> Result<RawTransaction, Error> {
 		// reverse hashes of inputs
 		let inputs: Vec<_> = inputs.into_iter()
@@ -180,14 +179,13 @@ impl<T> Raw for RawClient<T> where T: RawClientCoreApi {
 		rpc_unimplemented!()
 	}
 
-	fn get_raw_transaction(&self, _hash: H256, _verbose: Trailing<bool>) -> Result<GetRawTransactionResponse, Error> {
+	fn get_raw_transaction(&self, _hash: H256, _verbose: Option<bool>) -> Result<GetRawTransactionResponse, Error> {
 		rpc_unimplemented!()
 	}
 }
 
 #[cfg(test)]
 pub mod tests {
-	use jsonrpc_macros::Trailing;
 	use jsonrpc_core::IoHandler;
 	use chain::Transaction;
 	use primitives::hash::H256 as GlobalH256;
@@ -209,8 +207,8 @@ pub mod tests {
 			&self,
 			_inputs: Vec<TransactionInput>,
 			_outputs: TransactionOutputs,
-			_lock_time: Trailing<u32>,
-			_expiry_height: Trailing<u32>,
+			_lock_time: Option<u32>,
+			_expiry_height: Option<u32>,
 		) -> Result<Transaction, String> {
 			Ok("0100000001ad9d38823d95f31dc6c0cb0724c11a3cf5a466ca4147254a10cd94aade6eb5b3230000006b483045022100b7683165c3ecd57b0c44bf6a0fb258dc08c328458321c8fadc2b9348d4e66bd502204fd164c58d1a949a4d39bb380f8f05c9f6b3e9417f06bf72e5c068428ca3578601210391c35ac5ee7cf82c5015229dcff89507f83f9b8c952b8fecfa469066c1cb44ccffffffff0170f30500000000001976a914801da3cb2ed9e44540f4b982bde07cd3fbae264288ac00000000".into())
 		}
@@ -225,8 +223,8 @@ pub mod tests {
 			&self,
 			_inputs: Vec<TransactionInput>,
 			_outputs: TransactionOutputs,
-			_lock_time: Trailing<u32>,
-			_expiry_height: Trailing<u32>,
+			_lock_time: Option<u32>,
+			_expiry_height: Option<u32>,
 		) -> Result<Transaction, String> {
 			Err("error".to_owned())
 		}
