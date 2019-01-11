@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Parity Technologies <admin@parity.io>"]
 
 [dependencies]
-rocksdb = { git = "https://github.com/ethcore/rust-rocksdb" }
+parity-rocksdb = { git = "https://github.com/paritytech/rust-rocksdb" }
 elastic-array = "0.6"
 parking_lot = "0.4"
 log = "0.4"
