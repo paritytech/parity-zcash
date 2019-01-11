@@ -15,7 +15,7 @@ pub trait Raw {
 	#[rpc(name = "sendrawtransaction")]
 	fn send_raw_transaction(&self, RawTransaction) -> Result<H256, Error>;
 	/// Create a transaction spending the given inputs and creating new outputs.
-	/// @curl-example: curl --data-binary '{"jsonrpc": "2.0", "method": "createrawtransaction", "params": [[{"txid":"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b","vout":0}],{"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa":0.01}], "id":1 }' -H 'content-type: application/json' http://127.0.0.1:8332/
+	/// @curl-example: curl --data-binary '{"jsonrpc": "2.0", "method": "createrawtransaction", "params": [[{"txid":"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b","vout":0}],{"t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe":0.01}], "id":1 }' -H 'content-type: application/json' http://127.0.0.1:8332/
 	#[rpc(name = "createrawtransaction")]
 	fn create_raw_transaction(&self, Vec<TransactionInput>, TransactionOutputs, Option<u32>, Option<u32>) -> Result<RawTransaction, Error>;
 	/// Return an object representing the serialized, hex-encoded transaction.
