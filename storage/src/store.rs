@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use chain::BlockHeader;
-use primitives::compact::Compact;
 use {
 	BestBlock, BlockProvider, BlockHeaderProvider, TransactionProvider, TransactionMetaProvider,
 	TransactionOutputProvider, BlockChain, IndexedBlockProvider, Forkable, Error, NullifierTracker,
@@ -26,9 +25,6 @@ pub trait Store: AsSubstore {
 
 	/// get best header
 	fn best_header(&self) -> BlockHeader;
-
-	/// get blockchain difficulty
-	fn difficulty(&self, max_bits: Compact) -> f64;
 }
 
 /// Allows casting Arc<Store> to reference to any substore type

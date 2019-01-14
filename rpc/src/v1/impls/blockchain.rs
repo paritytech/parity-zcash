@@ -13,7 +13,7 @@ use global_script::Script;
 use chain::OutPoint;
 use verification;
 use ser::serialize;
-use network::{Network};
+use network::{Network, ConsensusParams};
 use primitives::hash::H256 as GlobalH256;
 
 pub struct BlockChainClient<T: BlockChainClientCoreApi> {
@@ -31,14 +31,14 @@ pub trait BlockChainClientCoreApi: Send + Sync + 'static {
 }
 
 pub struct BlockChainClientCore {
-	network: Network,
+	consensus: ConsensusParams,
 	storage: storage::SharedStore,
 }
 
 impl BlockChainClientCore {
-	pub fn new(network: Network, storage: storage::SharedStore) -> Self {
+	pub fn new(consensus: ConsensusParams, storage: storage::SharedStore) -> Self {
 		BlockChainClientCore {
-			network: network,
+			consensus: consensus,
 			storage: storage,
 		}
 	}
@@ -58,7 +58,17 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 	}
 
 	fn difficulty(&self) -> f64 {
-		self.storage.difficulty(self.network.max_bits().into())
+		let best_block = self.storage.best_block();
+		let now = ::time::get_time().sec as u32;
+
+		let next_work_required = verification::work_required(
+			best_block.hash,
+			now,
+			best_block.number + 1,
+			self.storage.as_block_header_provider(),
+			&self.consensus);
+
+		next_work_required.to_f64(self.consensus.network.max_bits().into())
 	}
 
 	fn raw_block(&self, hash: GlobalH256) -> Option<RawBlock> {
@@ -88,7 +98,7 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 					size: block_size as u32,
 					height: height,
 					mediantime: Some(median_time),
-					difficulty: block.header.raw.bits.to_f64(self.network.max_bits().into()),
+					difficulty: block.header.raw.bits.to_f64(self.consensus.network.max_bits().into()),
 					chainwork: U256::default(), // TODO: read from storage
 					previousblockhash: Some(block.header.raw.previous_header_hash.clone().into()),
 					nextblockhash: height.and_then(|h| self.storage.block_hash(h + 1).map(|h| h.into())),
@@ -148,7 +158,7 @@ impl BlockChainClientCoreApi for BlockChainClientCore {
 				req_sigs: script.num_signatures_required() as u32,
 				script_type: script.script_type().into(),
 				addresses: script_addresses.into_iter().map(|a| Address {
-					network: match self.network {
+					network: match self.consensus.network {
 						Network::Mainnet => keys::Network::Mainnet,
 						// there's no correct choices for Regtests && Other networks
 						// => let's just make Testnet key
@@ -442,7 +452,7 @@ pub mod tests {
 			]
 		));
 
-		let core = BlockChainClientCore::new(Network::Mainnet, storage);
+		let core = BlockChainClientCore::new(ConsensusParams::new(Network::Mainnet), storage);
 
 		// get info on block #1:
 		// https://blockexplorer.com/block/00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048
@@ -576,7 +586,7 @@ pub mod tests {
 	#[test]
 	fn verbose_transaction_out_contents() {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into(), test_data::block_h1().into()]));
-		let core = BlockChainClientCore::new(Network::Mainnet, storage);
+		let core = BlockChainClientCore::new(ConsensusParams::new(Network::Mainnet), storage);
 
 		// get info on tx from block#1:
 		// https://zcash.blockexplorer.com/tx/851bf6fbf7a976327817c738c489d7fa657752445430922d94c983c0b9ed4609

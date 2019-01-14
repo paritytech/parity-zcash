@@ -4,7 +4,6 @@ use std::path::Path;
 use parking_lot::RwLock;
 use hash::H256;
 use bytes::Bytes;
-use primitives::compact::Compact;
 use chain::{
 	IndexedBlock, IndexedBlockHeader, IndexedTransaction, BlockHeader, Block, Transaction,
 	OutPoint, TransactionOutput,
@@ -629,11 +628,6 @@ impl<T> Store for BlockChainDatabase<T> where T: KeyValueDatabase {
 	/// get best header
 	fn best_header(&self) -> BlockHeader {
 		self.block_header(self.best_block().hash.into()).expect("best block header should be in db; qed")
-	}
-
-	/// get blockchain difficulty
-	fn difficulty(&self, max_bits: Compact) -> f64 {
-		self.best_header().bits.to_f64(max_bits)
 	}
 }
 
