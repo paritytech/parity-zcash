@@ -14,7 +14,7 @@ use primitives::hash::H256;
 use miner::BlockTemplate;
 use synchronization_peers::{TransactionAnnouncementType, BlockAnnouncementType};
 use types::{PeerIndex, RequestId, StorageRef, MemoryPoolRef, PeersRef, ExecutorRef,
-	ClientRef, ServerRef, SynchronizationStateRef, SyncListenerRef};
+	ClientRef, ServerRef, SynchronizationStateRef, SyncListenerRef, BlockHeight};
 
 /// Local synchronization node
 pub struct LocalNode<T: TaskExecutor, U: Server, V: Client> {
@@ -237,6 +237,11 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		};
 		let memory_pool = &*self.memory_pool.read();
 		block_assembler.create_new_block(&self.storage, memory_pool, time::get_time().sec as u32, &self.consensus)
+	}
+
+	/// Get best synced (and stored) block number.
+	pub fn best_block_number(&self) -> BlockHeight {
+		self.state.best_storage_block_height()
 	}
 
 	/// Install synchronization events listener

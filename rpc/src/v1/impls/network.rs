@@ -3,7 +3,6 @@ use std::net::{SocketAddr, IpAddr};
 use v1::traits::Network as NetworkRpc;
 use v1::types::{AddNodeOperation, NodeInfo};
 use jsonrpc_core::Error;
-use jsonrpc_macros::Trailing;
 use v1::helpers::errors;
 use p2p;
 
@@ -34,7 +33,7 @@ impl<T> NetworkRpc for NetworkClient<T> where T: NetworkApi {
 		}
 	}
 
-	fn node_info(&self, _dns: bool, node_addr: Trailing<String>) -> Result<Vec<NodeInfo>, Error> {
+	fn node_info(&self, _dns: bool, node_addr: Option<String>) -> Result<Vec<NodeInfo>, Error> {
 		let node_addr: Option<String> = node_addr.into();
 		Ok(
 			match node_addr {

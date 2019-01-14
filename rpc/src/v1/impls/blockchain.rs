@@ -7,7 +7,6 @@ use v1::types::U256;
 use keys::{self, Address};
 use v1::helpers::errors::{block_not_found, block_at_height_not_found, transaction_not_found,
 	transaction_output_not_found, transaction_of_side_branch};
-use jsonrpc_macros::Trailing;
 use jsonrpc_core::Error;
 use {storage, chain};
 use global_script::Script;
@@ -192,7 +191,7 @@ impl<T> BlockChain for BlockChainClient<T> where T: BlockChainClientCoreApi {
 		Ok(self.core.difficulty())
 	}
 
-	fn block(&self, hash: H256, verbose: Trailing<bool>) -> Result<GetBlockResponse, Error> {
+	fn block(&self, hash: H256, verbose: Option<bool>) -> Result<GetBlockResponse, Error> {
 		let global_hash: GlobalH256 = hash.clone().into();
 		if verbose.unwrap_or_default() {
 			let verbose_block = self.core.verbose_block(global_hash.reversed());
@@ -213,7 +212,7 @@ impl<T> BlockChain for BlockChainClient<T> where T: BlockChainClientCoreApi {
 		.ok_or(block_not_found(hash))
 	}
 
-	fn transaction_out(&self, transaction_hash: H256, out_index: u32, _include_mempool: Trailing<bool>) -> Result<GetTxOutResponse, Error> {
+	fn transaction_out(&self, transaction_hash: H256, out_index: u32, _include_mempool: Option<bool>) -> Result<GetTxOutResponse, Error> {
 		// TODO: include_mempool
 		let transaction_hash: GlobalH256 = transaction_hash.into();
 		self.core.verbose_transaction_out(OutPoint { hash: transaction_hash.reversed(), index: out_index })
