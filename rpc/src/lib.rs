@@ -8,6 +8,7 @@ extern crate jsonrpc_core;
 #[macro_use]
 extern crate jsonrpc_derive;
 extern crate jsonrpc_http_server;
+extern crate time;
 extern crate tokio_core;
 extern crate sync;
 extern crate chain;

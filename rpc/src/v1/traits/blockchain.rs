@@ -21,7 +21,7 @@ pub trait BlockChain {
 	/// @curl-example: curl --data-binary '{"jsonrpc": "2.0", "method": "getblockhash", "params": [0], "id":1 }' -H 'content-type: application/json' http://127.0.0.1:8332/
 	#[rpc(name = "getblockhash")]
 	fn block_hash(&self, u32) -> Result<H256, Error>;
-	/// Get proof-of-work difficulty as a multiple of the minimum difficulty
+	/// Get proof-of-work difficulty for the next block as a multiple of the minimum difficulty
 	/// @curl-example: curl --data-binary '{"jsonrpc": "2.0", "method": "getdifficulty", "params": [], "id":1 }' -H 'content-type: application/json' http://127.0.0.1:8332/
 	#[rpc(name = "getdifficulty")]
 	fn difficulty(&self) -> Result<f64, Error>;
