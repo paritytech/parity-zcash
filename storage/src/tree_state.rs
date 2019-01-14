@@ -215,6 +215,16 @@ mod tests {
 	}
 
 	#[test]
+	fn appended_1_32_root() {
+		let mut tree = RegularTreeState::new();
+		tree.append(H256::from("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"));
+		assert_eq!(
+			tree.root(),
+			H256::from("af3a29c548af2d8314544875fe0a59555bfda3c81ea78da54bd02f89cce68acb")
+		);
+	}
+
+	#[test]
 	fn single_elem_in_double_tree() {
 		let mut tree = TreeState::<H2>::new();
 		tree.append(EMPTY_ROOTS[0].clone()).unwrap();
