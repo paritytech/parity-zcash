@@ -279,7 +279,7 @@ mod tests {
 					time: time,
 					bits: 0.into(),
 					nonce: (height as u8).into(),
-					reserved_hash: Default::default(),
+					final_sapling_root: Default::default(),
 					solution: Default::default(),
 				};
 				previous_header_hash = header.hash();

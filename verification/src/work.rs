@@ -193,7 +193,7 @@ mod tests {
 			previous_header_hash: 0.into(),
 			merkle_root_hash: 0.into(),
 			nonce: 0.into(),
-			reserved_hash: Default::default(),
+			final_sapling_root: Default::default(),
 			solution: Default::default(),
 		});
 
@@ -206,7 +206,7 @@ mod tests {
 				previous_header_hash: header_provider.by_height[i as usize - 1].hash(),
 				merkle_root_hash: 0.into(),
 				nonce: 0.into(),
-				reserved_hash: Default::default(),
+				final_sapling_root: Default::default(),
 				solution: Default::default(),
 			};
 			header_provider.insert(header);

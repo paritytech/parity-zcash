@@ -12,7 +12,7 @@ mod transaction;
 mod uint;
 mod nodes;
 
-pub use self::block::RawBlock;
+pub use self::block::{BlockRef, RawBlock};
 pub use self::block_template::{BlockTemplate, BlockTemplateTransaction};
 pub use self::block_template_request::{BlockTemplateRequest, BlockTemplateRequestMode};
 pub use self::bytes::Bytes;
