@@ -10,7 +10,9 @@ pub type RawBlock = Bytes;
 /// Block reference
 #[derive(Debug)]
 pub enum BlockRef {
+	/// References block by its number
 	Number(u32),
+	/// References block by its hash
 	Hash(H256),
 }
 
@@ -18,9 +20,9 @@ impl<'a> Deserialize<'a> for BlockRef {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'a> {
 		use serde::de::Visitor;
 
-		struct DummyVisitor;
+		struct BlockRefVisitor;
 
-		impl<'b> Visitor<'b> for DummyVisitor {
+		impl<'b> Visitor<'b> for BlockRefVisitor {
 			type Value = BlockRef;
 
 			fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -38,6 +40,6 @@ impl<'a> Deserialize<'a> for BlockRef {
 			}
 		}
 
-		deserializer.deserialize_identifier(DummyVisitor)
+		deserializer.deserialize_identifier(BlockRefVisitor)
 	}
 }
