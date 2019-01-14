@@ -2,7 +2,7 @@ use bytes::Bytes;
 use hash::H256;
 use ser::{serialize, List, deserialize};
 use chain::{Transaction as ChainTransaction, BlockHeader};
-use storage::{TransactionMeta, Nullifier, EpochTag};
+use storage::{TransactionMeta, Nullifier, EpochTag, RegularTreeState};
 
 pub const COL_COUNT: u32 = 16;
 pub const COL_META: u32 = 0;
@@ -14,7 +14,8 @@ pub const COL_TRANSACTIONS_META: u32 = 5;
 pub const COL_BLOCK_NUMBERS: u32 = 6;
 pub const COL_SPROUT_NULLIFIERS: u32 = 7;
 pub const COL_SAPLING_NULLIFIERS: u32 = 8;
-pub const COL_CONFIGURATION: u32 = 9;
+pub const COL_TREESTATES: u32 = 9;
+pub const COL_CONFIGURATION: u32 = 10;
 
 #[derive(Debug)]
 pub enum Operation {
@@ -33,6 +34,7 @@ pub enum KeyValue {
 	BlockNumber(H256, u32),
 	Configuration(&'static str, Bytes),
 	Nullifier(Nullifier),
+	TreeState(H256, RegularTreeState),
 }
 
 #[derive(Debug)]
@@ -46,6 +48,7 @@ pub enum Key {
 	BlockNumber(H256),
 	Configuration(&'static str),
 	Nullifier(Nullifier),
+	TreeRoot(H256),
 }
 
 #[derive(Debug, Clone)]
@@ -59,6 +62,7 @@ pub enum Value {
 	BlockNumber(u32),
 	Configuration(Bytes),
 	Empty,
+	TreeState(RegularTreeState),
 }
 
 impl Value {
@@ -73,6 +77,7 @@ impl Value {
 			Key::BlockNumber(_) => deserialize(bytes).map(Value::BlockNumber),
 			Key::Configuration(_) => deserialize(bytes).map(Value::Configuration),
 			Key::Nullifier(_) => Ok(Value::Empty),
+			Key::TreeRoot(_) => deserialize(bytes).map(Value::TreeState),
 		}.map_err(|e| format!("{:?}", e))
 	}
 
@@ -237,6 +242,7 @@ impl<'a> From<&'a KeyValue> for RawKeyValue {
 				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash()), Bytes::new()),
 			},
 			KeyValue::BlockNumber(ref key, ref value) => (COL_BLOCK_NUMBERS, serialize(key), serialize(value)),
+			KeyValue::TreeState(ref key, ref value) => (COL_TREESTATES, serialize(key), serialize(value)),
 			KeyValue::Configuration(ref key, ref value) => (COL_CONFIGURATION, serialize(key), serialize(value)),
 		};
 
@@ -275,6 +281,7 @@ impl<'a> From<&'a Key> for RawKey {
 				EpochTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash())),
 				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash())),
 			},
+			Key::TreeRoot(ref key) => (COL_TREESTATES, serialize(key)),
 			Key::BlockNumber(ref key) => (COL_BLOCK_NUMBERS, serialize(key)),
 			Key::Configuration(ref key) => (COL_CONFIGURATION, serialize(key)),
 		};

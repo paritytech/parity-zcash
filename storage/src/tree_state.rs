@@ -76,12 +76,14 @@ pub trait Dim {
 	const HEIGHT: usize;
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct H32;
 
 impl Dim for H32 {
 	const HEIGHT: usize = 32;
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct TreeState<D: Dim> {
 	_phantom: ::std::marker::PhantomData<D>,
 	left: Option<H256>,
