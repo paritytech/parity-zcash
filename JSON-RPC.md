@@ -68,7 +68,7 @@ Get proof-of-work difficulty as a multiple of the minimum difficulty
 
 Get information on given block.
 
-    curl -H 'content-type: application/json' --data-binary '{"jsonrpc": "2.0", "method": "getblock", "params": ["000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"], "id":1 }' localhost:8332
+    curl -H 'content-type: application/json' --data-binary '{"jsonrpc": "2.0", "method": "getblock", "params": ["0002a26c902619fc964443264feb16f1e3e2d71322fc53dcb81cc5d797e273ed"], "id":1 }' localhost:8332
 
 #### gettxout
 

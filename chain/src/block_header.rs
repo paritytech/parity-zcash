@@ -13,7 +13,7 @@ pub struct BlockHeader {
 	pub version: u32,
 	pub previous_header_hash: H256,
 	pub merkle_root_hash: H256,
-	pub reserved_hash: H256,
+	pub final_sapling_root: H256,
 	pub time: u32,
 	pub bits: Compact,
 	pub nonce: H256,
@@ -30,7 +30,7 @@ impl BlockHeader {
 		stream.append(&self.version)
 			.append(&self.previous_header_hash)
 			.append(&self.merkle_root_hash)
-			.append(&self.reserved_hash)
+			.append(&self.final_sapling_root)
 			.append(&self.time)
 			.append(&self.bits)
 			.append(&self.nonce);
@@ -85,7 +85,7 @@ mod tests {
 			version: 1,
 			previous_header_hash: [2; 32].into(),
 			merkle_root_hash: [3; 32].into(),
-			reserved_hash: Default::default(),
+			final_sapling_root: Default::default(),
 			time: 4,
 			bits: 5.into(),
 			nonce: 6.into(),
@@ -107,7 +107,7 @@ mod tests {
 			version: 1,
 			previous_header_hash: [2; 32].into(),
 			merkle_root_hash: [3; 32].into(),
-			reserved_hash: Default::default(),
+			final_sapling_root: Default::default(),
 			time: 4,
 			bits: 5.into(),
 			nonce: 6.into(),
