@@ -20,6 +20,7 @@ extern crate script;
 extern crate serialization as ser;
 extern crate rand;
 extern crate network;
+extern crate keys;
 
 mod blocks_writer;
 mod inbound_connection;

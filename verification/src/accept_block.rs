@@ -163,7 +163,7 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 		BlockCoinbaseMinerReward {
 			block: block,
 			store: store,
-			max_reward: consensus.miner_reward(height),
+			max_reward: consensus.block_reward(height),
 		}
 	}
 

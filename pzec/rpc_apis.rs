@@ -32,7 +32,7 @@ impl FromStr for Api {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
 			"raw" => Ok(Api::Raw),
-			"miner" => Ok(Api::Miner),
+			"miner" => Ok(Api::Miner),	
 			"blockchain" => Ok(Api::BlockChain),
 			"network" => Ok(Api::Network),
 			api => Err(format!("Unknown api: {}", api)),
@@ -54,7 +54,7 @@ pub fn setup_rpc(mut handler: MetaIoHandler<()>, apis: ApiSet, deps: Dependencie
 	for api in apis.list_apis() {
 		match api {
 			Api::Raw => handler.extend_with(RawClient::new(RawClientCore::new(deps.local_sync_node.clone())).to_delegate()),
-			Api::Miner => handler.extend_with(MinerClient::new(MinerClientCore::new(deps.local_sync_node.clone())).to_delegate()),
+			Api::Miner => handler.extend_with(MinerClient::new(MinerClientCore::new(deps.local_sync_node.clone(), deps.miner_address.clone())).to_delegate()),
 			Api::BlockChain => handler.extend_with(BlockChainClient::new(BlockChainClientCore::new(deps.consensus.clone(), deps.storage.clone())).to_delegate()),
 			Api::Network => handler.extend_with(NetworkClient::new(NetworkClientCore::new(deps.p2p_context.clone())).to_delegate()),
 		}

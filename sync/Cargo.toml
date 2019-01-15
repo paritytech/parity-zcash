@@ -18,6 +18,7 @@ chain = { path = "../chain" }
 bitcrypto = { path = "../crypto" }
 storage = { path = "../storage" }
 db = { path = "../db" }
+keys = { path = "../keys" }
 message = { path = "../message" }
 miner = { path = "../miner" }
 p2p = { path = "../p2p" }

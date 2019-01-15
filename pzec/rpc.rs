@@ -4,6 +4,7 @@ use rpc_apis::{self, ApiSet};
 use ethcore_rpc::{Server, start_http, MetaIoHandler, Compatibility};
 use network::ConsensusParams;
 use std::io;
+use keys::Address;
 use sync;
 use storage;
 use p2p;
@@ -13,6 +14,7 @@ pub struct Dependencies {
 	pub local_sync_node: sync::LocalNodeRef,
 	pub storage: storage::SharedStore,
 	pub p2p_context: Arc<p2p::Context>,
+	pub miner_address: Option<Address>,
 }
 
 #[derive(Debug, PartialEq)]

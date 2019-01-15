@@ -24,8 +24,6 @@ pub struct BlockTemplateRequest {
 	pub mode: Option<BlockTemplateRequestMode>,
 	/// Capabilities, supported by client
 	pub capabilities: Option<HashSet<String>>,
-	/// Softfork deployments, supported by client
-	pub rules: Option<HashSet<String>>,
 }
 
 #[cfg(test)]
@@ -47,29 +45,26 @@ mod tests {
 
 	#[test]
 	fn block_template_request_serialize() {
-		assert_eq!(serde_json::to_string(&BlockTemplateRequest::default()).unwrap(), r#"{"mode":null,"capabilities":null,"rules":null}"#);
+		assert_eq!(serde_json::to_string(&BlockTemplateRequest::default()).unwrap(), r#"{"mode":null,"capabilities":null}"#);
 		assert_eq!(serde_json::to_string(&BlockTemplateRequest {
 			mode: Some(BlockTemplateRequestMode::Template),
 			capabilities: Some(vec!["a".to_owned()].into_iter().collect()),
-			rules: Some(vec!["b".to_owned()].into_iter().collect()),
-		}).unwrap(), r#"{"mode":"template","capabilities":["a"],"rules":["b"]}"#);
+		}).unwrap(), r#"{"mode":"template","capabilities":["a"]}"#);
 	}
 
 	#[test]
 	fn block_template_request_deserialize() {
 		assert_eq!(
-			serde_json::from_str::<BlockTemplateRequest>(r#"{"mode":null,"capabilities":null,"rules":null}"#).unwrap(),
+			serde_json::from_str::<BlockTemplateRequest>(r#"{"mode":null,"capabilities":null}"#).unwrap(),
 			BlockTemplateRequest {
 				mode: None,
 				capabilities: None,
-				rules: None,
 			});
 		assert_eq!(
-			serde_json::from_str::<BlockTemplateRequest>(r#"{"mode":"template","capabilities":["a"],"rules":["b"]}"#).unwrap(),
+			serde_json::from_str::<BlockTemplateRequest>(r#"{"mode":"template","capabilities":["a"]}"#).unwrap(),
 			BlockTemplateRequest {
 				mode: Some(BlockTemplateRequestMode::Template),
 				capabilities: Some(vec!["a".to_owned()].into_iter().collect()),
-				rules: Some(vec!["b".to_owned()].into_iter().collect()),
 			});
 	}
 }

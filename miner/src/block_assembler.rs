@@ -1,14 +1,17 @@
 use std::collections::HashSet;
 use primitives::hash::H256;
 use primitives::compact::Compact;
-use chain::{OutPoint, TransactionOutput, IndexedTransaction};
+use chain::{OutPoint, TransactionOutput, TransactionInput, IndexedTransaction, Transaction,
+	SAPLING_TX_VERSION, SAPLING_TX_VERSION_GROUP_ID};
+use keys::Address;
 use storage::{SharedStore, TransactionOutputProvider};
+use script::Builder;
 use network::ConsensusParams;
 use memory_pool::{MemoryPool, OrderingStrategy, Entry};
 use verification::{work_required, transaction_sigops};
 
-const BLOCK_VERSION: u32 = 0x20000000;
-const BLOCK_HEADER_SIZE: u32 = 4 + 32 + 32 + 4 + 4 + 4;
+const BLOCK_VERSION: u32 = 4;
+const BLOCK_HEADER_SIZE: u32 = 4 + 32 + 32 + 32 + 4 + 4 + 32 + 1344;
 
 /// Block template as described in [BIP0022](https://github.com/bitcoin/bips/blob/master/bip-0022.mediawiki#block-template-request)
 pub struct BlockTemplate {
@@ -16,6 +19,8 @@ pub struct BlockTemplate {
 	pub version: u32,
 	/// The hash of previous block
 	pub previous_header_hash: H256,
+	/// The hash of the final sapling root
+	pub final_sapling_root_hash: H256,
 	/// The current time as seen by the server
 	pub time: u32,
 	/// The compressed difficulty
@@ -25,7 +30,7 @@ pub struct BlockTemplate {
 	/// Block transactions (excluding coinbase)
 	pub transactions: Vec<IndexedTransaction>,
 	/// Total funds available for the coinbase (in Satoshis)
-	pub coinbase_value: u64,
+	pub coinbase_tx: IndexedTransaction,
 	/// Number of bytes allowed in the block
 	pub size_limit: u32,
 	/// Number of sigops allowed in the block
@@ -115,7 +120,9 @@ impl SizePolicy {
 }
 
 /// Block assembler
-pub struct BlockAssembler {
+pub struct BlockAssembler<'a> {
+	/// Miner address.
+	pub miner_address: &'a Address,
 	/// Maximal block size.
 	pub max_block_size: u32,
 	/// Maximal # of sigops in the block.
@@ -245,8 +252,14 @@ impl<'a, T> Iterator for FittingTransactionsIterator<'a, T> where T: Iterator<It
 	}
 }
 
-impl BlockAssembler {
-	pub fn create_new_block(&self, store: &SharedStore, mempool: &MemoryPool, time: u32, consensus: &ConsensusParams) -> BlockTemplate {
+impl<'a> BlockAssembler<'a> {
+	pub fn create_new_block(
+		&self,
+		store: &SharedStore,
+		mempool: &MemoryPool,
+		time: u32,
+		consensus: &ConsensusParams,
+	) -> BlockTemplate {
 		// get best block
 		// take it's hash && height
 		let best_block = store.best_block();
@@ -255,10 +268,10 @@ impl BlockAssembler {
 		let bits = work_required(previous_header_hash.clone(), time, height, store.as_block_header_provider(), consensus);
 		let version = BLOCK_VERSION;
 
-		// TODO: sync with ZCash RPC - need to return founder reward?
 		let mut miner_reward = consensus.miner_reward(height);
 		let mut transactions = Vec::new();
 
+		let final_sapling_root_hash = Default::default(); // TODO: compute me
 		let mempool_iter = mempool.iter(OrderingStrategy::ByTransactionScore);
 		let tx_iter = FittingTransactionsIterator::new(
 			store.as_transaction_output_provider(),
@@ -276,14 +289,46 @@ impl BlockAssembler {
 			transactions.push(tx);
 		}
 
+		// prepare coinbase transaction
+		let mut coinbase_tx = Transaction {
+			overwintered: true,
+			version: SAPLING_TX_VERSION,
+			version_group_id: SAPLING_TX_VERSION_GROUP_ID,
+			inputs: vec![
+				TransactionInput::coinbase(Builder::default()
+					.push_i64(height.into())
+					.into_script()
+					.into())
+			],
+			outputs: vec![
+				TransactionOutput {
+					value: miner_reward,
+					script_pubkey: Builder::build_p2pkh(&self.miner_address.hash).into(),
+				},
+			],
+			lock_time: 0,
+			expiry_height: 0,
+			join_split: None,
+			sapling: None,
+		};
+
+		// insert founder reward if required
+		if let Some(founder_address) = consensus.founder_address(height) {
+			coinbase_tx.outputs.push(TransactionOutput {
+				value: consensus.founder_reward(height),
+				script_pubkey: Builder::build_p2sh(&founder_address.hash).into(),
+			});
+		}
+
 		BlockTemplate {
 			version: version,
 			previous_header_hash: previous_header_hash,
+			final_sapling_root_hash: final_sapling_root_hash,
 			time: time,
 			bits: bits,
 			height: height,
 			transactions: transactions,
-			coinbase_value: miner_reward,
+			coinbase_tx: coinbase_tx.into(),
 			size_limit: self.max_block_size,
 			sigop_limit: self.max_block_sigops,
 		}
@@ -363,6 +408,7 @@ mod tests {
 			pool.insert_verified(chain.at(1).into());
 
 			(BlockAssembler {
+				miner_address: &"t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe".into(),
 				max_block_size: 0xffffffff,
 				max_block_sigops: 0xffffffff,
 			}.create_new_block(&storage, &pool, 0, &consensus), hash0, hash1)

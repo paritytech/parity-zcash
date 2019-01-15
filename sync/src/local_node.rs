@@ -3,6 +3,7 @@ use parking_lot::{Mutex, Condvar};
 use time;
 use futures::{lazy, finished};
 use chain::{Transaction, IndexedTransaction, IndexedBlock};
+use keys::Address;
 use message::types;
 use miner::BlockAssembler;
 use network::ConsensusParams;
@@ -228,10 +229,11 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 	}
 
 	/// Get block template for mining
-	pub fn get_block_template(&self) -> BlockTemplate {
+	pub fn get_block_template(&self, miner_address: &Address) -> BlockTemplate {
 		let max_block_size = self.consensus.max_block_size();
 		let max_block_sigops = self.consensus.max_block_sigops();
 		let block_assembler = BlockAssembler {
+			miner_address: miner_address,
 			max_block_size: max_block_size as u32,
 			max_block_sigops: max_block_sigops as u32,
 		};
