@@ -123,6 +123,7 @@ pub fn start(cfg: config::Config) -> Result<(), String> {
 		storage: cfg.db,
 		local_sync_node: local_sync_node,
 		p2p_context: p2p.context().clone(),
+		miner_address: cfg.miner_address,
 	};
 	let _rpc_server = try!(rpc::new_http(cfg.rpc_config, rpc_deps));
 

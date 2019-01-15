@@ -95,6 +95,11 @@ args:
         help: Non-default verification-level is applied until a block with given hash is met.
         takes_value: true
         value_name: BLOCK
+    - miner-address:
+        long: miner-address
+        help: Sets the address to use in pubkey scripts of freshly generated coinbase transactions.
+        takes_value: true
+        value_name: ADDRESS
 subcommands:
     - import:
         about: Import blocks from a Bitcoin Core database.

@@ -1,6 +1,7 @@
 use std::net;
 use clap;
 use storage;
+use keys::Address;
 use message::Services;
 use network::{Network, ConsensusParams};
 use p2p::InternetProtocol;
@@ -33,6 +34,7 @@ pub struct Config {
 	pub block_notify_command: Option<String>,
 	pub verification_params: VerificationParameters,
 	pub db: storage::SharedStore,
+	pub miner_address: Option<Address>,
 }
 
 pub const DEFAULT_DB_CACHE: usize = 512;
@@ -139,6 +141,11 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 		_ => network.default_verification_edge(),
 	};
 
+	let miner_address = match matches.value_of("miner-address") {
+		Some(s) => Some(s.parse().map_err(|_| "Invalid miner-address commmand".to_owned())?),
+		None => None,
+	};
+
 	let config = Config {
 		quiet: quiet,
 		network: network,
@@ -162,6 +169,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 			verification_edge: verification_edge,
 		},
 		db: db,
+		miner_address: miner_address,
 	};
 
 	Ok(config)

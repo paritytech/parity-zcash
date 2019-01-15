@@ -427,8 +427,8 @@ impl ConsensusParams {
 		height >= self.sapling_height
 	}
 
-	/// Block reward (goes to miner) at given height.
-	pub fn miner_reward(&self, height: u32) -> u64 {
+	/// Block subsidy (total block reward).
+	pub fn block_reward(&self, height: u32) -> u64 {
 		let mut reward = 1_250_000_000u64;
 		if height < self.subsidy_slow_start_interval / 2 {
 			reward /= self.subsidy_slow_start_interval as u64;
@@ -448,9 +448,18 @@ impl ConsensusParams {
 		reward
 	}
 
+	/// Block reward (goes to miner) at given height.
+	pub fn miner_reward(&self, height: u32) -> u64 {
+		let mut miner_reward = self.block_reward(height);
+		if self.founder_address(height).is_some() {
+			miner_reward -= self.founder_reward(height);
+		}
+		miner_reward
+	}
+
 	/// Founders reward (goes to founders) at given height.
 	pub fn founder_reward(&self, height: u32) -> u64 {
-		self.miner_reward(height) / 5
+		self.block_reward(height) / 5
 	}
 
 	/// Address (transparent) where founders reward goes at given height.
@@ -487,16 +496,16 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn miner_reward() {
+	fn block_reward() {
 		let consensus = ConsensusParams::new(Network::Mainnet);
-		assert_eq!(consensus.miner_reward(1), 62_500);
-		assert_eq!(consensus.miner_reward(10_000), 625_062_500);
-		assert_eq!(consensus.miner_reward(20_000), 1_250_000_000);
-		assert_eq!(consensus.miner_reward(1_000_000), 625_000_000);
-		assert_eq!(consensus.miner_reward(2_000_000), 312_500_000);
-		assert_eq!(consensus.miner_reward(3_000_000), 156_250_000);
-		assert_eq!(consensus.miner_reward(4_000_000), 78_125_000);
-		assert_eq!(consensus.miner_reward(20_000_000), 149);
-		assert_eq!(consensus.miner_reward(30_000_000), 0);
+		assert_eq!(consensus.block_reward(1), 62_500);
+		assert_eq!(consensus.block_reward(10_000), 625_062_500);
+		assert_eq!(consensus.block_reward(20_000), 1_250_000_000);
+		assert_eq!(consensus.block_reward(1_000_000), 625_000_000);
+		assert_eq!(consensus.block_reward(2_000_000), 312_500_000);
+		assert_eq!(consensus.block_reward(3_000_000), 156_250_000);
+		assert_eq!(consensus.block_reward(4_000_000), 78_125_000);
+		assert_eq!(consensus.block_reward(20_000_000), 149);
+		assert_eq!(consensus.block_reward(30_000_000), 0);
 	}
 }

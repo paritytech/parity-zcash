@@ -585,7 +585,6 @@ pub mod tests {
 		assert_eq!(&sample, r#"{"jsonrpc":"2.0","error":{"code":-32099,"message":"Block with given hash is not found","data":"000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd"},"id":1}"#);
 	}
 
-	#[ignore("TODO: Needs ZCash address")]
 	#[test]
 	fn verbose_transaction_out_contents() {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into(), test_data::block_h1().into()]));
@@ -603,10 +602,10 @@ pub mod tests {
 				value: 0.0005,
 				script: TransactionOutputScript {
 					asm: "OP_PUSHBYTES_33 0x027a46eb513588b01b37ea24303f4b628afd12cc20df789fede0921e43cad3e875\nOP_CHECKSIG\n".to_owned(),
-					hex: Bytes::from("4104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac"),
+					hex: Bytes::from("21027a46eb513588b01b37ea24303f4b628afd12cc20df789fede0921e43cad3e875ac"),
 					req_sigs: 1,
 					script_type: ScriptType::PubKey,
-					addresses: vec!["1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa".into()]
+					addresses: vec!["t1KstPVzcNEK4ZeauQ6cogoqxQBMDSiRnGr".into()]
 				},
 				version: 1,
 				coinbase: true
