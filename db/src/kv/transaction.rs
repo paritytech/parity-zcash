@@ -15,7 +15,8 @@ pub const COL_BLOCK_NUMBERS: u32 = 6;
 pub const COL_SPROUT_NULLIFIERS: u32 = 7;
 pub const COL_SAPLING_NULLIFIERS: u32 = 8;
 pub const COL_TREESTATES: u32 = 9;
-pub const COL_CONFIGURATION: u32 = 10;
+pub const COL_BLOCK_ROOTS: u32 = 10;
+pub const COL_CONFIGURATION: u32 = 11;
 
 #[derive(Debug)]
 pub enum Operation {
@@ -35,6 +36,7 @@ pub enum KeyValue {
 	Configuration(&'static str, Bytes),
 	Nullifier(Nullifier),
 	TreeState(H256, RegularTreeState),
+	BlockRoot(H256, H256),
 }
 
 #[derive(Debug)]
@@ -49,6 +51,7 @@ pub enum Key {
 	Configuration(&'static str),
 	Nullifier(Nullifier),
 	TreeRoot(H256),
+	BlockRoot(H256),
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +66,7 @@ pub enum Value {
 	Configuration(Bytes),
 	Empty,
 	TreeState(RegularTreeState),
+	TreeRoot(H256),
 }
 
 impl Value {
@@ -78,6 +82,7 @@ impl Value {
 			Key::Configuration(_) => deserialize(bytes).map(Value::Configuration),
 			Key::Nullifier(_) => Ok(Value::Empty),
 			Key::TreeRoot(_) => deserialize(bytes).map(Value::TreeState),
+			Key::BlockRoot(_) => deserialize(bytes).map(Value::TreeRoot),
 		}.map_err(|e| format!("{:?}", e))
 	}
 
@@ -243,6 +248,7 @@ impl<'a> From<&'a KeyValue> for RawKeyValue {
 			},
 			KeyValue::BlockNumber(ref key, ref value) => (COL_BLOCK_NUMBERS, serialize(key), serialize(value)),
 			KeyValue::TreeState(ref key, ref value) => (COL_TREESTATES, serialize(key), serialize(value)),
+			KeyValue::BlockRoot(ref key, ref value) => (COL_BLOCK_ROOTS, serialize(key), serialize(value)),
 			KeyValue::Configuration(ref key, ref value) => (COL_CONFIGURATION, serialize(key), serialize(value)),
 		};
 
@@ -283,6 +289,7 @@ impl<'a> From<&'a Key> for RawKey {
 			},
 			Key::TreeRoot(ref key) => (COL_TREESTATES, serialize(key)),
 			Key::BlockNumber(ref key) => (COL_BLOCK_NUMBERS, serialize(key)),
+			Key::BlockRoot(ref key) => (COL_BLOCK_ROOTS, serialize(key)),
 			Key::Configuration(ref key) => (COL_CONFIGURATION, serialize(key)),
 		};
 
