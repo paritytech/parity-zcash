@@ -1,9 +1,9 @@
 use ser::Serializable;
 use crypto::Groth16VerifyingKey;
-use storage::{TransactionMetaProvider, TransactionOutputProvider, Nullifier, EpochTag, NullifierTracker};
+use storage::{Nullifier, NullifierTracker, EpochTag, TransactionMetaProvider, TransactionOutputProvider,
+	DuplexTransactionOutputProvider};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, SighashBase};
-use duplex_store::DuplexTransactionOutputProvider;
 use deployments::BlockDeployments;
 use sapling::accept_sapling;
 use sigops::transaction_sigops;

@@ -345,6 +345,7 @@ mod tests {
 	use storage::SharedStore;
 	use network::{ConsensusParams, Network};
 	use memory_pool::MemoryPool;
+	use fee::NonZeroFeeCalculator;
 	use self::test_data::{ChainBuilder, TransactionBuilder};
 	use super::{BlockAssembler, SizePolicy, NextStep, BlockTemplate};
 
@@ -404,8 +405,8 @@ mod tests {
 
 			let mut pool = MemoryPool::new();
 			let storage: SharedStore = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-			pool.insert_verified(chain.at(0).into());
-			pool.insert_verified(chain.at(1).into());
+			pool.insert_verified(chain.at(0).into(), &NonZeroFeeCalculator);
+			pool.insert_verified(chain.at(1).into(), &NonZeroFeeCalculator);
 
 			(BlockAssembler {
 				miner_address: &"t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe".into(),

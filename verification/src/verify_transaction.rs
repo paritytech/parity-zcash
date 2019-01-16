@@ -3,7 +3,7 @@ use ser::Serializable;
 use chain::{IndexedTransaction, BTC_TX_VERSION, OVERWINTER_TX_VERSION,
 	OVERWINTER_TX_VERSION_GROUP_ID, SAPLING_TX_VERSION_GROUP_ID};
 use network::{ConsensusParams};
-use duplex_store::NoopStore;
+use storage::NoopStore;
 use sigops::transaction_sigops;
 use error::TransactionError;
 use constants::{MIN_COINBASE_SIZE, MAX_COINBASE_SIZE};

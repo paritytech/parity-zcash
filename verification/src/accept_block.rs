@@ -1,9 +1,8 @@
 use keys::Address;
 use network::{ConsensusParams};
-use storage::{TransactionOutputProvider, BlockHeaderProvider};
+use storage::{DuplexTransactionOutputProvider, TransactionOutputProvider, BlockHeaderProvider};
 use script::{self, Builder};
-use sigops::{transaction_sigops};
-use duplex_store::DuplexTransactionOutputProvider;
+use sigops::transaction_sigops;
 use deployments::BlockDeployments;
 use canon::CanonBlock;
 use error::{Error, TransactionError};

@@ -1,13 +1,42 @@
 use chain::Transaction;
 use ser::Serializable;
-use storage::TransactionProvider;
+use storage::{TransactionOutputProvider, DuplexTransactionOutputProvider};
+use MemoryPool;
 
-pub fn transaction_fee(store: &TransactionProvider, transaction: &Transaction) -> u64 {
-	let mut inputs_sum = transaction.inputs.iter().map(|input| {
-		let input_transaction = store.transaction(&input.previous_output.hash)
-			.expect("transaction must be verified by caller");
-		input_transaction.outputs[input.previous_output.index as usize].value
-	}).sum::<u64>();
+/// Transaction fee calculator for memory pool
+pub trait MemoryPoolFeeCalculator {
+	/// Compute transaction fee
+	fn calculate(&self, memory_pool: &MemoryPool, tx: &Transaction) -> u64;
+}
+
+/// Fee calculator that computes sum of real transparent fee + real shielded fee.
+pub struct FeeCalculator<'a>(pub &'a TransactionOutputProvider);
+
+impl<'a> MemoryPoolFeeCalculator for FeeCalculator<'a> {
+	fn calculate(&self, memory_pool: &MemoryPool, tx: &Transaction) -> u64 {
+		let tx_out_provider = DuplexTransactionOutputProvider::new(self.0, memory_pool);
+		transaction_fee(&tx_out_provider, tx)
+	}
+}
+
+/// Used in tests in this && external crates
+#[cfg(any(test, feature = "test-helpers"))]
+pub struct NonZeroFeeCalculator;
+
+#[cfg(any(test, feature = "test-helpers"))]
+impl MemoryPoolFeeCalculator for NonZeroFeeCalculator {
+	fn calculate(&self, _: &MemoryPool, tx: &Transaction) -> u64 {
+		// add 100_000_000 to make sure tx won't be rejected by txpoool because of fee
+		// + but keep ordering by outputs sum
+		100_000_000 + tx.outputs.iter().fold(0, |acc, output| acc + output.value)
+	}
+}
+
+pub fn transaction_fee(store: &TransactionOutputProvider, transaction: &Transaction) -> u64 {
+	let mut inputs_sum = transaction.inputs.iter().map(|input|
+		store.transaction_output(&input.previous_output, ::std::usize::MAX)
+			.expect("transaction must be verified by caller")
+			.value).sum::<u64>();
 	inputs_sum += transaction.join_split.as_ref().map(|js| js.descriptions.iter()
 		.map(|jsd| jsd.value_pub_new)
 		.sum::<u64>()).unwrap_or_default();
@@ -20,8 +49,8 @@ pub fn transaction_fee(store: &TransactionProvider, transaction: &Transaction) -
 	inputs_sum.saturating_sub(outputs_sum)
 }
 
-pub fn transaction_fee_rate(store: &TransactionProvider, transaction: &Transaction) -> u64 {
-	transaction_fee(store, transaction) / transaction.serialized_size() as u64
+pub fn transaction_fee_rate(store: &TransactionOutputProvider, tx: &Transaction) -> u64 {
+	transaction_fee(store, tx) / tx.serialized_size() as u64
 }
 
 #[cfg(test)]
@@ -54,10 +83,10 @@ mod tests {
 
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![b0.into(), b1.into()]));
 
-		assert_eq!(transaction_fee(db.as_transaction_provider(), &tx0), 0);
-		assert_eq!(transaction_fee(db.as_transaction_provider(), &tx2), 500_000);
+		assert_eq!(transaction_fee(db.as_transaction_output_provider(), &tx0), 0);
+		assert_eq!(transaction_fee(db.as_transaction_output_provider(), &tx2), 500_000);
 
-		assert_eq!(transaction_fee_rate(db.as_transaction_provider(), &tx0), 0);
-		assert_eq!(transaction_fee_rate(db.as_transaction_provider(), &tx2), 4_901);
+		assert_eq!(transaction_fee_rate(db.as_transaction_output_provider(), &tx0), 0);
+		assert_eq!(transaction_fee_rate(db.as_transaction_output_provider(), &tx2), 4_901);
 	}
 }
