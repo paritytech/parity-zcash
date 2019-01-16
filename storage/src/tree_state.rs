@@ -219,7 +219,8 @@ mod tests {
 	#[test]
 	fn appended_1_32_root() {
 		let mut tree = RegularTreeState::new();
-		tree.append(H256::from("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"));
+		tree.append(H256::from("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
+			.expect("failed to append to the tree");
 		assert_eq!(
 			tree.root(),
 			H256::from("af3a29c548af2d8314544875fe0a59555bfda3c81ea78da54bd02f89cce68acb")

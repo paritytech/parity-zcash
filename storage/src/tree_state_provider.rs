@@ -1,6 +1,6 @@
 use hash::H256;
 use bytes::Bytes;
-use {EpochTag, RegularTreeState};
+use RegularTreeState;
 
 pub trait TreeStateProvider {
 	fn tree_bytes_at(&self, root: &H256) -> Option<Bytes>;
