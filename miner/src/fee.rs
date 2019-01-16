@@ -32,19 +32,41 @@ impl MemoryPoolFeeCalculator for NonZeroFeeCalculator {
 	}
 }
 
+/// Compute miner fee for given transaction.
+///
+/// It could return a wrong value (that should have overflow/underflow) if either outputs sum,
+/// inputs sum or their difference overflows/underflows. But since it is used for prioritizing
+/// verified transactions && verification checks that values are correct, the call is safe.
 pub fn transaction_fee(store: &TransactionOutputProvider, transaction: &Transaction) -> u64 {
 	let mut inputs_sum = transaction.inputs.iter().map(|input|
 		store.transaction_output(&input.previous_output, ::std::usize::MAX)
 			.expect("transaction must be verified by caller")
-			.value).sum::<u64>();
-	inputs_sum += transaction.join_split.as_ref().map(|js| js.descriptions.iter()
-		.map(|jsd| jsd.value_pub_new)
-		.sum::<u64>()).unwrap_or_default();
+			.value)
+		.fold(0u64, |acc, value| acc.saturating_add(value));
+	if let Some(ref join_split) = transaction.join_split {
+		let js_value_pub_new = join_split.descriptions.iter()
+			.fold(0u64, |acc, jsd| acc.saturating_add(jsd.value_pub_new));
+		inputs_sum = inputs_sum.saturating_add(js_value_pub_new);
+	}
+	if let Some(ref sapling) = transaction.sapling {
+		if sapling.balancing_value > 0 {
+			inputs_sum = inputs_sum.saturating_add(sapling.balancing_value as u64);
+		}
+	}
 
-	let mut outputs_sum = transaction.outputs.iter().map(|output| output.value).sum();
-	outputs_sum += transaction.join_split.as_ref().map(|js| js.descriptions.iter()
-		.map(|jsd| jsd.value_pub_old)
-		.sum::<u64>()).unwrap_or_default();
+	let mut outputs_sum = transaction.outputs.iter().map(|output| output.value)
+		.fold(0u64, |acc, value| acc.saturating_add(value));
+	if let Some(ref join_split) = transaction.join_split {
+		let js_value_pub_old = join_split.descriptions.iter()
+			.fold(0u64, |acc, jsd| acc.saturating_add(jsd.value_pub_old));
+		outputs_sum = outputs_sum.saturating_add(js_value_pub_old);
+	}
+	if let Some(ref sapling) = transaction.sapling {
+		if sapling.balancing_value < 0 {
+			inputs_sum = inputs_sum.saturating_add(sapling.balancing_value
+				.checked_neg().unwrap_or(::std::i64::MAX) as u64);
+		}
+	}
 
 	inputs_sum.saturating_sub(outputs_sum)
 }
