@@ -87,6 +87,11 @@ impl TransactionBuilder {
 		builder.set_join_split(join_split)
 	}
 
+	pub fn with_input(transaction: &Transaction, output_index: u32) -> TransactionBuilder {
+		let builder = TransactionBuilder::default();
+		builder.add_input(transaction, output_index)
+	}
+
 	pub fn reset(self) -> TransactionBuilder {
 		TransactionBuilder::default()
 	}

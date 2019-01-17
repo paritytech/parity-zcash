@@ -2,7 +2,7 @@
 //! require sophisticated (in more than one source) previous transaction lookups
 
 use chain::{OutPoint, TransactionOutput};
-use storage::TransactionOutputProvider;
+use TransactionOutputProvider;
 
 #[derive(Clone, Copy)]
 pub struct DuplexTransactionOutputProvider<'a> {

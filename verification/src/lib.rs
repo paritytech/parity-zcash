@@ -81,7 +81,6 @@ extern crate assert_matches;
 pub mod constants;
 mod canon;
 mod deployments;
-mod duplex_store;
 mod equihash;
 mod error;
 mod sapling;

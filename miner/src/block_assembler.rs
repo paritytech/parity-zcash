@@ -343,8 +343,10 @@ mod tests {
 	use db::BlockChainDatabase;
 	use primitives::hash::H256;
 	use storage::SharedStore;
+	use chain::IndexedTransaction;
 	use network::{ConsensusParams, Network};
 	use memory_pool::MemoryPool;
+	use fee::{FeeCalculator, NonZeroFeeCalculator};
 	use self::test_data::{ChainBuilder, TransactionBuilder};
 	use super::{BlockAssembler, SizePolicy, NextStep, BlockTemplate};
 
@@ -404,8 +406,8 @@ mod tests {
 
 			let mut pool = MemoryPool::new();
 			let storage: SharedStore = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
-			pool.insert_verified(chain.at(0).into());
-			pool.insert_verified(chain.at(1).into());
+			pool.insert_verified(chain.at(0).into(), &NonZeroFeeCalculator);
+			pool.insert_verified(chain.at(1).into(), &NonZeroFeeCalculator);
 
 			(BlockAssembler {
 				miner_address: &"t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe".into(),
@@ -420,5 +422,28 @@ mod tests {
 		assert!(hash1 < hash0);
 		assert_eq!(block.transactions[0].hash, hash0);
 		assert_eq!(block.transactions[1].hash, hash1);
+	}
+
+	#[test]
+	fn block_assembler_miner_fee() {
+		let input_tx = test_data::block_h1().transactions[0].clone();
+		let tx0: IndexedTransaction = TransactionBuilder::with_input(&input_tx, 0).set_output(10_000).into();
+		let expected_tx0_fee = input_tx.outputs[0].value - tx0.raw.total_spends();
+
+		let storage: SharedStore = Arc::new(BlockChainDatabase::init_test_chain(vec![
+			test_data::genesis().into(), test_data::block_h1().into(),
+		]));
+		let mut pool = MemoryPool::new();
+		pool.insert_verified(tx0, &FeeCalculator(storage.as_transaction_output_provider()));
+
+		let consensus = ConsensusParams::new(Network::Mainnet);
+		let block = BlockAssembler {
+			max_block_size: 0xffffffff,
+			max_block_sigops: 0xffffffff,
+			miner_address: &"t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe".into(),
+		}.create_new_block(&storage, &pool, 0, &consensus);
+
+		let expected_coinbase_value = consensus.block_reward(2) + expected_tx0_fee;
+		assert_eq!(block.coinbase_tx.raw.total_spends(), expected_coinbase_value);
 	}
 }
