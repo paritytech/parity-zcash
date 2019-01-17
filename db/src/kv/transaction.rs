@@ -141,6 +141,20 @@ impl Value {
 			_ => None,
 		}
 	}
+
+	pub fn as_tree_state(self) -> Option<RegularTreeState> {
+		match self  {
+			Value::TreeState(tree) => Some(tree),
+			_ => None,
+		}
+	}
+
+	pub fn as_block_root(self) -> Option<H256> {
+		match self {
+			Value::TreeRoot(v) => Some(v),
+			_ => None,
+		}
+	}
 }
 
 #[derive(Debug, Clone)]

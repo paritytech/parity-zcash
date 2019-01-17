@@ -147,6 +147,10 @@ impl<D: Dim> TreeState<D> {
 
 		root
 	}
+
+	pub fn empty_root() -> H256 {
+		EMPTY_ROOTS[D::HEIGHT]
+	}
 }
 
 pub type RegularTreeState = TreeState<H32>;
