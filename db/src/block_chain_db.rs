@@ -18,7 +18,8 @@ use kv::{
 };
 use kv::{
 	COL_COUNT, COL_BLOCK_HASHES, COL_BLOCK_HEADERS, COL_BLOCK_TRANSACTIONS, COL_TRANSACTIONS,
-	COL_TRANSACTIONS_META, COL_BLOCK_NUMBERS
+	COL_TRANSACTIONS_META, COL_BLOCK_NUMBERS, COL_SAPLING_NULLIFIERS, COL_SPROUT_NULLIFIERS,
+	COL_TREE_STATES, COL_BLOCK_ROOTS,
 };
 use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
@@ -51,18 +52,57 @@ impl<'a, T> ForkChain for ForkChainDatabase<'a, T> where T: KeyValueDatabase {
 	}
 }
 
+mod cache {
+	pub const CACHE_TRANSACTIONS: u32 = 20;
+	pub const CACHE_TRANSACTION_META: u32 = 20;
+	pub const CACHE_HEADERS: u32 = 15;
+	pub const CACHE_BLOCK_HASHES: u32 = 5;
+	pub const CACHE_BLOCK_TRANSACTIONS: u32 = 10;
+	pub const CACHE_BLOCK_NUMBERS: u32 = 5;
+	pub const CACHE_SPROUT_NULLIFIERS: u32 = 5;
+	pub const CACHE_SAPLING_NULLIFIERS: u32 = 5;
+	pub const CACHE_TREE_STATES: u32 = 10;
+	pub const CACHE_BLOCK_ROOTS: u32 = 5;
+
+	pub fn set(cfg: &mut ::kv::DatabaseConfig, total: usize, col: u32, distr: u32) {
+		cfg.set_cache(Some(col), (total as f32 * distr as f32 / 100f32).round() as usize)
+	}
+
+	#[test]
+	fn total_is_100() {
+		assert_eq!(100,
+			CACHE_TRANSACTIONS +
+			CACHE_TRANSACTION_META +
+			CACHE_HEADERS +
+			CACHE_BLOCK_HASHES +
+			CACHE_BLOCK_TRANSACTIONS +
+			CACHE_BLOCK_NUMBERS +
+			CACHE_SPROUT_NULLIFIERS +
+			CACHE_SAPLING_NULLIFIERS +
+			CACHE_TREE_STATES +
+			CACHE_BLOCK_ROOTS
+		);
+	}
+}
+
 impl BlockChainDatabase<CacheDatabase<AutoFlushingOverlayDatabase<DiskDatabase>>> {
 	pub fn open_at_path<P>(path: P, total_cache: usize) -> Result<Self, Error> where P: AsRef<Path> {
 		fs::create_dir_all(path.as_ref()).map_err(|err| Error::DatabaseError(err.to_string()))?;
 		let mut cfg = DatabaseConfig::with_columns(Some(COL_COUNT));
 
-		cfg.set_cache(Some(COL_TRANSACTIONS), total_cache / 4);
-		cfg.set_cache(Some(COL_TRANSACTIONS_META), total_cache / 4);
-		cfg.set_cache(Some(COL_BLOCK_HEADERS), total_cache / 4);
+		cache::set(&mut cfg, total_cache, COL_TRANSACTIONS, cache::CACHE_TRANSACTIONS);
+		cache::set(&mut cfg, total_cache, COL_TRANSACTIONS_META, cache::CACHE_TRANSACTION_META);
+		cache::set(&mut cfg, total_cache, COL_BLOCK_HEADERS, cache::CACHE_HEADERS);
 
-		cfg.set_cache(Some(COL_BLOCK_HASHES), total_cache / 12);
-		cfg.set_cache(Some(COL_BLOCK_TRANSACTIONS), total_cache / 12);
-		cfg.set_cache(Some(COL_BLOCK_NUMBERS), total_cache / 12);
+		cache::set(&mut cfg, total_cache, COL_BLOCK_HASHES, cache::CACHE_BLOCK_HASHES);
+		cache::set(&mut cfg, total_cache, COL_BLOCK_TRANSACTIONS, cache::CACHE_BLOCK_TRANSACTIONS);
+		cache::set(&mut cfg, total_cache, COL_BLOCK_NUMBERS, cache::CACHE_BLOCK_NUMBERS);
+
+		cache::set(&mut cfg, total_cache, COL_SPROUT_NULLIFIERS, cache::CACHE_SPROUT_NULLIFIERS);
+		cache::set(&mut cfg, total_cache, COL_SAPLING_NULLIFIERS, cache::CACHE_SAPLING_NULLIFIERS);
+
+		cache::set(&mut cfg, total_cache, COL_TREE_STATES, cache::CACHE_TREE_STATES);
+		cache::set(&mut cfg, total_cache, COL_BLOCK_ROOTS, cache::CACHE_BLOCK_ROOTS);
 
 		cfg.bloom_filters.insert(Some(COL_TRANSACTIONS_META), 32);
 

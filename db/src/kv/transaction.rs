@@ -14,7 +14,7 @@ pub const COL_TRANSACTIONS_META: u32 = 5;
 pub const COL_BLOCK_NUMBERS: u32 = 6;
 pub const COL_SPROUT_NULLIFIERS: u32 = 7;
 pub const COL_SAPLING_NULLIFIERS: u32 = 8;
-pub const COL_TREESTATES: u32 = 9;
+pub const COL_TREE_STATES: u32 = 9;
 pub const COL_BLOCK_ROOTS: u32 = 10;
 pub const COL_CONFIGURATION: u32 = 11;
 
@@ -261,7 +261,7 @@ impl<'a> From<&'a KeyValue> for RawKeyValue {
 				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash()), Bytes::new()),
 			},
 			KeyValue::BlockNumber(ref key, ref value) => (COL_BLOCK_NUMBERS, serialize(key), serialize(value)),
-			KeyValue::TreeState(ref key, ref value) => (COL_TREESTATES, serialize(key), serialize(value)),
+			KeyValue::TreeState(ref key, ref value) => (COL_TREE_STATES, serialize(key), serialize(value)),
 			KeyValue::BlockRoot(ref key, ref value) => (COL_BLOCK_ROOTS, serialize(key), serialize(value)),
 			KeyValue::Configuration(ref key, ref value) => (COL_CONFIGURATION, serialize(key), serialize(value)),
 		};
@@ -301,7 +301,7 @@ impl<'a> From<&'a Key> for RawKey {
 				EpochTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash())),
 				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash())),
 			},
-			Key::TreeRoot(ref key) => (COL_TREESTATES, serialize(key)),
+			Key::TreeRoot(ref key) => (COL_TREE_STATES, serialize(key)),
 			Key::BlockNumber(ref key) => (COL_BLOCK_NUMBERS, serialize(key)),
 			Key::BlockRoot(ref key) => (COL_BLOCK_ROOTS, serialize(key)),
 			Key::Configuration(ref key) => (COL_CONFIGURATION, serialize(key)),
