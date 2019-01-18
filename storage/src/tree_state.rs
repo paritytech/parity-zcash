@@ -76,12 +76,14 @@ pub trait Dim {
 	const HEIGHT: usize;
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct H32;
 
 impl Dim for H32 {
 	const HEIGHT: usize = 32;
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct TreeState<D: Dim> {
 	_phantom: ::std::marker::PhantomData<D>,
 	left: Option<H256>,
@@ -145,6 +147,10 @@ impl<D: Dim> TreeState<D> {
 
 		root
 	}
+
+	pub fn empty_root() -> H256 {
+		EMPTY_ROOTS[D::HEIGHT]
+	}
 }
 
 pub type RegularTreeState = TreeState<H32>;
@@ -203,6 +209,25 @@ mod tests {
 		assert_eq!(
 			tree.root(),
 			H256::from("da5698be17b9b46962335799779fbeca8ce5d491c0d26243bafef9ea1837a9d8")
+		);
+	}
+
+	#[test]
+	fn empty_32_root() {
+		assert_eq!(
+			RegularTreeState::new().root(),
+			H256::from("ac58cd1388fec290d398f1944b564449a63c815880566bd1d189f7839e3b0c8c"),
+		)
+	}
+
+	#[test]
+	fn appended_1_32_root() {
+		let mut tree = RegularTreeState::new();
+		tree.append(H256::from("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
+			.expect("failed to append to the tree");
+		assert_eq!(
+			tree.root(),
+			H256::from("af3a29c548af2d8314544875fe0a59555bfda3c81ea78da54bd02f89cce68acb")
 		);
 	}
 

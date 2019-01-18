@@ -24,7 +24,7 @@ use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
 	TransactionMetaProvider, TransactionProvider, TransactionOutputProvider, BlockChain, Store,
 	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock, NullifierTracker, Nullifier,
-	EpochTag,
+	EpochTag, RegularTreeState, TreeStateProvider,
 };
 
 const KEY_BEST_BLOCK_NUMBER: &'static str = "best_block_number";
@@ -205,19 +205,40 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 			return Ok(())
 		}
 
-		let parent_hash = block.header.raw.previous_header_hash.clone();
-		if !self.contains_block(parent_hash.clone().into()) && !parent_hash.is_zero() {
+		let parent_hash = block.header.raw.previous_header_hash;
+		if !self.contains_block(parent_hash.into()) && !parent_hash.is_zero() {
 			return Err(Error::UnknownParent);
 		}
 
+		let mut tree_state = if parent_hash.is_zero() {
+			RegularTreeState::new()
+		} else {
+			self.tree_at_block(&parent_hash)
+				.expect(&format!("Corrupted database - no root for block {}", parent_hash))
+		};
+
 		let mut update = DBTransaction::new();
-		update.insert(KeyValue::BlockHeader(block.hash().clone(), block.header.raw));
-		let tx_hashes = block.transactions.iter().map(|tx| tx.hash.clone()).collect::<Vec<_>>();
-		update.insert(KeyValue::BlockTransactions(block.header.hash.clone(), List::from(tx_hashes)));
+		update.insert(KeyValue::BlockHeader(*block.hash(), block.header.raw));
+		let tx_hashes = block.transactions.iter().map(|tx| tx.hash).collect::<Vec<_>>();
+		update.insert(KeyValue::BlockTransactions(block.header.hash, List::from(tx_hashes)));
 
 		for tx in block.transactions.into_iter() {
+
+			if let Some(ref js) = tx.raw.join_split {
+				for js_descriptor in js.descriptions.iter() {
+					for commitment in &js_descriptor.commitments[..] {
+						tree_state.append(H256::from(&commitment[..]))
+							.expect("Appending to a full commitment tree in the block insertion")
+					}
+				}
+			}
+
 			update.insert(KeyValue::Transaction(tx.hash, tx.raw));
 		}
+
+		let tree_root = tree_state.root();
+		update.insert(KeyValue::BlockRoot(block.header.hash, tree_root));
+		update.insert(KeyValue::TreeState(tree_root, tree_state));
 
 		self.db.write(update).map_err(Error::DatabaseError)
 	}
@@ -573,6 +594,16 @@ impl<T> TransactionOutputProvider for BlockChainDatabase<T> where T: KeyValueDat
 impl<T> NullifierTracker for BlockChainDatabase<T> where T: KeyValueDatabase {
 	fn contains_nullifier(&self, nullifier: Nullifier) -> bool {
 		self.get(Key::Nullifier(nullifier)).is_some()
+	}
+}
+
+impl<T> TreeStateProvider for BlockChainDatabase<T> where T: KeyValueDatabase {
+	fn tree_at(&self, root: &H256) -> Option<RegularTreeState> {
+		self.get(Key::TreeRoot(*root)).and_then(Value::as_tree_state)
+	}
+
+	fn block_root(&self, block_hash: &H256) -> Option<H256> {
+		self.get(Key::BlockRoot(*block_hash)).and_then(Value::as_block_root)
 	}
 }
 

@@ -7,12 +7,13 @@ use bytes::Bytes;
 use ser::List;
 use chain::{Transaction as ChainTransaction, BlockHeader};
 use kv::{Transaction, Key, KeyState, Operation, Value, KeyValueDatabase, KeyValue};
-use storage::{TransactionMeta, EpochTag};
+use storage::{TransactionMeta, EpochTag, RegularTreeState, Nullifier};
 
 #[derive(Default, Debug)]
 struct InnerDatabase {
 	meta: HashMap<&'static str, KeyState<Bytes>>,
 	block_hash: HashMap<u32, KeyState<H256>>,
+	block_root: HashMap<H256, KeyState<H256>>,
 	block_header: HashMap<H256, KeyState<BlockHeader>>,
 	block_transactions: HashMap<H256, KeyState<List<H256>>>,
 	transaction: HashMap<H256, KeyState<ChainTransaction>>,
@@ -21,6 +22,7 @@ struct InnerDatabase {
 	configuration: HashMap<&'static str, KeyState<Bytes>>,
 	sprout_nullifiers: HashMap<H256, KeyState<()>>,
 	sapling_nullifiers: HashMap<H256, KeyState<()>>,
+	tree_state: HashMap<H256, KeyState<RegularTreeState>>,
 }
 
 #[derive(Default, Debug)]
@@ -55,6 +57,28 @@ impl MemoryDatabase {
 		let configuration = replace(&mut db.configuration, HashMap::default()).into_iter()
 			.flat_map(|(key, state)| state.into_operation(key, KeyValue::Configuration, Key::Configuration));
 
+		let sprout_nullifiers = replace(&mut db.sprout_nullifiers, HashMap::default()).into_iter()
+			.flat_map(|(key, state)|
+				state.into_operation(key,
+					|k, _| KeyValue::Nullifier(Nullifier::new(EpochTag::Sprout, k)),
+					|h| Key::Nullifier(Nullifier::new(EpochTag::Sprout, h))
+				)
+			);
+
+		let sapling_nullifiers = replace(&mut db.sapling_nullifiers, HashMap::default()).into_iter()
+			.flat_map(|(key, state)|
+				state.into_operation(key,
+					|k, _| KeyValue::Nullifier(Nullifier::new(EpochTag::Sapling, k)),
+					|h| Key::Nullifier(Nullifier::new(EpochTag::Sapling, h))
+				)
+			);
+
+		let tree_state = replace(&mut db.tree_state, HashMap::default()).into_iter()
+			.flat_map(|(key, state)| state.into_operation(key, KeyValue::TreeState, Key::TreeRoot));
+
+		let block_root = replace(&mut db.block_root, HashMap::default()).into_iter()
+			.flat_map(|(key, state)| state.into_operation(key, KeyValue::BlockRoot, Key::BlockRoot));
+
 		Transaction {
 			operations: meta
 				.chain(block_hash)
@@ -64,6 +88,10 @@ impl MemoryDatabase {
 				.chain(transaction_meta)
 				.chain(block_number)
 				.chain(configuration)
+				.chain(tree_state)
+				.chain(block_root)
+				.chain(sprout_nullifiers)
+				.chain(sapling_nullifiers)
 				.collect()
 		}
 	}
@@ -87,6 +115,8 @@ impl KeyValueDatabase for MemoryDatabase {
 						EpochTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
 						EpochTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Insert(())); },
 					},
+					KeyValue::TreeState(key, value) => { db.tree_state.insert(key, KeyState::Insert(value)); },
+					KeyValue::BlockRoot(key, value) => { db.block_root.insert(key, KeyState::Insert(value)); },
 				},
 				Operation::Delete(delete) => match delete {
 					Key::Meta(key) => { db.meta.insert(key, KeyState::Delete); }
@@ -101,6 +131,8 @@ impl KeyValueDatabase for MemoryDatabase {
 						EpochTag::Sprout => { db.sprout_nullifiers.insert(*key.hash(), KeyState::Delete); },
 						EpochTag::Sapling => { db.sapling_nullifiers.insert(*key.hash(), KeyState::Delete); },
 					},
+					Key::TreeRoot(key) => { db.tree_state.insert(key, KeyState::Delete); },
+					Key::BlockRoot(key) => { db.block_root.insert(key, KeyState::Delete); },
 				},
 			}
 		}
@@ -121,7 +153,9 @@ impl KeyValueDatabase for MemoryDatabase {
 			Key::Nullifier(ref key) => match key.tag() {
 				EpochTag::Sprout => db.sprout_nullifiers.get(key.hash()).cloned().unwrap_or_default().map(|_| Value::Empty),
 				EpochTag::Sapling => db.sapling_nullifiers.get(key.hash()).cloned().unwrap_or_default().map(|_| Value::Empty),
-			}
+			},
+			Key::TreeRoot(ref key) => db.tree_state.get(key).cloned().unwrap_or_default().map(Value::TreeState),
+			Key::BlockRoot(ref key) => db.block_root.get(key).cloned().unwrap_or_default().map(Value::TreeRoot),
 		};
 
 		Ok(result)
