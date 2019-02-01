@@ -13,10 +13,10 @@ serde_derive = "1.0"
 rustc-hex = "2"
 time = "0.1"
 tokio-core = "0.1.1"
-jsonrpc-core = { git = "https://github.com/ethcore/jsonrpc.git", branch = "pzec_dependency_multiple_trailing_args" }
-jsonrpc-derive = { git = "https://github.com/ethcore/jsonrpc.git", branch = "pzec_dependency_multiple_trailing_args" }
-jsonrpc-pubsub = { git = "https://github.com/ethcore/jsonrpc.git", branch = "pzec_dependency_multiple_trailing_args" }
-jsonrpc-http-server = { git = "https://github.com/ethcore/jsonrpc.git", branch = "pzec_dependency_multiple_trailing_args" }
+jsonrpc-core = "10.0"
+jsonrpc-derive = "10.0"
+jsonrpc-pubsub = "10.0"
+jsonrpc-http-server = "10.0"
 
 sync = { path = "../sync" }
 serialization = { path = "../serialization" }
