@@ -597,8 +597,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "jsonrpc-core"
-version = "9.0.0"
-source = "git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args#1691c6e52b2af1d56e8c734312cb0a5d6826e857"
+version = "10.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -609,8 +609,8 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc-derive"
-version = "9.0.0"
-source = "git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args#1691c6e52b2af1d56e8c734312cb0a5d6826e857"
+version = "10.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 0.4.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -619,12 +619,12 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc-http-server"
-version = "9.0.0"
-source = "git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args#1691c6e52b2af1d56e8c734312cb0a5d6826e857"
+version = "10.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "hyper 0.12.20 (registry+https://github.com/rust-lang/crates.io-index)",
- "jsonrpc-core 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)",
- "jsonrpc-server-utils 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)",
+ "jsonrpc-core 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-server-utils 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicase 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -632,10 +632,10 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc-pubsub"
-version = "9.0.0"
-source = "git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args#1691c6e52b2af1d56e8c734312cb0a5d6826e857"
+version = "10.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "jsonrpc-core 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)",
+ "jsonrpc-core 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.84 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -643,12 +643,12 @@ dependencies = [
 
 [[package]]
 name = "jsonrpc-server-utils"
-version = "9.0.0"
-source = "git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args#1691c6e52b2af1d56e8c734312cb0a5d6826e857"
+version = "10.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bytes 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "globset 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "jsonrpc-core 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)",
+ "jsonrpc-core 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1144,7 +1144,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "autocfg 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1165,7 +1165,7 @@ name = "rand_hc"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1203,7 +1203,7 @@ name = "rand_xorshift"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1282,10 +1282,10 @@ version = "0.1.0"
 dependencies = [
  "chain 0.1.0",
  "db 0.1.0",
- "jsonrpc-core 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)",
- "jsonrpc-derive 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)",
- "jsonrpc-http-server 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)",
- "jsonrpc-pubsub 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)",
+ "jsonrpc-core 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-derive 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-http-server 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jsonrpc-pubsub 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "keys 0.1.0",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "miner 0.1.0",
@@ -2037,11 +2037,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7e81a7c05f79578dbc15793d8b619db9ba32b4577003ef3af1a91c416798c58d"
 "checksum iovec 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "dbe6e417e7d0975db6512b90796e8ce223145ac4e33c377e4a42882a0e88bb08"
 "checksum itoa 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "1306f3464951f30e30d12373d31c79fbd52d236e5e896fd92f96ec7babbbe60b"
-"checksum jsonrpc-core 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)" = "<none>"
-"checksum jsonrpc-derive 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)" = "<none>"
-"checksum jsonrpc-http-server 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)" = "<none>"
-"checksum jsonrpc-pubsub 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)" = "<none>"
-"checksum jsonrpc-server-utils 9.0.0 (git+https://github.com/ethcore/jsonrpc.git?branch=pzec_dependency_multiple_trailing_args)" = "<none>"
+"checksum jsonrpc-core 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7a5152c3fda235dfd68341b3edf4121bc4428642c93acbd6de88c26bf95fc5d7"
+"checksum jsonrpc-derive 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8de4e89cf0938dec51a14255556172b1f5208e4d8999d613813eceeae1405d37"
+"checksum jsonrpc-http-server 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "99e1ce36c7cc9dcab398024d76849ab2cb917ee812653bce6f74fc9eb7c82d16"
+"checksum jsonrpc-pubsub 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "56608ed54b1b2a69f4357cb8bdfbcbd99fe1179383c03a09bb428931bd35f592"
+"checksum jsonrpc-server-utils 10.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5521613b31ea22d36d9f95ad642058dccec846a94ed8690957652d479f620707"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a374c89b9db55895453a74c1e38861d9deec0b01b405a82516e9d5de4820dea1"
 "checksum lazycell 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b294d6fa9ee409a054354afc4352b0b9ef7ca222c69b8812cbea9e7d2bf3783f"
