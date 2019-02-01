@@ -4,6 +4,8 @@
 
 Gitter [![Gitter https://gitter.im/paritytech/parity-zcash](https://badges.gitter.im/paritytech/parity-zcash.svg)](https://gitter.im/paritytech/parity-zcash)
 
+## Blog: [Parity teams up with Zcash Foundation for Parity Zcash client](https://www.parity.io/parity-teams-up-with-zcash-foundation-for-parity-zcash-client/)
+
 - [Installing from source](#installing-from-source)
 
 - [Installing the snap](#installing-the-snap)
@@ -39,7 +41,7 @@ Both `rustc` and `cargo` are a part of rust tool-chain.
 An easy way to install the stable binaries for Linux and Mac is to run this in your shell:
 
 ```
-curl -sSf https://static.rust-lang.org/rustup.sh | sh
+curl https://sh.rustup.rs -sSf | sh
 ```
 
 Windows binaries can be downloaded from [rust-lang website](https://forge.rust-lang.org/other-installation-methods.html#standalone).
@@ -48,6 +50,14 @@ Windows binaries can be downloaded from [rust-lang website](https://forge.rust-l
 
 You will need the cc and gcc compilers to build some of the dependencies.
 
+On MacOSX <br />
+
+`build-essential` is a Debian package. On MacOSX you will need to make sure you have XCode installed. If you already have Homebrew installed, you probably also already have the Xcode tools installed as well. If not, you can run the command below:
+```
+xcode-select --install
+```
+
+On Linux
 ```
 sudo apt-get update
 sudo apt-get install build-essential
