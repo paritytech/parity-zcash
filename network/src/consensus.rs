@@ -52,7 +52,7 @@ pub struct ConsensusParams {
 
 	/// 'Slow start' interval parameter.
 	///
-	/// For details on how (and why) ZCash 'slow start' works, refer to:
+	/// For details on how (and why) Zcash 'slow start' works, refer to:
 	/// https://z.cash/support/faq/#what-is-slow-start-mining
 	/// https://github.com/zcash/zcash/issues/762
 	pub subsidy_slow_start_interval: u32,

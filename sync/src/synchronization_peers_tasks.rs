@@ -9,7 +9,7 @@ use utils::AverageSpeedMeter;
 
 /// Max peer failures # before excluding from sync process
 const MAX_PEER_FAILURES: usize = 4;
-/// Max blocks failures # before forgetiing this block and restarting sync
+/// Max blocks failures # before forgetting this block and restarting sync
 const MAX_BLOCKS_FAILURES: usize = 6;
 /// Number of blocks to inspect while calculating average response time
 const BLOCKS_TO_INSPECT: usize = 32;
@@ -66,7 +66,7 @@ pub struct BlocksRequest {
 /// Peer trust level.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TrustLevel {
-	/// Suspicios peer (either it is fresh peer, or it has failed to respond to last requests).
+	/// Suspicious peer (either it is fresh peer, or it has failed to respond to last requests).
 	Suspicious,
 	/// This peer is responding to requests.
 	Trusted,
@@ -206,7 +206,7 @@ impl PeersTasks {
 
 			blocks_request.blocks.is_empty()
 		} else {
-			// this peers hasn't been requested for blocks at all
+			// these peers haven't been requested for blocks at all
 			return;
 		};
 
@@ -270,7 +270,7 @@ impl PeersTasks {
 		self.stats.get_mut(&peer_index).map(|br| br.speed.start());
 	}
 
-	/// Headers hashave been requested from peer.
+	/// Headers have been requested from peer.
 	pub fn on_headers_requested(&mut self, peer_index: PeerIndex) {
 		if !self.all.contains(&peer_index) {
 			self.unuseful_peer(peer_index);

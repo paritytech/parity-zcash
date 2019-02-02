@@ -100,7 +100,7 @@ struct Peer {
 	pub transaction_announcement_type: TransactionAnnouncementType,
 }
 
-/// Default implementation of connectd peers container
+/// Default implementation of connected peers container
 #[derive(Default)]
 pub struct PeersImpl {
 	/// All connected peers. Most of times this field is accessed, it is accessed in read mode.

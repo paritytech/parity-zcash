@@ -543,7 +543,7 @@ mod tests {
 		}
 	}
 
-	// Official test vectors from ZCash codebase referenced by both sighash-related ZIPs
+	// Official test vectors from Zcash codebase referenced by both sighash-related ZIPs
 	// ZIP143 (https://github.com/zcash/zips/blob/9515d73aac0aea3494f77bcd634e1e4fbd744b97/zip-0143.rst)
 	// ZIP243 (https://github.com/zcash/zips/blob/9515d73aac0aea3494f77bcd634e1e4fbd744b97/zip-0243.rst)
 	// revision:

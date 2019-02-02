@@ -72,7 +72,7 @@ fn is_valid_signature_encoding(sig: &[u8]) -> bool {
 	//   excluding the sighash byte.
 	// * R-length: 1-byte length descriptor of the R value that follows.
 	// * R: arbitrary-length big-endian encoded R value. It must use the shortest
-	//   possible encoding for a positive integers (which means no null bytes at
+	//   possible encoding for a positive integer (which means no null bytes at
 	//   the start, except a single one when the next byte has its highest bit set).
 	// * S-length: 1-byte length descriptor of the S value that follows.
 	// * S: arbitrary-length big-endian encoded S value. The same rules apply.
@@ -305,7 +305,7 @@ pub fn verify_script(
 	Ok(())
 }
 
-/// Evaluautes the script
+/// Evaluates the script
 #[cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
 pub fn eval_script(
 	stack: &mut Stack<Bytes>,

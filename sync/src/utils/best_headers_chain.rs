@@ -48,7 +48,7 @@ impl BestHeadersChain {
 			.and_then(|hash| self.headers.get(&hash).cloned())
 	}
 
-	/// Get geader by given hash
+	/// Get header by given hash
 	pub fn by_hash(&self, hash: &H256) -> Option<IndexedBlockHeader> {
 		self.headers.get(hash).cloned()
 	}

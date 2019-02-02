@@ -54,11 +54,11 @@ impl TransactionOutputProvider for MemoryPoolTransactionOutputProvider {
 	fn transaction_output(&self, prevout: &OutPoint, transaction_index: usize) -> Option<TransactionOutput> {
 		let hashed_prevout: HashedOutPoint = prevout.clone().into();
 
-		// check if that is output of some transaction, which is vitually removed from memory pool
+		// check if that is output of some transaction, which is virtually removed from memory pool
 		if let Some(ref nonfinal_spends) = self.nonfinal_spends {
 			if nonfinal_spends.dependent_spends.contains(&hashed_prevout) {
 				// transaction is trying to replace some nonfinal transaction
-				// + it is also depends on this transaction
+				// + it also depends on this transaction
 				// => this is definitely an error
 				return None;
 			}

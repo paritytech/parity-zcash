@@ -91,7 +91,7 @@ use types::{PeerIndex, ClientCoreRef, SynchronizationStateRef, EmptyBoxFuture, S
 ///! 1.3) move requested blocks from `scheduled` to `requested` queue
 ///! 1.4) mark idle peers as active
 ///! 1.5) stop (1)
-///! 2) if `scheduled` queue is not yet saturated: ===> ask for new blocks hashes
+///! 2) if `scheduled` queue is not yet saturated: ===> ask for new block hashes
 ///! 2.1) for each idle peer: send shortened `getblocks` message
 ///! 2.2) 'forget' idle peers => they will be added again if respond with inventory
 ///! 2.3) stop (2)
@@ -163,7 +163,7 @@ impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Veri
 	}
 
 	fn on_block(&self, peer_index: PeerIndex, block: IndexedBlock) {
-		// block can became:
+		// block can become:
 		// ignored, unknown, orphaned => no verification should occur
 		// on-time => this block + all dependent orphaned should be verified
 		{
@@ -189,7 +189,7 @@ impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Veri
 	}
 
 	fn on_transaction(&self, peer_index: PeerIndex, transaction: IndexedTransaction) {
-		// block can became:
+		// block can become:
 		// ignored, orphaned => no verification should occur
 		// on-time => this transaction + all dependent orphaned should be verified
 		let transactions_to_verify = self.core.lock().on_transaction(peer_index, transaction);

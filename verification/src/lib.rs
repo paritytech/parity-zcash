@@ -43,7 +43,7 @@
 //! C.1 VerifyHeader
 //! C.2 AcceptHeader (?)
 //!
-//! --> D. after successfull chain_reorganization
+//! --> D. after successful chain_reorganization
 //!
 //! D.1 AcceptMemoryPoolTransaction on each tx in memory pool
 //!

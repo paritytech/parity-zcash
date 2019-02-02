@@ -137,7 +137,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 
 	pub fn check(&self) -> Result<(), TransactionError> {
 		// Bip30 is not checked because we don't need to allow tx pool acceptance of an unspent duplicate.
-		// Tx pool validation is not strinctly a matter of consensus.
+		// Tx pool validation is not strictly a matter of consensus.
 		self.version.check()?;
 		self.size.check()?;
 		self.expiry.check()?;

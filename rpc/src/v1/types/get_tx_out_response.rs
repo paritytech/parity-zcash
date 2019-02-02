@@ -16,7 +16,7 @@ pub struct GetTxOutResponse {
 	pub script: TransactionOutputScript,
 	/// This transaction version
 	pub version: i32,
-	/// Is this transactio a coinbase transaction?
+	/// Is this transaction a coinbase transaction?
 	pub coinbase: bool,
 }
 

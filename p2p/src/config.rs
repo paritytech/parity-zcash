@@ -19,7 +19,7 @@ pub struct Config {
 	pub seeds: Vec<String>,
 	/// p2p/nodes.csv file path.
 	pub node_table_path: path::PathBuf,
-	/// Peers with this services will get a boost in node_table.
+	/// Peers with these services will get a boost in node_table.
 	pub preferable_services: Services,
 	/// Internet protocol.
 	pub internet_protocol: InternetProtocol,

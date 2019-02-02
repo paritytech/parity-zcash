@@ -4,7 +4,7 @@ use super::super::types::{StorageRef, BlockHeight};
 // AtomicU32 is unstable => using AtomicUsize here
 
 /// Shared synchronization client state.
-/// It can be slightly innacurate, but the accuracy is not required for it
+/// It can be slightly inaccurate, but the accuracy is not required for it
 #[derive(Debug)]
 pub struct SynchronizationState {
 	/// Is synchronization in progress?

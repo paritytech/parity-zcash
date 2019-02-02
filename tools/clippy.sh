@@ -2,7 +2,7 @@
 
 # NOTE!
 # this script requires nightly version of rustc
-# clippy plugin needs to be compiled with the same nigtly version as currently set one
+# clippy plugin needs to be compiled with the same nightly version as currently set one
 # tested with clippy 0.0.98
 
 # temporary workaround for cargo clippy issue #1330

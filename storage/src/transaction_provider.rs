@@ -28,7 +28,7 @@ pub trait TransactionOutputProvider: Send + Sync {
 
 /// Transaction meta provider stores transaction meta information
 pub trait TransactionMetaProvider: Send + Sync {
-	/// Returns None if transactin with given hash does not exist
+	/// Returns None if transaction with given hash does not exist
 	/// Otherwise returns transaction meta object
 	fn transaction_meta(&self, hash: &H256) -> Option<TransactionMeta>;
 }

@@ -1,4 +1,4 @@
-//! Bitcoin trainsaction.
+//! Bitcoin transaction.
 //! https://en.bitcoin.it/wiki/Protocol_documentation#tx
 
 use std::io;
@@ -335,7 +335,7 @@ mod tests {
 	use ser::{Serializable, serialize};
 	use super::Transaction;
 
-	// real transaction from ZCash block 30003
+	// real transaction from Zcash block 30003
 	// https://zcash.blockexplorer.com/api/rawtx/54c8acf69271dad83e9faa34284cda725caa5bea7378db92acf35becd0989463
 	#[test]
 	fn test_transparent_only_transaction() {
@@ -373,7 +373,7 @@ mod tests {
 		assert_eq!(t, hex);
 	}
 
-	// real transaction from ZCash block 396
+	// real transaction from Zcash block 396
 	// https://zcash.blockexplorer.com/api/rawtx/ec31a1b3e18533702c74a67d91c49d622717bd53d6192c5cb23b9bdf080416a5
 	#[test]
 	fn test_sprout_transaction() {
