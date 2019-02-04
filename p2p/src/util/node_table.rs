@@ -196,7 +196,7 @@ impl NodeTable {
 		fs::OpenOptions::new()
 			.create(true)
 			.read(true)
-			// without opening for write, mac os returns os error 22
+			// without opening for write, macOS returns os error 22
 			.write(true)
 			.open(path)
 			.and_then(|f| Self::load(preferable_services, f))
@@ -251,9 +251,9 @@ impl<T> NodeTable<T> where T: Time {
 		}
 	}
 
-	/// Tries to remove node with the speicified socket address
+	/// Tries to remove node with the specified socket address
 	/// from table, if exists.
-	/// Returnes `true` if it has removed anything
+	/// Returns `true` if it has removed anything
 	pub fn remove(&mut self, addr: &SocketAddr) -> Result<(), NodeTableError> {
 		let node = self.by_addr.remove(&addr);
 		match node {
@@ -309,7 +309,7 @@ impl<T> NodeTable<T> where T: Time {
 		}
 	}
 
-	/// Returnes most reliable nodes with desired services.
+	/// Returns most reliable nodes with desired services.
 	pub fn nodes_with_services(&self, services: &Services, protocol: InternetProtocol, except: &HashSet<net::SocketAddr>, limit: usize) -> Vec<Node> {
 		self.by_score.iter()
 			.filter(|node| protocol.is_allowed(&node.0.addr))
@@ -330,16 +330,16 @@ impl<T> NodeTable<T> where T: Time {
 			.collect()
 	}
 
-	/// Returnes all nodes
+	/// Returns all nodes
 	pub fn nodes(&self) -> Vec<Node> {
 		self.by_addr.iter().map(|(_, n)| n).cloned().collect()
 	}
 
 	/// Returns most recently active nodes.
 	///
-	/// The documenation says:
+	/// The documentation says:
 	/// "Non-advertised nodes should be forgotten after typically 3 hours"
-	/// but bitcoin client still advertises them even after a month.
+	/// but Bitcoin client still advertises them even after a month.
 	/// Let's do the same.
 	///
 	/// https://en.bitcoin.it/wiki/Protocol_documentation#addr

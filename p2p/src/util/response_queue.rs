@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use bytes::Bytes;
 
-/// Queue of out-of-order responses. Each peer has it's own queue.
+/// Queue of out-of-order responses. Each peer has its own queue.
 #[derive(Debug, Default)]
 pub struct ResponseQueue {
 	unfinished: HashMap<u32, Vec<Bytes>>,

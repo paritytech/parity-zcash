@@ -6,7 +6,7 @@ pub enum Error {
 	/// Invalid block
 	#[display(fmt = "Cannot canonize block")]
 	CannotCanonize,
-	/// Uknown parent
+	/// Unknown parent
 	#[display(fmt = "Block parent is unknown")]
 	UnknownParent,
 	/// Ancient fork

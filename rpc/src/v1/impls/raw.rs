@@ -54,7 +54,7 @@ impl RawClientCore {
 		let version = SAPLING_TX_VERSION;
 		let version_group_id = SAPLING_TX_VERSION_GROUP_ID;
 
-		// to make lock_time work at least one input must have sequnce < SEQUENCE_FINAL
+		// to make lock_time work at least one input must have sequence < SEQUENCE_FINAL
 		let lock_time = lock_time.unwrap_or_default();
 		let default_sequence = if lock_time != 0 { chain::constants::SEQUENCE_FINAL - 1 } else { chain::constants::SEQUENCE_FINAL };
 

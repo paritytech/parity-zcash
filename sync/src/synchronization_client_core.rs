@@ -211,7 +211,7 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 	}
 
 	fn on_disconnect(&mut self, peer_index: PeerIndex) {
-		// sync tasks from this peers must be executed by other peers
+		// sync tasks from these peers must be executed by other peers
 		let peer_tasks = self.peers_tasks.reset_blocks_tasks(peer_index);
 		self.peers_tasks.disconnect(peer_index);
 		self.execute_synchronization_tasks(Some(peer_tasks), None);
@@ -340,7 +340,7 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 					}
 				}
 
-				// this peers has supplied us with new headers => useful indeed
+				// these peers have supplied us with new headers => useful indeed
 				self.peers_tasks.useful_peer(peer_index);
 				// and execute tasks
 				self.execute_synchronization_tasks(None, None);
@@ -561,7 +561,7 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 			tasks.extend(forced_tasks);
 		}
 
-		// if some blocks requests are marked as last [i.e. blocks are potentialy wrong] => ask peers anyway
+		// if some blocks requests are marked as last [i.e. blocks are potentially wrong] => ask peers anyway
 		if let Some(final_blocks_requests) = final_blocks_requests {
 			let useful_peers = self.peers_tasks.useful_peers();
 			if !useful_peers.is_empty() { // if empty => not a problem, just forget these blocks
@@ -617,7 +617,7 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 							// => peers have not yet responded with a single requested blocks
 							60_f64
 						} else {
-							// blocks were are already received
+							// blocks were already received
 							// => bad situation
 							0_f64
 						}
@@ -2204,7 +2204,7 @@ pub mod tests {
 		// forget tasks
 		{ executor.take_tasks(); }
 
-		// and then peer2 responds with with b1 while b0 is still left in queue
+		// and then peer2 responds with b1 while b0 is still left in queue
 		sync.on_block(2, b1.into());
 
 		// now simulate some time has passed && number of b0 failures is @max level

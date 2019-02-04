@@ -157,8 +157,8 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		trace!(target: "sync", "Got `getheaders` message from peer#{}", peer_index);
 
 		// simulating bitcoind for passing tests: if we are in nearly-saturated state
-		// and peer, which has just provided a new blocks to us, is asking for headers
-		// => do not serve getheaders until we have fully process his blocks + wait until headers are served before returning
+		// and peer, which has just provided new blocks to us, is asking for headers
+		// => do not serve getheaders until we have fully processed its blocks + wait until headers are served before returning
 		let server = Arc::downgrade(&self.server);
 		let server_task = ServerTask::GetHeaders(peer_index, message, id);
 		let lazy_server_task = lazy(move || {
@@ -209,7 +209,7 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 		self.peers.set_block_announcement_type(peer_index, BlockAnnouncementType::SendHeaders);
 	}
 
-	/// When peer sents us a merkle block
+	/// When peer sends us a merkle block
 	pub fn on_merkleblock(&self, peer_index: PeerIndex, _message: types::MerkleBlock) {
 		trace!(target: "sync", "Got `merkleblock` message from peer#{}", peer_index);
 		// we never setup filter on connections => misbehaving

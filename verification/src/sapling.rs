@@ -474,7 +474,7 @@ mod tests {
 			Err(OutputError::NoteCommitment(_))
 		);
 
-		// when empeheral key isn't represented by an on-curve point
+		// when ephemeral key isn't represented by an on-curve point
 		let mut output = sapling.outputs[0].clone();
 		output.ephemeral_key = swap_xy(output.ephemeral_key);
 		assert_matches!(
@@ -482,7 +482,7 @@ mod tests {
 			Err(OutputError::EphemeralKey(PointError::Invalid(_)))
 		);
 
-		// when empeheral key is represented by a small order point
+		// when ephemeral key is represented by a small order point
 		let mut output = sapling.outputs[0].clone();
 		output.ephemeral_key = small_order_point();
 		assert_matches!(

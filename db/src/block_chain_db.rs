@@ -309,7 +309,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 
 	/// Marks block as a new best block.
 	///
-	/// Block must be already inserted into db, and it's parent must be current best block.
+	/// Block must be already inserted into db, and its parent must be current best block.
 	/// Updates meta data.
 	pub fn canonize(&self, hash: &H256) -> Result<(), Error> {
 		let mut best_block = self.best_block.write();

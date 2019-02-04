@@ -157,7 +157,7 @@ impl Context {
 		Box::new(connection.then(move |result| {
 			match result {
 				Ok(DeadlineStatus::Meet(Ok(connection))) => {
-					// successfull hanshake
+					// successful handshake
 					trace!("Connected to {}", connection.address);
 					context.node_table.write().insert(connection.address, connection.services);
 					let channel = context.connections.store::<T>(context.clone(), connection, Direction::Outbound);
@@ -211,7 +211,7 @@ impl Context {
 		Box::new(accept_connection(stream, handle, &config, socket).then(move |result| {
 			match result {
 				Ok(DeadlineStatus::Meet(Ok(connection))) => {
-					// successfull hanshake
+					// successful handshake
 					trace!("Accepted connection from {}", connection.address);
 					context.node_table.write().insert(connection.address, connection.services);
 					let channel = context.connections.store::<NormalSessionFactory>(context.clone(), connection, Direction::Inbound);
@@ -255,7 +255,7 @@ impl Context {
 		})
 	}
 
-	/// Starts tcp server and listens for incomming connections.
+	/// Starts tcp server and listens for incoming connections.
 	pub fn listen(context: Arc<Context>, handle: &Handle, config: NetConfig) -> Result<BoxedEmptyFuture, io::Error> {
 		trace!("Starting tcp server");
 		let server = try!(TcpListener::bind(&config.local_address, handle));
@@ -277,7 +277,7 @@ impl Context {
 		Ok(server)
 	}
 
-	/// Called on incomming mesage.
+	/// Called on incoming message.
 	pub fn on_message(context: Arc<Context>, channel: Arc<Channel>) -> IoFuture<MessageResult<()>> {
 		Box::new(channel.read_message().then(move |result| {
 			match result {

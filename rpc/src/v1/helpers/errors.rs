@@ -22,7 +22,7 @@ macro_rules! rpc_unimplemented {
 pub fn unimplemented(details: Option<String>) -> Error {
 	Error {
 		code: ErrorCode::InternalError,
-		message: "This request is not implemented yet. Please create an issue on Github repo.".into(),
+		message: "This request is not implemented yet. Please create an issue on GitHub repo.".into(),
 		data: details.map(Value::String),
 	}
 }

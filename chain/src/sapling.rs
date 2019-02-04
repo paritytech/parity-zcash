@@ -65,7 +65,7 @@ pub struct SaplingOutputDescription {
 	/// Ciphertext component for the encrypted output note.
 	pub enc_cipher_text: [u8; 580],
 	/// Ciphertext component that allows the holder of a full viewing key to recover the recipient
-	/// diversified transmission key and teh ephemeral private key (and therefore the entire note
+	/// diversified transmission key and the ephemeral private key (and therefore the entire note
 	/// plaintext).
 	pub out_cipher_text: [u8; 80],
 	/// Zero-knowledge proof with primary input

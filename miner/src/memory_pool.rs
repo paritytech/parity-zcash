@@ -54,9 +54,9 @@ pub struct Entry {
 	pub transaction: Transaction,
 	/// In-pool ancestors hashes for this transaction
 	pub ancestors: HashSet<H256>,
-	/// Transaction hash (stored for effeciency)
+	/// Transaction hash (stored for efficiency)
 	pub hash: H256,
-	/// Transaction size (stored for effeciency)
+	/// Transaction size (stored for efficiency)
 	pub size: usize,
 	/// Throughout index of this transaction in memory pool (non persistent)
 	pub storage_index: u64,
@@ -301,7 +301,7 @@ impl Storage {
 		// update pool information
 		self.transactions_size_in_bytes += entry.size;
 
-		// remember that this transactions depends on its inputs
+		// remember that this transaction depends on its inputs
 		for input_hash in entry.transaction.inputs.iter().map(|input| &input.previous_output.hash) {
 			self.references.by_input.entry(input_hash.clone()).or_insert_with(HashSet::new).insert(entry.hash.clone());
 		}
@@ -537,7 +537,7 @@ impl Storage {
 		};
 		top_hash.map(|hash| {
 			let entry = self.remove_by_hash(&hash)
-				.expect("`hash` is read from `references`; entries in `references` have corresponging entries in `by_hash`; `remove_by_hash` removes entry from `by_hash`; qed");
+				.expect("`hash` is read from `references`; entries in `references` have corresponding entries in `by_hash`; `remove_by_hash` removes entry from `by_hash`; qed");
 			IndexedTransaction::new(entry.hash, entry.transaction)
 		})
 	}
@@ -670,7 +670,7 @@ impl MemoryPool {
 	}
 
 	/// Removes single transaction by its hash.
-	/// All descedants remain in the pool.
+	/// All descendants remain in the pool.
 	pub fn remove_by_hash(&mut self, h: &H256) -> Option<Transaction> {
 		self.storage.remove_by_hash(h).map(|entry| entry.transaction)
 	}
@@ -982,7 +982,7 @@ pub mod tests {
 		pool.insert_verified(chain.at(1).into(), &NonZeroFeeCalculator); // timestamp 1
 		pool.insert_verified(chain.at(0).into(), &NonZeroFeeCalculator); // timestamp 2
 
-		// check that parent transaction was removed before child trnasaction
+		// check that parent transaction was removed before child transaction
 		let transactions = pool.remove_n_with_strategy(3, OrderingStrategy::ByTimestamp);
 		assert_eq!(transactions.len(), 3);
 		assert_eq!(transactions[0], chain.at(0).into());
@@ -1000,7 +1000,7 @@ pub mod tests {
 		// insert parent, then child
 		let mut pool = to_memory_pool(chain);
 
-		// check that parent transaction was removed before child trnasaction
+		// check that parent transaction was removed before child transaction
 		let transactions = pool.remove_n_with_strategy(3, OrderingStrategy::ByTimestamp);
 		assert_eq!(transactions.len(), 3);
 		assert_eq!(transactions[0], chain.at(0).into());

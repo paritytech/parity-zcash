@@ -44,7 +44,7 @@ impl<F> BlockHashBuilder<F> where F: Invoke<(H256, chain::Block)> {
 	}
 
 	pub fn build(self) -> F::Result {
-		let block = self.block.expect("Block is supposed to be build here to get hash");
+		let block = self.block.expect("Block is supposed to be built here to get hash");
 		self.callback.invoke((
 			block.hash(),
 			block

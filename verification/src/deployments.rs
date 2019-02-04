@@ -118,7 +118,7 @@ fn threshold_state(cache: &mut DeploymentStateCache, deployment: Deployment, num
 		}
 	}
 
-	// number is number of block which is currently validating
+	// number is block number which is currently validating
 	// => it is not in database
 	// we need to make all checks for previous blocks
 	let number = number.saturating_sub(1);

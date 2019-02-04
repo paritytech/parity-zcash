@@ -30,7 +30,7 @@ pub struct TransactionOutputWithAddress {
 	pub amount: f64,
 }
 
-/// Trasaction output of form "data": serialized(output script data)
+/// Transaction output of form "data": serialized(output script data)
 #[derive(Debug, PartialEq)]
 pub struct TransactionOutputWithScriptData {
 	/// Serialized script data

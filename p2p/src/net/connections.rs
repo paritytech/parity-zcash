@@ -46,7 +46,7 @@ impl Connections {
 	}
 
 	/// Stores new channel.
-	/// Returnes a shared pointer to it.
+	/// Returns a shared pointer to it.
 	pub fn store<T>(&self, context: Arc<Context>, connection: Connection, direction: Direction) -> Arc<Channel> where T: SessionFactory {
 		let id = self.peer_counter.fetch_add(1, Ordering::AcqRel);
 

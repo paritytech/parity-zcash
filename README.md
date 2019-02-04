@@ -50,9 +50,9 @@ Windows binaries can be downloaded from [rust-lang website](https://forge.rust-l
 
 You will need the cc and gcc compilers to build some of the dependencies.
 
-On MacOSX <br />
+On macOS <br />
 
-`build-essential` is a Debian package. On MacOSX you will need to make sure you have XCode installed. If you already have Homebrew installed, you probably also already have the Xcode tools installed as well. If not, you can run the command below:
+`build-essential` is a Debian package. On macOS you will need to make sure you have Xcode installed. If you already have Homebrew installed, you probably also already have the Xcode tools installed as well. If not, you can run the command below:
 ```
 xcode-select --install
 ```

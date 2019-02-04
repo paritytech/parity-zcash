@@ -38,7 +38,7 @@ pub struct BlockTemplate {
 }
 
 /// Block size and number of signatures opcodes is limited
-/// This structure should be used for storing this values.
+/// This structure should be used for storing these values.
 struct SizePolicy {
 	/// Current size
 	current_size: u32,
@@ -169,7 +169,7 @@ impl<'a, T> FittingTransactionsIterator<'a, T> where T: Iterator<Item = &'a Entr
 			block_height: block_height,
 			block_time: block_time,
 			checkdatasig_active,
-			// reserve some space for header and transations len field
+			// reserve some space for header and transactions len field
 			block_size: SizePolicy::new(BLOCK_HEADER_SIZE + 4, max_block_size, 1_000, 50),
 			sigops: SizePolicy::new(0, max_block_sigops, 8, 50),
 			previous_entries: Vec::new(),
@@ -261,7 +261,7 @@ impl<'a> BlockAssembler<'a> {
 		consensus: &ConsensusParams,
 	) -> BlockTemplate {
 		// get best block
-		// take it's hash && height
+		// take its hash && height
 		let best_block = store.best_block();
 		let previous_header_hash = best_block.hash;
 		let height = best_block.number + 1;

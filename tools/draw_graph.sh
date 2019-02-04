@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Cargo graph does not work with cargo worspaces #33
+# Cargo graph does not work with cargo workspaces #33
 # https://github.com/kbknapp/cargo-graph/issues/33
 # so first we need to patch Cargo.toml and remove workspace
 patch -R Cargo.toml tools/workspace.diff

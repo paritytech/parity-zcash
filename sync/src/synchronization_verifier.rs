@@ -241,7 +241,7 @@ impl<T> Verifier for SyncVerifier<T> where T: VerificationSink {
 		match self.verifier.verify_block(&block) {
 			Ok(_) => {
 				// SyncVerifier is used for bulk blocks import only
-				// => there are no memory pool
+				// => there is no memory pool
 				// => we could ignore decanonized transactions
 				self.sink.on_block_verification_success(block);
 			},

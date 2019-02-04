@@ -119,7 +119,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let rpc_config = parse_rpc_config(network, matches)?;
 
 	let block_notify_command = match matches.value_of("blocknotify") {
-		Some(s) => Some(s.parse().map_err(|_| "Invalid blocknotify commmand".to_owned())?),
+		Some(s) => Some(s.parse().map_err(|_| "Invalid blocknotify command".to_owned())?),
 		None => None,
 	};
 
@@ -142,7 +142,7 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	};
 
 	let miner_address = match matches.value_of("miner-address") {
-		Some(s) => Some(s.parse().map_err(|_| "Invalid miner-address commmand".to_owned())?),
+		Some(s) => Some(s.parse().map_err(|_| "Invalid miner-address command".to_owned())?),
 		None => None,
 	};
 

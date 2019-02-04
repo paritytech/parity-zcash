@@ -79,7 +79,7 @@ impl SeednodeProtocol {
 impl Protocol for SeednodeProtocol {
 	fn on_message(&mut self, command: &Command, _payload: &Bytes) -> Result<(), Error> {
 		// Seednodes send addr message more than once with different addresses.
-		// We can't disconenct after first read. Let's delay it by 60 seconds.
+		// We can't disconnect after first read. Let's delay it by 60 seconds.
 		if !self.disconnecting && command == &Addr::command() {
 			self.disconnecting = true;
 			let context = self.context.global().clone();
