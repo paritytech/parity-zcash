@@ -25,15 +25,9 @@ addons:
     - g++-4.8
     - oracle-java8-set-default
 script:
-- echo 'Running tests' && echo -en 'travis_fold:start:tests'
 - cargo test --all
-- echo -en 'travis_fold:end:tests'
-- echo 'Building in release mode' && echo -en 'travis_fold:start:build.release'
 - cargo build --release
-- echo -en 'travis_fold:end:build.release'
-- echo 'Running bench from ./tools/bench.sh' && echo -en 'travis_fold:start:bench'
 - "./tools/bench.sh"
-- echo -en 'travis_fold:end:bench'
 after_success: |
   [ true ] &&
   [ $TRAVIS_BRANCH = master ] &&
