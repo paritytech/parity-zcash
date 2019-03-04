@@ -57,8 +57,6 @@ extern crate log;
 extern crate parking_lot;
 extern crate rayon;
 extern crate byteorder;
-#[macro_use]
-extern crate lazy_static;
 #[cfg(test)]
 extern crate rand;
 extern crate rustc_hex as hex;

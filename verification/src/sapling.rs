@@ -1,18 +1,14 @@
 use std::io::Error as IoError;
 use chain::{Sapling, SaplingSpendDescription, SaplingOutputDescription};
 use crypto::{
-	Groth16VerifyingKey,
+	Groth16VerifyingKey, JUBJUB,
 	pairing::{bls12_381::{Bls12, Fr, FrRepr}, PrimeField, PrimeFieldRepr, PrimeFieldDecodingError},
 	bellman::{SynthesisError, groth16::{verify_proof, Proof}},
 	sapling_crypto::{circuit::multipack, redjubjub::{self, Signature}},
-	sapling_crypto::jubjub::{edwards,fs::FsRepr, FixedGenerators, JubjubBls12, JubjubParams, Unknown}
+	sapling_crypto::jubjub::{edwards,fs::FsRepr, FixedGenerators, JubjubParams, Unknown}
 };
 
 type Point = edwards::Point<Bls12, Unknown>;
-
-lazy_static! {
-	static ref JUBJUB: JubjubBls12 = { JubjubBls12::new() };
-}
 
 /// Errors that could occur during sapling verification.
 #[derive(Debug)]

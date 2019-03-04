@@ -1,8 +1,8 @@
 use hash::H256;
-use crypto::sha256_compress;
+use crypto::{sha256_compress, pedersen_hash};
 
 lazy_static! {
-	static ref EMPTY_ROOTS: Vec<H256> = [
+	static ref SPROUT_EMPTY_ROOTS: Vec<H256> = [
 		H256::from("0000000000000000000000000000000000000000000000000000000000000000"),
 		H256::from("da5698be17b9b46962335799779fbeca8ce5d491c0d26243bafef9ea1837a9d8"),
 		H256::from("dc766fab492ccf3d1e49d4f374b5235fa56506aac2224d39f943fcd49202974c"),
@@ -70,10 +70,84 @@ lazy_static! {
 		H256::from("eadf23fc99d514dd8ea204d223e98da988831f9b5d1940274ca520b7fb173d8a"),
 		H256::from("5b8e14facac8a7c7a3bfee8bae71f2f7793d3ad5fe3383f93ab6061f2a11bb02")
 	].to_vec();
+
+	static ref SAPLING_EMPTY_ROOTS: Vec<H256> = [
+		H256::from("0100000000000000000000000000000000000000000000000000000000000000"),
+		H256::from("817de36ab2d57feb077634bca77819c8e0bd298c04f6fed0e6a83cc1356ca155"),
+		H256::from("ffe9fc03f18b176c998806439ff0bb8ad193afdb27b2ccbc88856916dd804e34"),
+		H256::from("d8283386ef2ef07ebdbb4383c12a739a953a4d6e0d6fb1139a4036d693bfbb6c"),
+		H256::from("e110de65c907b9dea4ae0bd83a4b0a51bea175646a64c12b4c9f931b2cb31b49"),
+		H256::from("912d82b2c2bca231f71efcf61737fbf0a08befa0416215aeef53e8bb6d23390a"),
+		H256::from("8ac9cf9c391e3fd42891d27238a81a8a5c1d3a72b1bcbea8cf44a58ce7389613"),
+		H256::from("d6c639ac24b46bd19341c91b13fdcab31581ddaf7f1411336a271f3d0aa52813"),
+		H256::from("7b99abdc3730991cc9274727d7d82d28cb794edbc7034b4f0053ff7c4b680444"),
+		H256::from("43ff5457f13b926b61df552d4e402ee6dc1463f99a535f9a713439264d5b616b"),
+		H256::from("ba49b659fbd0b7334211ea6a9d9df185c757e70aa81da562fb912b84f49bce72"),
+		H256::from("4777c8776a3b1e69b73a62fa701fa4f7a6282d9aee2c7a6b82e7937d7081c23c"),
+		H256::from("ec677114c27206f5debc1c1ed66f95e2b1885da5b7be3d736b1de98579473048"),
+		H256::from("1b77dac4d24fb7258c3c528704c59430b630718bec486421837021cf75dab651"),
+		H256::from("bd74b25aacb92378a871bf27d225cfc26baca344a1ea35fdd94510f3d157082c"),
+		H256::from("d6acdedf95f608e09fa53fb43dcd0990475726c5131210c9e5caeab97f0e642f"),
+		H256::from("1ea6675f9551eeb9dfaaa9247bc9858270d3d3a4c5afa7177a984d5ed1be2451"),
+		H256::from("6edb16d01907b759977d7650dad7e3ec049af1a3d875380b697c862c9ec5d51c"),
+		H256::from("cd1c8dbf6e3acc7a80439bc4962cf25b9dce7c896f3a5bd70803fc5a0e33cf00"),
+		H256::from("6aca8448d8263e547d5ff2950e2ed3839e998d31cbc6ac9fd57bc6002b159216"),
+		H256::from("8d5fa43e5a10d11605ac7430ba1f5d81fb1b68d29a640405767749e841527673"),
+		H256::from("08eeab0c13abd6069e6310197bf80f9c1ea6de78fd19cbae24d4a520e6cf3023"),
+		H256::from("0769557bc682b1bf308646fd0b22e648e8b9e98f57e29f5af40f6edb833e2c49"),
+		H256::from("4c6937d78f42685f84b43ad3b7b00f81285662f85c6a68ef11d62ad1a3ee0850"),
+		H256::from("fee0e52802cb0c46b1eb4d376c62697f4759f6c8917fa352571202fd778fd712"),
+		H256::from("16d6252968971a83da8521d65382e61f0176646d771c91528e3276ee45383e4a"),
+		H256::from("d2e1642c9a462229289e5b0e3b7f9008e0301cbb93385ee0e21da2545073cb58"),
+		H256::from("a5122c08ff9c161d9ca6fc462073396c7d7d38e8ee48cdb3bea7e2230134ed6a"),
+		H256::from("28e7b841dcbc47cceb69d7cb8d94245fb7cb2ba3a7a6bc18f13f945f7dbd6e2a"),
+		H256::from("e1f34b034d4a3cd28557e2907ebf990c918f64ecb50a94f01d6fda5ca5c7ef72"),
+		H256::from("12935f14b676509b81eb49ef25f39269ed72309238b4c145803544b646dca62d"),
+		H256::from("b2eed031d4d6a4f02a097f80b54cc1541d4163c6b6f5971f88b6e41d35c53814"),
+		H256::from("fbc2f4300c01f0b7820d00e3347c8da4ee614674376cbc45359daa54f9b5493e"),
+		H256::from("252e6798645f5bf114e4b4e90e96182861489840d9b4ccc4c1fb5a46997cee14"),
+		H256::from("98b19042f1f7c7dd11ec25ea66b6ff74e08ce11d447ed6f1bfe87e110e331e11"),
+		H256::from("d451304799572ba9f42c4dab6b07c703bd2c123ab9d60f2a60f9955854910b6a"),
+		H256::from("3ecd5f27acf01bd37a33e4517867ef76474cd83fb31c9208dcef2eedcef36c72"),
+		H256::from("26c37da67894a13df8aa4878d2514a4212573b73eccaab16fe4fa660e8fe2707"),
+		H256::from("b545ef34485eed30d42b2c295a4a5b680de8a9d5e38345782462c04f09dc6851"),
+		H256::from("77fd20b300946765a87f24bd045073729cbd7b66eb8fa140b583faa9d1425801"),
+		H256::from("cbaa576b1799b58ff3a6decbba919b0b68d7c893e46fde998768e87e350a0725"),
+		H256::from("45fe81b18ca30074d0120d2b1a0d10b3a050933512db8ee34e52473d4f08a267"),
+		H256::from("0e60a1f0121f591e551d3ed1865b50a75d7ccff1289df7c44dd465a54317f56a"),
+		H256::from("cedfb184dd92a0cbfc11e8be697b476988ed5f39369abdd90c61544988601c0d"),
+		H256::from("f362686612649a313ba464437a0cad0e7e3d7e1b4b3743f90e05a2100a495f42"),
+		H256::from("7deae5f3bbdeffd3f85271a08b5ec31f16f937964ae708fdff7c13e5a4f3df6b"),
+		H256::from("40ccf0fc1eab6d8502bd93dc31342dfd57df5bbb5d70a1bf6b92efc61ec9a258"),
+		H256::from("d78025491f1bca8507f64f25872dd02388479a1a225126e40d2fe418b98e0e2c"),
+		H256::from("0db7294685c8a0725f15846ea5899ea0e986c2707bd7b412954412f26abf550a"),
+		H256::from("b7e290be9555cf75548650da6d47c893aef7f8c6dd2735499495f636590dae0a"),
+		H256::from("2dd2532a858c300145a65e351f91be6afeab597c41ef073f50b622d586ff5927"),
+		H256::from("972f0c5c6f9aeb0e38bf8319f3a5fcdc8fd8782e4188730cd082d9babc589851"),
+		H256::from("001e577b0f4390182b4ae43d329b3aa8835dae1bb79e604b7d2da0e90d060929"),
+		H256::from("aa6e70a91ebc54eefce5ffd5b675daf3f1d940a8451fcb01081fa9d4f262436f"),
+		H256::from("d77038bf67e631752940231251d7fe85af52dbdd6aab37c7a5ec32b65fe6de03"),
+		H256::from("d227a17a7e0cf96dcedd9fc7bce43c6c1d66badd7543a887c8656c547ecfb24f"),
+		H256::from("70e8a521951583e53fc0585c707eceda89b7a7d1af41d1a015d797fa76c0f569"),
+		H256::from("e485a96855e872fc5090150e2cd24e10591d35166eb0eb30fcdfac93b01d281c"),
+		H256::from("e4a19febdf2a86896e41f2cedcf2ae584671802e6a467e8439cab5d61843416b"),
+		H256::from("e927838847806a43bd6c6088e39f65b8b3e58b2db5f7ad5643d91e0659a28a2a"),
+		H256::from("0bd3a818e83f9cd2ff4f62011a510176ac32f5448e6e154515043c5926d51c6f"),
+		H256::from("ce413445e03790498fe72d8e01915e7ff120ae35b3b590d21b7f74dee1830f0d"),
+		H256::from("600e6f93e73d7abd4ee0a65cb1b19aa3ecc525689dbf17779658741b95c15a55"),
+	].to_vec();
 }
 
 pub trait Dim {
 	const HEIGHT: usize;
+}
+
+pub trait TreeHash {
+	/// Get reference to empty hashes.
+	fn empty() -> &'static [H256];
+
+	/// Combine two hashes at given depth;
+	fn combine(left: &H256, right: &H256, depth: usize) -> H256;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -84,14 +158,40 @@ impl Dim for H32 {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TreeState<D: Dim> {
-	_phantom: ::std::marker::PhantomData<D>,
+pub struct SproutTreeHash;
+
+impl TreeHash for SproutTreeHash {
+	fn empty() -> &'static [H256] {
+		&SPROUT_EMPTY_ROOTS
+	}
+
+	fn combine(left: &H256, right: &H256, _depth: usize) -> H256 {
+		sha256_compress(&**left, &**right)
+	}
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SaplingTreeHash;
+
+impl TreeHash for SaplingTreeHash {
+	fn empty() -> &'static [H256] {
+		&SAPLING_EMPTY_ROOTS
+	}
+
+	fn combine(left: &H256, right: &H256, depth: usize) -> H256 {
+		pedersen_hash(&**left, &**right, depth)
+	}
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TreeState<D: Dim, H: TreeHash> {
+	_phantom: ::std::marker::PhantomData<(D, H)>,
 	left: Option<H256>,
 	right: Option<H256>,
 	parents: Vec<Option<H256>>,
 }
 
-impl<D: Dim> TreeState<D> {
+impl<D: Dim, H: TreeHash> TreeState<D, H> {
 	pub fn new() -> Self {
 		TreeState {
 			_phantom: ::std::marker::PhantomData,
@@ -112,7 +212,7 @@ impl<D: Dim> TreeState<D> {
 			let former_right = self.right.take()
 				.expect("none variant is handled in the branch above; qed");
 
-			let mut combined = sha256_compress(&*former_left, &*former_right);
+			let mut combined = H::combine(&former_left, &former_right, 0);
 			for i in 0..D::HEIGHT-1 {
 				let parent_slot = &mut self.parents[i as usize];
 
@@ -122,7 +222,7 @@ impl<D: Dim> TreeState<D> {
 						return Ok(());
 					},
 					Some(former) => {
-						combined = sha256_compress(&*former, &*combined)
+						combined = H::combine(&former, &combined, i + 1)
 					},
 				}
 			}
@@ -133,15 +233,15 @@ impl<D: Dim> TreeState<D> {
 	}
 
 	pub fn root(&self) -> H256 {
-		let left = self.left.as_ref().unwrap_or(&EMPTY_ROOTS[0]);
-		let right = self.right.as_ref().unwrap_or(&EMPTY_ROOTS[0]);
+		let left = self.left.as_ref().unwrap_or(&H::empty()[0]);
+		let right = self.right.as_ref().unwrap_or(&H::empty()[0]);
 
-		let mut root = sha256_compress(&**left, &**right);
+		let mut root = H::combine(&left, &right, 0);
 
 		for i in 0..D::HEIGHT-1 {
 			match &self.parents[i as usize] {
-				&Some(ref parent) => { root = sha256_compress(&**parent, &*root); }
-				&None => { root = sha256_compress(&*root, &*EMPTY_ROOTS[i as usize + 1]); },
+				&Some(ref parent) => { root = H::combine(&parent, &root, i + 1); }
+				&None => { root = H::combine(&root, &H::empty()[i as usize + 1], i + 1); },
 			}
 		}
 
@@ -149,13 +249,14 @@ impl<D: Dim> TreeState<D> {
 	}
 
 	pub fn empty_root() -> H256 {
-		EMPTY_ROOTS[D::HEIGHT]
+		H::empty()[D::HEIGHT]
 	}
 }
 
-pub type RegularTreeState = TreeState<H32>;
+pub type SproutTreeState = TreeState<H32, SproutTreeHash>;
+pub type SaplingTreeState = TreeState<H32, SaplingTreeHash>;
 
-impl<D: Dim> serialization::Serializable for TreeState<D> {
+impl<D: Dim, H: TreeHash> serialization::Serializable for TreeState<D, H> {
 	fn serialize(&self, stream: &mut serialization::Stream) {
 		stream.append(&self.left);
 		stream.append(&self.right);
@@ -163,11 +264,11 @@ impl<D: Dim> serialization::Serializable for TreeState<D> {
 	}
 }
 
-impl<D: Dim> serialization::Deserializable for TreeState<D> {
+impl<D: Dim, H: TreeHash> serialization::Deserializable for TreeState<D, H> {
 	fn deserialize<R: ::std::io::Read>(reader: &mut serialization::Reader<R>)
 		-> Result<Self, serialization::Error>
 	{
-		let mut tree_state = TreeState::<D>::new();
+		let mut tree_state = TreeState::new();
 		tree_state.left = reader.read()?;
 		tree_state.right = reader.read()?;
 		tree_state.parents = reader.read_list()?;
@@ -187,7 +288,8 @@ mod tests {
 		const HEIGHT: usize = 4;
 	}
 
-	type TestTreeState = TreeState<H4>;
+	type TestSproutTreeState = TreeState<H4, SproutTreeHash>;
+	type TestSaplingTreeState = TreeState<H4, SaplingTreeHash>;
 
 	pub struct H1;
 
@@ -203,8 +305,8 @@ mod tests {
 
 	#[test]
 	fn single_root() {
-		let mut tree = TreeState::<H1>::new();
-		tree.append(EMPTY_ROOTS[0].clone()).unwrap();
+		let mut tree = TreeState::<H1, SproutTreeHash>::new();
+		tree.append(SPROUT_EMPTY_ROOTS[0].clone()).unwrap();
 
 		assert_eq!(
 			tree.root(),
@@ -215,14 +317,14 @@ mod tests {
 	#[test]
 	fn empty_32_root() {
 		assert_eq!(
-			RegularTreeState::new().root(),
+			SproutTreeState::new().root(),
 			H256::from("ac58cd1388fec290d398f1944b564449a63c815880566bd1d189f7839e3b0c8c"),
 		)
 	}
 
 	#[test]
 	fn appended_1_32_root() {
-		let mut tree = RegularTreeState::new();
+		let mut tree = SproutTreeState::new();
 		tree.append(H256::from("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
 			.expect("failed to append to the tree");
 		assert_eq!(
@@ -233,8 +335,8 @@ mod tests {
 
 	#[test]
 	fn single_elem_in_double_tree() {
-		let mut tree = TreeState::<H2>::new();
-		tree.append(EMPTY_ROOTS[0].clone()).unwrap();
+		let mut tree = TreeState::<H2, SproutTreeHash>::new();
+		tree.append(SPROUT_EMPTY_ROOTS[0].clone()).unwrap();
 
 		assert_eq!(
 			tree.root(),
@@ -244,7 +346,7 @@ mod tests {
 
 	#[test]
 	fn commitment_1() {
-		let mut tree = TestTreeState::new();
+		let mut tree = TestSproutTreeState::new();
 		tree.append(H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
 			.unwrap();
 
@@ -256,7 +358,7 @@ mod tests {
 
 	#[test]
 	fn commitment_2() {
-		let mut tree = TestTreeState::new();
+		let mut tree = TestSproutTreeState::new();
 		tree.append(H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
 			.unwrap();
 		tree.append(H256::from_reversed_str("43c9a4b21555b832a79fc12ce27a97d4f4eca1638e7161a780db1d5ebc35eb68"))
@@ -270,7 +372,7 @@ mod tests {
 
 	#[test]
 	fn glass() {
-		let mut tree = TestTreeState::new();
+		let mut tree = TestSproutTreeState::new();
 		tree.append(H256::from_reversed_str("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
 			.unwrap();
 		tree.append(H256::from_reversed_str("43c9a4b21555b832a79fc12ce27a97d4f4eca1638e7161a780db1d5ebc35eb68"))
@@ -388,7 +490,7 @@ mod tests {
 			H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc"),
 		];
 
-		let mut tree = TestTreeState::new();
+		let mut tree = TestSproutTreeState::new();
 
 		for i in 0..TEST_COMMITMENTS.len() {
 			tree.append(TEST_COMMITMENTS[i].clone()).expect(&format!("Failed to add commitment #{}", i));
@@ -401,7 +503,7 @@ mod tests {
 
 	#[test]
 	fn serde() {
-		let mut tree = TestTreeState::new();
+		let mut tree = TestSproutTreeState::new();
 		for i in 0..TEST_COMMITMENTS.len() {
 			tree.append(TEST_COMMITMENTS[i].clone()).expect(&format!("Failed to add commitment #{}", i));
 		}
@@ -414,8 +516,71 @@ mod tests {
 		let bytes = stream.out();
 
 		let mut reader = serialization::Reader::new(&bytes[..]);
-		let deserialized_tree: TestTreeState = reader.read().expect("Failed to deserialize");
+		let deserialized_tree: TestSproutTreeState = reader.read().expect("Failed to deserialize");
 
 		assert_eq!(deserialized_tree.root(), H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc"));
+	}
+
+	#[test]
+	fn sapling_empty_root() {
+		let expected_root = H256::from_reversed_str("3e49b5f954aa9d3545bc6c37744661eea48d7c34e3000d82b7f0010c30f4c2fb");
+		let actual_root = SaplingTreeState::empty_root();
+		assert_eq!(actual_root, expected_root);
+	}
+
+	#[test]
+	fn sapling_tree_state_root() {
+		// some tests from:
+		// https://github.com/zcash/zcash/blob/92cd76fcba8f284694f213547293a1cfc2c0369d/src/gtest/test_merkletree.cpp#L208
+
+		let commitments = [
+			H256::from_reversed_str("556f3af94225d46b1ef652abc9005dee873b2e245eef07fd5be587e0f21023b0"),
+			H256::from_reversed_str("d814b127a6c6b8f07ed03f0f6e2843ff04c9851ff824a4e5b4dad5b5f3475722"),
+			H256::from_reversed_str("ec030e6d7460f91668cc842ceb78cdb54470469e78cd59cf903d3a6e1aa03e7c"),
+			H256::from_reversed_str("b0a0d08406b9e3693ee4c062bd1e6816f95bf14f5a13aafa1d57942c6c1d4250"),
+			H256::from_reversed_str("92fc3e7298eb327a88abcc406fbe595e45dddd9b4209803b2e0baa3a8663ecaa"),
+			H256::from_reversed_str("f607dd230ada93d14f4de1d9008a5e64a59af87c2e4f64a5f9e55e0cd44867f8"),
+			H256::from_reversed_str("ae0bfc1e123edcb6252251611650f3667371f781b60302385c414716c75e8abc"),
+			H256::from_reversed_str("91a5e54bf9a9b57e1c163904999ad1527f1e126c685111e18193decca2dd1ada"),
+			H256::from_reversed_str("c674f7836089063143fc18b673b2d92f888c63380e3680385d47bcdbd5fe273a"),
+			H256::from_reversed_str("7c1dbdb260441b89a08ba411d5f8406e81abd9dc85382f307999fdf77d8fcac8"),
+			H256::from_reversed_str("02372c746664e0898576972ca6d0500c7c8ec42f144622349d133b06e837faf0"),
+			H256::from_reversed_str("08c6d7dd3d2e387f7b84d6769f2b6cbe308918ab81e0f7321bd0945868d7d4e6"),
+			H256::from_reversed_str("a6e8c4061f2ad984d19f2c0a4436b9800e529069c0b0d3186d4683e83bb7eb8c"),
+			H256::from_reversed_str("837cc2391338956026521beca5c81b541b7f2d1ead7758bf4d1588dbbcb8fa22"),
+			H256::from_reversed_str("1cc467cfd2b504e156c9a38bc5c0e4f5ea6cc208054d2d0653a7e561ac3a3ef4"),
+			H256::from_reversed_str("15ac4057a9a94536eca9802de65e985319e89627c9c64bc94626b712bc61363a"),
+		];
+
+		let roots = [
+			H256::from("8c3daa300c9710bf24d2595536e7c80ff8d147faca726636d28e8683a0c27703"),
+			H256::from("8611f17378eb55e8c3c3f0a5f002e2b0a7ca39442fc928322b8072d1079c213d"),
+			H256::from("3db73b998d536be0e1c2ec124df8e0f383ae7b602968ff6a5276ca0695023c46"),
+			H256::from("7ac2e6442fec5970e116dfa4f2ee606f395366cafb1fa7dfd6c3de3ce18c4363"),
+			H256::from("6a8f11ab2a11c262e39ed4ea3825ae6c94739ccf94479cb69402c5722b034532"),
+			H256::from("102b109d1d41f762852c2068df174db8d5313bc8195b1e72d4c3c2ed8f5b9f5b"),
+			H256::from("37807232a70f2259451cfdd55fcb9db766b2c8a567bf84ccc0c19004828a061e"),
+			H256::from("d5136159c424f6728de653cad86e59745aa319e2e05c577ab5820763db7d9838"),
+			H256::from("f9dfc0f06bc8c70d6e74309bbdb89b13a6917992cebd48101c5441b017477b0b"),
+			H256::from("a50c3af16b41f35bf127cd8cf03a083b95e65c18d1a40b60bd617c8f9c011042"),
+			H256::from("3385fbc241ed176b0140d111cb17a51ebd3aab12626bdb89d636db67e360e139"),
+			H256::from("e38bf6a3784f2febe4b9bec1658da6bf05438acd647932bbf35f525af127bd5b"),
+			H256::from("60b63895c392a16a327b0ed5f828dcd6238cdba379c4ab41aa4c4547ecf52c27"),
+			H256::from("5e9642b3149706553d2bd8744025babdc2d6a4e4efa31d30377331f21ad30258"),
+			H256::from("e36e68df1af4fe4a779ed2aa1c96f09df222f507602d22b2c1bcee764617ce04"),
+			H256::from("886f6518ceae948fa8d8c90d53c58fee66dd4f7fd38a40d3868bc06ed73f546a"),
+		];
+
+		let mut tree_state = TestSaplingTreeState::new();
+
+		let expected_root = TestSaplingTreeState::empty_root();
+		let actual_root = tree_state.root();
+		assert_eq!(actual_root, expected_root);
+
+		for (commitment, expected_root) in commitments.iter().zip(roots.iter()) {
+			tree_state.append(*commitment).unwrap();
+			let actual_root = tree_state.root();
+			assert_eq!(actual_root, *expected_root);
+		}
 	}
 }

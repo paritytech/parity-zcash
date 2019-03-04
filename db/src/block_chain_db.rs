@@ -25,7 +25,7 @@ use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
 	TransactionMetaProvider, TransactionProvider, TransactionOutputProvider, BlockChain, Store,
 	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock, NullifierTracker, Nullifier,
-	EpochTag, RegularTreeState, TreeStateProvider,
+	EpochTag, SproutTreeState, TreeStateProvider,
 };
 
 const KEY_BEST_BLOCK_NUMBER: &'static str = "best_block_number";
@@ -251,7 +251,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 		}
 
 		let mut tree_state = if parent_hash.is_zero() {
-			RegularTreeState::new()
+			SproutTreeState::new()
 		} else {
 			self.tree_at_block(&parent_hash)
 				.expect(&format!("Corrupted database - no root for block {}", parent_hash))
@@ -638,7 +638,7 @@ impl<T> NullifierTracker for BlockChainDatabase<T> where T: KeyValueDatabase {
 }
 
 impl<T> TreeStateProvider for BlockChainDatabase<T> where T: KeyValueDatabase {
-	fn tree_at(&self, root: &H256) -> Option<RegularTreeState> {
+	fn tree_at(&self, root: &H256) -> Option<SproutTreeState> {
 		self.get(Key::TreeRoot(*root)).and_then(Value::as_tree_state)
 	}
 

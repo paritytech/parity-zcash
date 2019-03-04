@@ -2,7 +2,7 @@ use bytes::Bytes;
 use hash::H256;
 use ser::{serialize, List, deserialize};
 use chain::{Transaction as ChainTransaction, BlockHeader};
-use storage::{TransactionMeta, Nullifier, EpochTag, RegularTreeState};
+use storage::{TransactionMeta, Nullifier, EpochTag, SproutTreeState};
 
 pub const COL_COUNT: u32 = 16;
 pub const COL_META: u32 = 0;
@@ -35,7 +35,7 @@ pub enum KeyValue {
 	BlockNumber(H256, u32),
 	Configuration(&'static str, Bytes),
 	Nullifier(Nullifier),
-	TreeState(H256, RegularTreeState),
+	TreeState(H256, SproutTreeState),
 	BlockRoot(H256, H256),
 }
 
@@ -65,7 +65,7 @@ pub enum Value {
 	BlockNumber(u32),
 	Configuration(Bytes),
 	Empty,
-	TreeState(RegularTreeState),
+	TreeState(SproutTreeState),
 	TreeRoot(H256),
 }
 
@@ -142,7 +142,7 @@ impl Value {
 		}
 	}
 
-	pub fn as_tree_state(self) -> Option<RegularTreeState> {
+	pub fn as_tree_state(self) -> Option<SproutTreeState> {
 		match self  {
 			Value::TreeState(tree) => Some(tree),
 			_ => None,
