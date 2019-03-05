@@ -4,7 +4,7 @@ use primitives::compact::Compact;
 use chain::{OutPoint, TransactionOutput, TransactionInput, IndexedTransaction, Transaction,
 	SAPLING_TX_VERSION, SAPLING_TX_VERSION_GROUP_ID};
 use keys::Address;
-use storage::{SharedStore, TransactionOutputProvider};
+use storage::{SharedStore, TransactionOutputProvider, SaplingTreeState};
 use script::Builder;
 use network::ConsensusParams;
 use memory_pool::{MemoryPool, OrderingStrategy, Entry};
@@ -271,8 +271,8 @@ impl<'a> BlockAssembler<'a> {
 		let mut miner_reward = consensus.miner_reward(height);
 		let mut transactions = Vec::new();
 
-		let final_sapling_root_hash = Default::default(); // TODO: compute me
 		let mempool_iter = mempool.iter(OrderingStrategy::ByTransactionScore);
+		let mut sapling_tree = SaplingTreeState::new(); // TODO: read from database
 		let tx_iter = FittingTransactionsIterator::new(
 			store.as_transaction_output_provider(),
 			mempool_iter,
@@ -286,6 +286,16 @@ impl<'a> BlockAssembler<'a> {
 			// memory pool should restrict miner fee to be positive
 			miner_reward += entry.miner_fee as u64;
 			let tx = IndexedTransaction::new(entry.hash.clone(), entry.transaction.clone());
+			if let Some(ref sapling) = tx.raw.sapling {
+				for out in &sapling.outputs {
+					sapling_tree.append(out.note_commitment.into())
+						.expect("only returns Err if tree is already full;
+							sapling tree has height = 32;
+							it means that there must be 2^32-1 sapling output descriptions to make it full;
+							this should be impossible by consensus rules (i.e. it'll overflow block size before);
+							qed");
+				}
+			}
 			transactions.push(tx);
 		}
 
@@ -323,7 +333,7 @@ impl<'a> BlockAssembler<'a> {
 		BlockTemplate {
 			version: version,
 			previous_header_hash: previous_header_hash,
-			final_sapling_root_hash: final_sapling_root_hash,
+			final_sapling_root_hash: sapling_tree.root(),
 			time: time,
 			bits: bits,
 			height: height,

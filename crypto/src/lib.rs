@@ -11,6 +11,7 @@ pub extern crate bellman;
 pub extern crate pairing;
 pub extern crate sapling_crypto;
 
+#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate serde_derive;
 
 mod json;
@@ -18,6 +19,11 @@ mod pghr13;
 
 pub use rcrypto::digest::Digest;
 pub use blake2_rfc::blake2b::Blake2b;
+
+lazy_static! {
+	pub static ref JUBJUB: sapling_crypto::jubjub::JubjubBls12 =
+		{ sapling_crypto::jubjub::JubjubBls12::new() };
+}
 
 use std::hash::Hasher;
 use rcrypto::sha1::Sha1;
@@ -212,6 +218,48 @@ pub fn blake2b_personal(personalization: &[u8], input: &[u8]) -> H256 {
 	hasher.finalize().as_bytes().into()
 }
 
+/// "Uncommitted" note value.
+#[inline]
+pub fn pedersen_uncommitted() -> H256 {
+	use pairing::{PrimeField, PrimeFieldRepr};
+	use pairing::bls12_381::{Bls12};
+
+	let hash_point = sapling_crypto::primitives::Note::<Bls12>::uncommitted().into_repr();
+
+	let mut hash = H256::default();
+	hash_point.write_le(&mut hash[..]).expect("only fails when length is not 32; length is 32; qed");
+
+	hash
+}
+
+/// Computes a Pedersen hash for merkle tree at given depth.
+pub fn pedersen_hash(left: &[u8; 32], right: &[u8; 32], depth: usize) -> H256 {
+	use pairing::{PrimeField, PrimeFieldRepr, BitIterator};
+	use pairing::bls12_381::{Bls12, Fr, FrRepr};
+
+	let mut left_repr = FrRepr::default();
+	left_repr.read_le(&mut &left[..]).expect("only fails when length is not 32; length is 32; qed");
+
+	let mut right_repr = FrRepr::default();
+	right_repr.read_le(&mut &right[..]).expect("only fails when length is not 32; length is 32; qed");
+
+	let left_bits: Vec<bool> = BitIterator::new(left_repr).collect();
+	let right_bits: Vec<bool> = BitIterator::new(right_repr).collect();
+	let input_bits = left_bits.into_iter().rev().take(Fr::NUM_BITS as usize)
+		.chain(right_bits.into_iter().rev().take(Fr::NUM_BITS as usize));
+
+	let hash_point = sapling_crypto::pedersen_hash::pedersen_hash::<Bls12, _>(
+		sapling_crypto::pedersen_hash::Personalization::MerkleTree(depth),
+		input_bits,
+		&JUBJUB,
+	).into_xy().0.into_repr();
+
+	let mut hash = H256::default();
+	hash_point.write_le(&mut hash[..]).expect("only fails when length is not 32; length is 32; qed");
+
+	hash
+}
+
 /// Data checksum
 #[inline]
 pub fn checksum(data: &[u8]) -> H32 {
@@ -230,7 +278,7 @@ impl ::std::fmt::Debug for Groth16VerifyingKey {
 mod tests {
 	use primitives::bytes::Bytes;
 	use primitives::hash::H256;
-	use super::{ripemd160, sha1, sha256, dhash160, dhash256, siphash24, checksum, sha256_compress};
+	use super::{ripemd160, sha1, sha256, dhash160, dhash256, siphash24, checksum, sha256_compress, pedersen_hash};
 
 	#[test]
 	fn test_ripemd160() {
@@ -361,5 +409,17 @@ mod tests {
 			next = sha256_compress(&next[..], &next[..]);
 			assert_eq!(next, H256::from(vectors[idx]));
 		}
+	}
+
+	#[test]
+	fn test_pedersen_hash() {
+		// ofiginal test case:
+		// https://github.com/zcash/zcash/blob/92cd76fcba8f284694f213547293a1cfc2c0369d/src/gtest/test_pedersen_hash.cpp#L5
+
+		let left = H256::from_reversed_str("87a086ae7d2252d58729b30263fb7b66308bf94ef59a76c9c86e7ea016536505");
+		let right = H256::from_reversed_str("a75b84a125b2353da7e8d96ee2a15efe4de23df9601b9d9564ba59de57130406");
+		let expected = H256::from_reversed_str("5bf43b5736c19b714d1f462c9d22ba3492c36e3d9bbd7ca24d94b440550aa561");
+		let actual = pedersen_hash(&left, &right, 25);
+		assert_eq!(actual, expected);
 	}
 }

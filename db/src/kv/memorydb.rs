@@ -7,7 +7,7 @@ use bytes::Bytes;
 use ser::List;
 use chain::{Transaction as ChainTransaction, BlockHeader};
 use kv::{Transaction, Key, KeyState, Operation, Value, KeyValueDatabase, KeyValue};
-use storage::{TransactionMeta, EpochTag, RegularTreeState, Nullifier};
+use storage::{TransactionMeta, EpochTag, SproutTreeState, Nullifier};
 
 #[derive(Default, Debug)]
 struct InnerDatabase {
@@ -22,7 +22,7 @@ struct InnerDatabase {
 	configuration: HashMap<&'static str, KeyState<Bytes>>,
 	sprout_nullifiers: HashMap<H256, KeyState<()>>,
 	sapling_nullifiers: HashMap<H256, KeyState<()>>,
-	tree_state: HashMap<H256, KeyState<RegularTreeState>>,
+	tree_state: HashMap<H256, KeyState<SproutTreeState>>,
 }
 
 #[derive(Default, Debug)]
