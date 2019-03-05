@@ -22,7 +22,15 @@ impl<'a> ChainAcceptor<'a> {
 		let headers = store.as_block_header_provider();
 
 		ChainAcceptor {
-			block: BlockAcceptor::new(store.as_transaction_output_provider(), consensus, block, height, deployments, headers),
+			block: BlockAcceptor::new(
+				store.as_transaction_output_provider(),
+				store.as_tree_state_provider(),
+				consensus,
+				block,
+				height,
+				deployments,
+				headers,
+			),
 			header: HeaderAcceptor::new(headers, consensus, block.header(), height, time, deployments),
 			transactions: block.transactions()
 				.into_iter()

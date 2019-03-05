@@ -1,6 +1,7 @@
 use keys::Address;
 use network::{ConsensusParams};
-use storage::{DuplexTransactionOutputProvider, TransactionOutputProvider, BlockHeaderProvider};
+use storage::{DuplexTransactionOutputProvider, TransactionOutputProvider, BlockHeaderProvider,
+	TreeStateProvider, SaplingTreeState};
 use script::{self, Builder};
 use sigops::transaction_sigops;
 use deployments::BlockDeployments;
@@ -16,11 +17,13 @@ pub struct BlockAcceptor<'a> {
 	pub miner_reward: BlockCoinbaseMinerReward<'a>,
 	pub founder_reward: BlockFounderReward<'a>,
 	pub coinbase_script: BlockCoinbaseScript<'a>,
+	pub sapling_root: BlockSaplingRoot<'a>,
 }
 
 impl<'a> BlockAcceptor<'a> {
 	pub fn new(
-		store: &'a TransactionOutputProvider,
+		tx_out_store: &'a TransactionOutputProvider,
+		tree_state_store: &'a TreeStateProvider,
 		consensus: &'a ConsensusParams,
 		block: CanonBlock<'a>,
 		height: u32,
@@ -31,9 +34,10 @@ impl<'a> BlockAcceptor<'a> {
 			finality: BlockFinality::new(block, height, deployments, headers),
 			serialized_size: BlockSerializedSize::new(block, consensus),
 			coinbase_script: BlockCoinbaseScript::new(block, consensus, height),
-			miner_reward: BlockCoinbaseMinerReward::new(block, store, consensus, height),
+			miner_reward: BlockCoinbaseMinerReward::new(block, tx_out_store, consensus, height),
 			founder_reward: BlockFounderReward::new(block, consensus, height),
-			sigops: BlockSigops::new(block, store, consensus),
+			sigops: BlockSigops::new(block, tx_out_store, consensus),
+			sapling_root: BlockSaplingRoot::new(block, tree_state_store, consensus, height),
 		}
 	}
 
@@ -44,6 +48,7 @@ impl<'a> BlockAcceptor<'a> {
 		self.miner_reward.check()?;
 		self.founder_reward.check()?;
 		self.coinbase_script.check()?;
+		self.sapling_root.check()?;
 		Ok(())
 	}
 }
@@ -296,12 +301,67 @@ impl<'a> BlockFounderReward<'a> {
 	}
 }
 
+pub struct BlockSaplingRoot<'a> {
+	block: CanonBlock<'a>,
+	tree_state_store: &'a TreeStateProvider,
+	is_sapling_active: bool,
+}
+
+impl<'a> BlockSaplingRoot<'a> {
+	fn new(
+		block: CanonBlock<'a>,
+		tree_state_store: &'a TreeStateProvider,
+		consensus_params: &ConsensusParams,
+		height: u32,
+	) -> Self {
+		BlockSaplingRoot {
+			block: block,
+			tree_state_store: tree_state_store,
+			is_sapling_active: consensus_params.is_sapling_active(height),
+		}
+	}
+
+	fn check(&self) -> Result<(), Error> {
+		if !self.is_sapling_active {
+			return Ok(());
+		}
+
+		let mut sapling_tree = if self.block.header.raw.previous_header_hash.is_zero() {
+			SaplingTreeState::new()
+		} else {
+			self.tree_state_store.sapling_tree_at_block(&self.block.header.raw.previous_header_hash)
+				.ok_or(Error::MissingSaplingCommitmentTree)?
+		};
+
+		for tx in &self.block.transactions {
+			if let Some(ref sapling) = tx.raw.sapling {
+				for out in &sapling.outputs {
+					sapling_tree.append(out.note_commitment.into())
+						.map_err(|e| Error::FailedToAppendSaplingCommitmentNote(e.into()))?;
+				}
+			}
+		}
+
+		let sapling_tree_root = sapling_tree.root();
+		if sapling_tree_root != self.block.header.raw.final_sapling_root {
+			return Err(Error::InvalidFinalSaplingRootHash {
+				expected: sapling_tree_root,
+				actual: self.block.header.raw.final_sapling_root,
+			});
+		}
+
+		Ok(())
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	extern crate test_data;
 
+	use db::BlockChainDatabase;
+	use storage::SaplingTreeState;
 	use {Error, CanonBlock};
-	use super::{BlockCoinbaseScript};
+	use super::{BlockCoinbaseScript, BlockSaplingRoot};
 
 	#[test]
 	fn test_block_coinbase_script() {
@@ -330,5 +390,40 @@ mod tests {
 		};
 
 		assert_eq!(coinbase_script_validator2.check(), Err(Error::CoinbaseScript));
+	}
+
+	#[test]
+	fn test_block_sapling_root() {
+		let storage = BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]);
+
+		// when sapling is inactive
+		let block = test_data::block_builder().header().build().build().into();
+		assert_eq!(BlockSaplingRoot {
+			block: CanonBlock::new(&block),
+			tree_state_store: &storage,
+			is_sapling_active: false,
+		}.check(), Ok(()));
+
+		// when sapling is active and root matches
+		let block = test_data::block_builder()
+			.header().final_sapling_root(SaplingTreeState::empty_root()).build()
+			.build()
+			.into();
+		assert_eq!(BlockSaplingRoot {
+			block: CanonBlock::new(&block),
+			tree_state_store: &storage,
+			is_sapling_active: true,
+		}.check(), Ok(()));
+
+		// when sapling is active and root mismatches
+		let block = test_data::block_builder().header().build().build().into();
+		assert_eq!(BlockSaplingRoot {
+			block: CanonBlock::new(&block),
+			tree_state_store: &storage,
+			is_sapling_active: true,
+		}.check(), Err(Error::InvalidFinalSaplingRootHash {
+			expected: "fbc2f4300c01f0b7820d00e3347c8da4ee614674376cbc45359daa54f9b5493e".into(),
+			actual: "0000000000000000000000000000000000000000000000000000000000000000".into(),
+		}));
 	}
 }
