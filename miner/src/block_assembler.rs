@@ -288,7 +288,12 @@ impl<'a> BlockAssembler<'a> {
 			let tx = IndexedTransaction::new(entry.hash.clone(), entry.transaction.clone());
 			if let Some(ref sapling) = tx.raw.sapling {
 				for out in &sapling.outputs {
-					sapling_tree.append(out.note_commitment.into()).expect("TODO");
+					sapling_tree.append(out.note_commitment.into())
+						.expect("only returns Err if tree is already full;
+							sapling tree has height = 32;
+							it means that there must be 2^32-1 sapling output descriptions to make it full;
+							this should be impossible by consensus rules (i.e. it'll overflow block size before);
+							qed");
 				}
 			}
 			transactions.push(tx);

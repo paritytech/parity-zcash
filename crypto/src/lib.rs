@@ -233,7 +233,6 @@ pub fn pedersen_uncommitted() -> H256 {
 }
 
 /// Computes a Pedersen hash for merkle tree at given depth.
-#[inline]
 pub fn pedersen_hash(left: &[u8; 32], right: &[u8; 32], depth: usize) -> H256 {
 	use pairing::{PrimeField, PrimeFieldRepr, BitIterator};
 	use pairing::bls12_381::{Bls12, Fr, FrRepr};
