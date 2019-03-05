@@ -19,13 +19,13 @@ use kv::{
 use kv::{
 	COL_COUNT, COL_BLOCK_HASHES, COL_BLOCK_HEADERS, COL_BLOCK_TRANSACTIONS, COL_TRANSACTIONS,
 	COL_TRANSACTIONS_META, COL_BLOCK_NUMBERS, COL_SAPLING_NULLIFIERS, COL_SPROUT_NULLIFIERS,
-	COL_TREE_STATES, COL_BLOCK_ROOTS,
+	COL_SPROUT_TREE_STATES, COL_SPROUT_BLOCK_ROOTS, COL_SAPLING_TREE_STATES, COL_SAPLING_BLOCK_ROOTS,
 };
 use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
 	TransactionMetaProvider, TransactionProvider, TransactionOutputProvider, BlockChain, Store,
-	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock, NullifierTracker, Nullifier,
-	EpochTag, SproutTreeState, TreeStateProvider,
+	SideChainOrigin, ForkChain, Forkable, CanonStore, ConfigStore, BestBlock, NullifierTracker,
+	EpochTag, EpochRef, SproutTreeState, SaplingTreeState, TreeStateProvider,
 };
 
 const KEY_BEST_BLOCK_NUMBER: &'static str = "best_block_number";
@@ -61,8 +61,10 @@ mod cache {
 	pub const CACHE_BLOCK_NUMBERS: u32 = 5;
 	pub const CACHE_SPROUT_NULLIFIERS: u32 = 5;
 	pub const CACHE_SAPLING_NULLIFIERS: u32 = 5;
-	pub const CACHE_TREE_STATES: u32 = 10;
-	pub const CACHE_BLOCK_ROOTS: u32 = 5;
+	pub const CACHE_SPROUT_TREE_STATES: u32 = 5;
+	pub const CACHE_SPROUT_BLOCK_ROOTS: u32 = 2;
+	pub const CACHE_SAPLING_TREE_STATES: u32 = 5;
+	pub const CACHE_SAPLING_BLOCK_ROOTS: u32 = 3;
 
 	pub fn set(cfg: &mut ::kv::DatabaseConfig, total: usize, col: u32, distr: u32) {
 		cfg.set_cache(Some(col), (total as f32 * distr as f32 / 100f32).round() as usize)
@@ -79,8 +81,10 @@ mod cache {
 			CACHE_BLOCK_NUMBERS +
 			CACHE_SPROUT_NULLIFIERS +
 			CACHE_SAPLING_NULLIFIERS +
-			CACHE_TREE_STATES +
-			CACHE_BLOCK_ROOTS
+			CACHE_SPROUT_TREE_STATES +
+			CACHE_SPROUT_BLOCK_ROOTS +
+			CACHE_SAPLING_TREE_STATES +
+			CACHE_SAPLING_BLOCK_ROOTS
 		);
 	}
 }
@@ -101,8 +105,11 @@ impl BlockChainDatabase<CacheDatabase<AutoFlushingOverlayDatabase<DiskDatabase>>
 		cache::set(&mut cfg, total_cache, COL_SPROUT_NULLIFIERS, cache::CACHE_SPROUT_NULLIFIERS);
 		cache::set(&mut cfg, total_cache, COL_SAPLING_NULLIFIERS, cache::CACHE_SAPLING_NULLIFIERS);
 
-		cache::set(&mut cfg, total_cache, COL_TREE_STATES, cache::CACHE_TREE_STATES);
-		cache::set(&mut cfg, total_cache, COL_BLOCK_ROOTS, cache::CACHE_BLOCK_ROOTS);
+		cache::set(&mut cfg, total_cache, COL_SPROUT_TREE_STATES, cache::CACHE_SPROUT_TREE_STATES);
+		cache::set(&mut cfg, total_cache, COL_SAPLING_TREE_STATES, cache::CACHE_SAPLING_TREE_STATES);
+
+		cache::set(&mut cfg, total_cache, COL_SPROUT_BLOCK_ROOTS, cache::CACHE_SPROUT_BLOCK_ROOTS);
+		cache::set(&mut cfg, total_cache, COL_SAPLING_BLOCK_ROOTS, cache::CACHE_SAPLING_BLOCK_ROOTS);
 
 		cfg.bloom_filters.insert(Some(COL_TRANSACTIONS_META), 32);
 
@@ -250,11 +257,18 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 			return Err(Error::UnknownParent);
 		}
 
-		let mut tree_state = if parent_hash.is_zero() {
+		let mut sprout_tree_state = if parent_hash.is_zero() {
 			SproutTreeState::new()
 		} else {
-			self.tree_at_block(&parent_hash)
-				.expect(&format!("Corrupted database - no root for block {}", parent_hash))
+			self.sprout_tree_at_block(&parent_hash)
+				.expect(&format!("Corrupted database - no sprout root for block {}", parent_hash))
+		};
+
+		let mut sapling_tree_state = if parent_hash.is_zero() {
+			SaplingTreeState::new()
+		} else {
+			self.sapling_tree_at_block(&parent_hash)
+				.expect(&format!("Corrupted database - no sapling root for block {}", parent_hash))
 		};
 
 		let mut update = DBTransaction::new();
@@ -267,18 +281,34 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 			if let Some(ref js) = tx.raw.join_split {
 				for js_descriptor in js.descriptions.iter() {
 					for commitment in &js_descriptor.commitments[..] {
-						tree_state.append(H256::from(&commitment[..]))
+						sprout_tree_state.append(H256::from(&commitment[..]))
 							.expect("Appending to a full commitment tree in the block insertion")
 					}
+				}
+			}
+
+			if let Some(ref sapling) = tx.raw.sapling {
+				for out_desc in &sapling.outputs {
+					sapling_tree_state.append(out_desc.note_commitment.into())
+						.expect("only returns Err if tree is already full;
+							sapling tree has height = 32;
+							it means that there must be 2^32-1 sapling output descriptions to make it full;
+							this should be detected by verification (which preceeds insert);
+							qed");
 				}
 			}
 
 			update.insert(KeyValue::Transaction(tx.hash, tx.raw));
 		}
 
-		let tree_root = tree_state.root();
-		update.insert(KeyValue::BlockRoot(block.header.hash, tree_root));
-		update.insert(KeyValue::TreeState(tree_root, tree_state));
+		let sprout_tree_root = sprout_tree_state.root();
+		update.insert(KeyValue::BlockRoot(EpochRef::new(EpochTag::Sprout, block.header.hash), sprout_tree_root));
+		update.insert(KeyValue::SproutTreeState(sprout_tree_root, sprout_tree_state));
+
+		// TODO: possible optimization is not to store sapling trees until sapling is activated
+		let sapling_tree_root = sapling_tree_state.root();
+		update.insert(KeyValue::BlockRoot(EpochRef::new(EpochTag::Sapling, block.header.hash), sapling_tree_root));
+		update.insert(KeyValue::SaplingTreeState(sapling_tree_root, sapling_tree_state));
 
 		self.db.write(update).map_err(Error::DatabaseError)
 	}
@@ -352,7 +382,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 			if let Some(ref js) = tx.raw.join_split {
 				for js_descriptor in js.descriptions.iter() {
 					for nullifier in &js_descriptor.nullifiers[..] {
-						let nullifier_key = Nullifier::new(
+						let nullifier_key = EpochRef::new(
 							EpochTag::Sprout,
 							H256::from(&nullifier[..])
 						);
@@ -367,7 +397,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 
 			if let Some(ref sapling) = tx.raw.sapling {
 				for spend in &sapling.spends {
-					let nullifier_key = Nullifier::new(
+					let nullifier_key = EpochRef::new(
 						EpochTag::Sapling,
 						H256::from(&spend.nullifier[..])
 					);
@@ -438,7 +468,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 			if let Some(ref js) = tx.raw.join_split {
 				for js_descriptor in js.descriptions.iter() {
 					for nullifier in &js_descriptor.nullifiers[..] {
-						let nullifier_key = Nullifier::new(
+						let nullifier_key = EpochRef::new(
 							EpochTag::Sprout,
 							H256::from(&nullifier[..])
 						);
@@ -453,7 +483,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 
 			if let Some(ref sapling) = tx.raw.sapling {
 				for spend in &sapling.spends {
-					let nullifier_key = Nullifier::new(
+					let nullifier_key = EpochRef::new(
 						EpochTag::Sapling,
 						H256::from(&spend.nullifier[..])
 					);
@@ -632,18 +662,26 @@ impl<T> TransactionOutputProvider for BlockChainDatabase<T> where T: KeyValueDat
 }
 
 impl<T> NullifierTracker for BlockChainDatabase<T> where T: KeyValueDatabase {
-	fn contains_nullifier(&self, nullifier: Nullifier) -> bool {
+	fn contains_nullifier(&self, nullifier: EpochRef) -> bool {
 		self.get(Key::Nullifier(nullifier)).is_some()
 	}
 }
 
 impl<T> TreeStateProvider for BlockChainDatabase<T> where T: KeyValueDatabase {
-	fn tree_at(&self, root: &H256) -> Option<SproutTreeState> {
-		self.get(Key::TreeRoot(*root)).and_then(Value::as_tree_state)
+	fn sprout_tree_at(&self, root: &H256) -> Option<SproutTreeState> {
+		self.get(Key::TreeRoot(EpochRef::new(EpochTag::Sprout, *root))).and_then(Value::as_sprout_tree_state)
 	}
 
-	fn block_root(&self, block_hash: &H256) -> Option<H256> {
-		self.get(Key::BlockRoot(*block_hash)).and_then(Value::as_block_root)
+	fn sapling_tree_at(&self, root: &H256) -> Option<SaplingTreeState> {
+		self.get(Key::TreeRoot(EpochRef::new(EpochTag::Sapling, *root))).and_then(Value::as_sapling_tree_state)
+	}
+
+	fn sprout_block_root(&self, block_hash: &H256) -> Option<H256> {
+		self.get(Key::BlockRoot(EpochRef::new(EpochTag::Sprout, *block_hash))).and_then(Value::as_block_root)
+	}
+
+	fn sapling_block_root(&self, block_hash: &H256) -> Option<H256> {
+		self.get(Key::BlockRoot(EpochRef::new(EpochTag::Sapling, *block_hash))).and_then(Value::as_block_root)
 	}
 }
 

@@ -2,7 +2,7 @@ use bytes::Bytes;
 use hash::H256;
 use ser::{serialize, List, deserialize};
 use chain::{Transaction as ChainTransaction, BlockHeader};
-use storage::{TransactionMeta, Nullifier, EpochTag, SproutTreeState};
+use storage::{TransactionMeta, EpochTag, EpochRef, SproutTreeState, SaplingTreeState};
 
 pub const COL_COUNT: u32 = 16;
 pub const COL_META: u32 = 0;
@@ -14,9 +14,11 @@ pub const COL_TRANSACTIONS_META: u32 = 5;
 pub const COL_BLOCK_NUMBERS: u32 = 6;
 pub const COL_SPROUT_NULLIFIERS: u32 = 7;
 pub const COL_SAPLING_NULLIFIERS: u32 = 8;
-pub const COL_TREE_STATES: u32 = 9;
-pub const COL_BLOCK_ROOTS: u32 = 10;
-pub const COL_CONFIGURATION: u32 = 11;
+pub const COL_SPROUT_TREE_STATES: u32 = 9;
+pub const COL_SPROUT_BLOCK_ROOTS: u32 = 10;
+pub const COL_SAPLING_TREE_STATES: u32 = 11;
+pub const COL_SAPLING_BLOCK_ROOTS: u32 = 12;
+pub const COL_CONFIGURATION: u32 = 13;
 
 #[derive(Debug)]
 pub enum Operation {
@@ -34,9 +36,10 @@ pub enum KeyValue {
 	TransactionMeta(H256, TransactionMeta),
 	BlockNumber(H256, u32),
 	Configuration(&'static str, Bytes),
-	Nullifier(Nullifier),
-	TreeState(H256, SproutTreeState),
-	BlockRoot(H256, H256),
+	Nullifier(EpochRef),
+	SproutTreeState(H256, SproutTreeState),
+	SaplingTreeState(H256, SaplingTreeState),
+	BlockRoot(EpochRef, H256),
 }
 
 #[derive(Debug)]
@@ -49,9 +52,9 @@ pub enum Key {
 	TransactionMeta(H256),
 	BlockNumber(H256),
 	Configuration(&'static str),
-	Nullifier(Nullifier),
-	TreeRoot(H256),
-	BlockRoot(H256),
+	Nullifier(EpochRef),
+	TreeRoot(EpochRef),
+	BlockRoot(EpochRef),
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +68,8 @@ pub enum Value {
 	BlockNumber(u32),
 	Configuration(Bytes),
 	Empty,
-	TreeState(SproutTreeState),
+	SproutTreeState(SproutTreeState),
+	SaplingTreeState(SaplingTreeState),
 	TreeRoot(H256),
 }
 
@@ -81,7 +85,10 @@ impl Value {
 			Key::BlockNumber(_) => deserialize(bytes).map(Value::BlockNumber),
 			Key::Configuration(_) => deserialize(bytes).map(Value::Configuration),
 			Key::Nullifier(_) => Ok(Value::Empty),
-			Key::TreeRoot(_) => deserialize(bytes).map(Value::TreeState),
+			Key::TreeRoot(tag) => match tag.epoch() {
+				EpochTag::Sprout => deserialize(bytes).map(Value::SproutTreeState),
+				EpochTag::Sapling => deserialize(bytes).map(Value::SaplingTreeState),
+			},
 			Key::BlockRoot(_) => deserialize(bytes).map(Value::TreeRoot),
 		}.map_err(|e| format!("{:?}", e))
 	}
@@ -142,9 +149,16 @@ impl Value {
 		}
 	}
 
-	pub fn as_tree_state(self) -> Option<SproutTreeState> {
+	pub fn as_sprout_tree_state(self) -> Option<SproutTreeState> {
 		match self  {
-			Value::TreeState(tree) => Some(tree),
+			Value::SproutTreeState(tree_state) => Some(tree_state),
+			_ => None,
+		}
+	}
+
+	pub fn as_sapling_tree_state(self) -> Option<SaplingTreeState> {
+		match self  {
+			Value::SaplingTreeState(tree_state) => Some(tree_state),
 			_ => None,
 		}
 	}
@@ -256,13 +270,17 @@ impl<'a> From<&'a KeyValue> for RawKeyValue {
 			KeyValue::BlockTransactions(ref key, ref value) => (COL_BLOCK_TRANSACTIONS, serialize(key), serialize(value)),
 			KeyValue::Transaction(ref key, ref value) => (COL_TRANSACTIONS, serialize(key), serialize(value)),
 			KeyValue::TransactionMeta(ref key, ref value) => (COL_TRANSACTIONS_META, serialize(key), serialize(value)),
-			KeyValue::Nullifier(ref key) => match key.tag() {
+			KeyValue::Nullifier(ref key) => match key.epoch() {
 				EpochTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash()), Bytes::new()),
 				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash()), Bytes::new()),
 			},
 			KeyValue::BlockNumber(ref key, ref value) => (COL_BLOCK_NUMBERS, serialize(key), serialize(value)),
-			KeyValue::TreeState(ref key, ref value) => (COL_TREE_STATES, serialize(key), serialize(value)),
-			KeyValue::BlockRoot(ref key, ref value) => (COL_BLOCK_ROOTS, serialize(key), serialize(value)),
+			KeyValue::SproutTreeState(ref key, ref value) => (COL_SPROUT_TREE_STATES, serialize(key), serialize(value)),
+			KeyValue::SaplingTreeState(ref key, ref value) => (COL_SAPLING_TREE_STATES, serialize(key), serialize(value)),
+			KeyValue::BlockRoot(ref key, ref value) => match key.epoch() {
+				EpochTag::Sprout => (COL_SPROUT_BLOCK_ROOTS, serialize(key.hash()), serialize(value)),
+				EpochTag::Sapling => (COL_SAPLING_BLOCK_ROOTS, serialize(key.hash()), serialize(value)),
+			},
 			KeyValue::Configuration(ref key, ref value) => (COL_CONFIGURATION, serialize(key), serialize(value)),
 		};
 
@@ -297,13 +315,19 @@ impl<'a> From<&'a Key> for RawKey {
 			Key::BlockTransactions(ref key) => (COL_BLOCK_TRANSACTIONS, serialize(key)),
 			Key::Transaction(ref key) => (COL_TRANSACTIONS, serialize(key)),
 			Key::TransactionMeta(ref key) => (COL_TRANSACTIONS_META, serialize(key)),
-			Key::Nullifier(ref key) => match key.tag() {
+			Key::Nullifier(ref key) => match key.epoch() {
 				EpochTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash())),
 				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash())),
 			},
-			Key::TreeRoot(ref key) => (COL_TREE_STATES, serialize(key)),
+			Key::TreeRoot(ref key) => match key.epoch() {
+				EpochTag::Sprout => (COL_SPROUT_TREE_STATES, serialize(key.hash())),
+				EpochTag::Sapling => (COL_SAPLING_TREE_STATES, serialize(key.hash())),
+			},
 			Key::BlockNumber(ref key) => (COL_BLOCK_NUMBERS, serialize(key)),
-			Key::BlockRoot(ref key) => (COL_BLOCK_ROOTS, serialize(key)),
+			Key::BlockRoot(ref key) => match key.epoch() {
+				EpochTag::Sprout => (COL_SPROUT_BLOCK_ROOTS, serialize(key.hash())),
+				EpochTag::Sapling => (COL_SAPLING_BLOCK_ROOTS, serialize(key.hash())),
+			},
 			Key::Configuration(ref key) => (COL_CONFIGURATION, serialize(key)),
 		};
 

@@ -25,7 +25,7 @@ mod error;
 mod store;
 mod transaction_meta;
 mod transaction_provider;
-mod nullifier;
+mod nullifier_tracker;
 mod tree_state;
 mod tree_state_provider;
 
@@ -43,9 +43,11 @@ pub use error::Error;
 pub use store::{AsSubstore, Store, SharedStore, CanonStore, ConfigStore};
 pub use transaction_meta::TransactionMeta;
 pub use transaction_provider::{TransactionProvider, TransactionOutputProvider, TransactionMetaProvider};
-pub use nullifier::{Nullifier, NullifierTracker};
+pub use nullifier_tracker::NullifierTracker;
 pub use tree_state::{TreeState, H32 as H32TreeDim, Dim as TreeDim, SproutTreeState, SaplingTreeState};
 pub use tree_state_provider::TreeStateProvider;
+
+use hash::H256;
 
 /// Epoch tag.
 ///
@@ -53,8 +55,44 @@ pub use tree_state_provider::TreeStateProvider;
 /// even if they have the same bit pattern.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EpochTag {
-	/// Sprout nullifier.
+	/// Sprout epoch.
 	Sprout,
-	/// Sapling nullifier.
+	/// Sapling epoch.
 	Sapling,
+}
+
+/// H256-reference to some object that is valid within single epoch (nullifiers, commitment trees, ...).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EpochRef {
+	epoch: EpochTag,
+	hash: H256,
+}
+
+impl EpochRef {
+	/// New reference.
+	pub fn new(epoch: EpochTag, hash: H256) -> Self {
+		EpochRef {
+			epoch: epoch,
+			hash: hash,
+		}
+	}
+
+	/// Epoch tag
+	pub fn epoch(&self) -> EpochTag {
+		self.epoch
+	}
+
+	/// Hash reference
+	pub fn hash(&self) -> &H256 {
+		&self.hash
+	}
+}
+
+impl From<(EpochTag, H256)> for EpochRef {
+	fn from(tuple: (EpochTag, H256)) -> Self {
+		EpochRef {
+			epoch: tuple.0,
+			hash: tuple.1,
+		}
+	}
 }
