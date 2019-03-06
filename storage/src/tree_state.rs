@@ -189,6 +189,7 @@ pub struct TreeState<D: Dim, H: TreeHash> {
 	left: Option<H256>,
 	right: Option<H256>,
 	parents: Vec<Option<H256>>,
+	is_empty: bool,
 }
 
 impl<D: Dim, H: TreeHash> TreeState<D, H> {
@@ -198,6 +199,7 @@ impl<D: Dim, H: TreeHash> TreeState<D, H> {
 			left: None,
 			right: None,
 			parents: vec![None; D::HEIGHT - 1],
+			is_empty: true,
 		}
 	}
 
@@ -229,10 +231,16 @@ impl<D: Dim, H: TreeHash> TreeState<D, H> {
 
 			return Err("Appending to full tree");
 		}
+
+		self.is_empty = false;
 		Ok(())
 	}
 
 	pub fn root(&self) -> H256 {
+		if self.is_empty {
+			return Self::empty_root();
+		}
+
 		let left = self.left.as_ref().unwrap_or(&H::empty()[0]);
 		let right = self.right.as_ref().unwrap_or(&H::empty()[0]);
 
@@ -272,6 +280,10 @@ impl<D: Dim, H: TreeHash> serialization::Deserializable for TreeState<D, H> {
 		tree_state.left = reader.read()?;
 		tree_state.right = reader.read()?;
 		tree_state.parents = reader.read_list()?;
+
+		tree_state.is_empty = tree_state.left.is_none()
+			&& tree_state.right.is_none()
+			&& tree_state.parents.iter().all(Option::is_none);
 
 		Ok(tree_state)
 	}
@@ -508,6 +520,7 @@ mod tests {
 			tree.append(TEST_COMMITMENTS[i].clone()).expect(&format!("Failed to add commitment #{}", i));
 		}
 
+		assert!(!tree.is_empty);
 		assert_eq!(tree.root(), H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc"));
 
 		let mut stream = serialization::Stream::new();
@@ -518,7 +531,22 @@ mod tests {
 		let mut reader = serialization::Reader::new(&bytes[..]);
 		let deserialized_tree: TestSproutTreeState = reader.read().expect("Failed to deserialize");
 
+		assert!(!tree.is_empty);
 		assert_eq!(deserialized_tree.root(), H256::from("0bf622cb9f901b7532433ea2e7c1b7632f5935899b62dcf897a71551997dc8cc"));
+	}
+
+	#[test]
+	fn serde_empty() {
+		let tree = TestSproutTreeState::new();
+		let mut stream = serialization::Stream::new();
+		assert!(tree.is_empty);
+		stream.append(&tree);
+
+		let bytes = stream.out();
+
+		let mut reader = serialization::Reader::new(&bytes[..]);
+		let deserialized_tree: TestSproutTreeState = reader.read().expect("Failed to deserialize");
+		assert!(deserialized_tree.is_empty);
 	}
 
 	#[test]
