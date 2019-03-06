@@ -14,11 +14,10 @@ pub const COL_TRANSACTIONS_META: u32 = 5;
 pub const COL_BLOCK_NUMBERS: u32 = 6;
 pub const COL_SPROUT_NULLIFIERS: u32 = 7;
 pub const COL_SAPLING_NULLIFIERS: u32 = 8;
-pub const COL_SPROUT_TREE_STATES: u32 = 9;
-pub const COL_SPROUT_BLOCK_ROOTS: u32 = 10;
-pub const COL_SAPLING_TREE_STATES: u32 = 11;
-pub const COL_SAPLING_BLOCK_ROOTS: u32 = 12;
-pub const COL_CONFIGURATION: u32 = 13;
+pub const COL_SPROUT_BLOCK_ROOTS: u32 = 9;
+pub const COL_SAPLING_BLOCK_ROOTS: u32 = 10;
+pub const COL_TREE_STATES: u32 = 11;
+pub const COL_CONFIGURATION: u32 = 12;
 
 #[derive(Debug)]
 pub enum Operation {
@@ -275,8 +274,8 @@ impl<'a> From<&'a KeyValue> for RawKeyValue {
 				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash()), Bytes::new()),
 			},
 			KeyValue::BlockNumber(ref key, ref value) => (COL_BLOCK_NUMBERS, serialize(key), serialize(value)),
-			KeyValue::SproutTreeState(ref key, ref value) => (COL_SPROUT_TREE_STATES, serialize(key), serialize(value)),
-			KeyValue::SaplingTreeState(ref key, ref value) => (COL_SAPLING_TREE_STATES, serialize(key), serialize(value)),
+			KeyValue::SproutTreeState(ref key, ref value) => (COL_TREE_STATES, serialize(key), serialize(value)),
+			KeyValue::SaplingTreeState(ref key, ref value) => (COL_TREE_STATES, serialize(key), serialize(value)),
 			KeyValue::BlockRoot(ref key, ref value) => match key.epoch() {
 				EpochTag::Sprout => (COL_SPROUT_BLOCK_ROOTS, serialize(key.hash()), serialize(value)),
 				EpochTag::Sapling => (COL_SAPLING_BLOCK_ROOTS, serialize(key.hash()), serialize(value)),
@@ -319,10 +318,7 @@ impl<'a> From<&'a Key> for RawKey {
 				EpochTag::Sprout => (COL_SPROUT_NULLIFIERS, serialize(key.hash())),
 				EpochTag::Sapling => (COL_SAPLING_NULLIFIERS, serialize(key.hash())),
 			},
-			Key::TreeRoot(ref key) => match key.epoch() {
-				EpochTag::Sprout => (COL_SPROUT_TREE_STATES, serialize(key.hash())),
-				EpochTag::Sapling => (COL_SAPLING_TREE_STATES, serialize(key.hash())),
-			},
+			Key::TreeRoot(ref key) => (COL_TREE_STATES, serialize(key.hash())),
 			Key::BlockNumber(ref key) => (COL_BLOCK_NUMBERS, serialize(key)),
 			Key::BlockRoot(ref key) => match key.epoch() {
 				EpochTag::Sprout => (COL_SPROUT_BLOCK_ROOTS, serialize(key.hash())),

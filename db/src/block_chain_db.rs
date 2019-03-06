@@ -19,7 +19,7 @@ use kv::{
 use kv::{
 	COL_COUNT, COL_BLOCK_HASHES, COL_BLOCK_HEADERS, COL_BLOCK_TRANSACTIONS, COL_TRANSACTIONS,
 	COL_TRANSACTIONS_META, COL_BLOCK_NUMBERS, COL_SAPLING_NULLIFIERS, COL_SPROUT_NULLIFIERS,
-	COL_SPROUT_TREE_STATES, COL_SPROUT_BLOCK_ROOTS, COL_SAPLING_TREE_STATES, COL_SAPLING_BLOCK_ROOTS,
+	COL_SPROUT_BLOCK_ROOTS, COL_SAPLING_BLOCK_ROOTS, COL_TREE_STATES,
 };
 use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
@@ -61,9 +61,8 @@ mod cache {
 	pub const CACHE_BLOCK_NUMBERS: u32 = 5;
 	pub const CACHE_SPROUT_NULLIFIERS: u32 = 5;
 	pub const CACHE_SAPLING_NULLIFIERS: u32 = 5;
-	pub const CACHE_SPROUT_TREE_STATES: u32 = 5;
+	pub const CACHE_TREE_STATES: u32 = 10;
 	pub const CACHE_SPROUT_BLOCK_ROOTS: u32 = 2;
-	pub const CACHE_SAPLING_TREE_STATES: u32 = 5;
 	pub const CACHE_SAPLING_BLOCK_ROOTS: u32 = 3;
 
 	pub fn set(cfg: &mut ::kv::DatabaseConfig, total: usize, col: u32, distr: u32) {
@@ -81,9 +80,8 @@ mod cache {
 			CACHE_BLOCK_NUMBERS +
 			CACHE_SPROUT_NULLIFIERS +
 			CACHE_SAPLING_NULLIFIERS +
-			CACHE_SPROUT_TREE_STATES +
+			CACHE_TREE_STATES +
 			CACHE_SPROUT_BLOCK_ROOTS +
-			CACHE_SAPLING_TREE_STATES +
 			CACHE_SAPLING_BLOCK_ROOTS
 		);
 	}
@@ -105,8 +103,7 @@ impl BlockChainDatabase<CacheDatabase<AutoFlushingOverlayDatabase<DiskDatabase>>
 		cache::set(&mut cfg, total_cache, COL_SPROUT_NULLIFIERS, cache::CACHE_SPROUT_NULLIFIERS);
 		cache::set(&mut cfg, total_cache, COL_SAPLING_NULLIFIERS, cache::CACHE_SAPLING_NULLIFIERS);
 
-		cache::set(&mut cfg, total_cache, COL_SPROUT_TREE_STATES, cache::CACHE_SPROUT_TREE_STATES);
-		cache::set(&mut cfg, total_cache, COL_SAPLING_TREE_STATES, cache::CACHE_SAPLING_TREE_STATES);
+		cache::set(&mut cfg, total_cache, COL_TREE_STATES, cache::CACHE_TREE_STATES);
 
 		cache::set(&mut cfg, total_cache, COL_SPROUT_BLOCK_ROOTS, cache::CACHE_SPROUT_BLOCK_ROOTS);
 		cache::set(&mut cfg, total_cache, COL_SAPLING_BLOCK_ROOTS, cache::CACHE_SAPLING_BLOCK_ROOTS);
