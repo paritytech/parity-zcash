@@ -229,7 +229,7 @@ impl<T, U, V> LocalNode<T, U, V> where T: TaskExecutor, U: Server, V: Client {
 	}
 
 	/// Get block template for mining
-	pub fn get_block_template(&self, miner_address: &Address) -> BlockTemplate {
+	pub fn get_block_template(&self, miner_address: &Address) -> Result<BlockTemplate, String> {
 		let max_block_size = self.consensus.max_block_size();
 		let max_block_sigops = self.consensus.max_block_sigops();
 		let block_assembler = BlockAssembler {

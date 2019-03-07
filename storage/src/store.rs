@@ -3,6 +3,7 @@ use chain::BlockHeader;
 use {
 	BestBlock, BlockProvider, BlockHeaderProvider, TransactionProvider, TransactionMetaProvider,
 	TransactionOutputProvider, BlockChain, IndexedBlockProvider, Forkable, Error, NullifierTracker,
+	TreeStateProvider,
 };
 
 pub trait CanonStore: Store + Forkable + ConfigStore {
@@ -47,6 +48,8 @@ pub trait AsSubstore:
 	fn as_transaction_meta_provider(&self) -> &TransactionMetaProvider;
 
 	fn as_nullifier_tracker(&self) -> &NullifierTracker;
+
+	fn as_tree_state_provider(&self) -> &TreeStateProvider;
 }
 
 impl<T> AsSubstore for T
@@ -55,7 +58,8 @@ impl<T> AsSubstore for T
 		TransactionProvider +
 		TransactionMetaProvider +
 		TransactionOutputProvider +
-		NullifierTracker
+		NullifierTracker +
+		TreeStateProvider
 {
 	fn as_block_provider(&self) -> &BlockProvider {
 		&*self
@@ -78,6 +82,10 @@ impl<T> AsSubstore for T
 	}
 
 	fn as_nullifier_tracker(&self) -> &NullifierTracker {
+		&*self
+	}
+
+	fn as_tree_state_provider(&self) -> &TreeStateProvider {
 		&*self
 	}
 }

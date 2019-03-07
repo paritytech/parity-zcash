@@ -259,7 +259,7 @@ impl<'a> BlockAssembler<'a> {
 		mempool: &MemoryPool,
 		time: u32,
 		consensus: &ConsensusParams,
-	) -> BlockTemplate {
+	) -> Result<BlockTemplate, String> {
 		// get best block
 		// take its hash && height
 		let best_block = store.best_block();
@@ -272,7 +272,12 @@ impl<'a> BlockAssembler<'a> {
 		let mut transactions = Vec::new();
 
 		let mempool_iter = mempool.iter(OrderingStrategy::ByTransactionScore);
-		let mut sapling_tree = SaplingTreeState::new(); // TODO: read from database
+		let mut sapling_tree = if previous_header_hash.is_zero() {
+			SaplingTreeState::new()
+		} else {
+			store.as_tree_state_provider().sapling_tree_at_block(&previous_header_hash)
+				.ok_or_else(|| format!("Sapling commitment tree for block {} is not found", previous_header_hash.reversed()))?
+		};
 		let tx_iter = FittingTransactionsIterator::new(
 			store.as_transaction_output_provider(),
 			mempool_iter,
@@ -330,7 +335,7 @@ impl<'a> BlockAssembler<'a> {
 			});
 		}
 
-		BlockTemplate {
+		Ok(BlockTemplate {
 			version: version,
 			previous_header_hash: previous_header_hash,
 			final_sapling_root_hash: sapling_tree.root(),
@@ -341,7 +346,7 @@ impl<'a> BlockAssembler<'a> {
 			coinbase_tx: coinbase_tx.into(),
 			size_limit: self.max_block_size,
 			sigop_limit: self.max_block_sigops,
-		}
+		})
 	}
 }
 
@@ -423,7 +428,7 @@ mod tests {
 				miner_address: &"t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe".into(),
 				max_block_size: 0xffffffff,
 				max_block_sigops: 0xffffffff,
-			}.create_new_block(&storage, &pool, 0, &consensus), hash0, hash1)
+			}.create_new_block(&storage, &pool, 0, &consensus).unwrap(), hash0, hash1)
 		}
 
 		// when topological consensus is used
@@ -451,7 +456,7 @@ mod tests {
 			max_block_size: 0xffffffff,
 			max_block_sigops: 0xffffffff,
 			miner_address: &"t1h8SqgtM3QM5e2M8EzhhT1yL2PXXtA6oqe".into(),
-		}.create_new_block(&storage, &pool, 0, &consensus);
+		}.create_new_block(&storage, &pool, 0, &consensus).unwrap();
 
 		let expected_coinbase_value = consensus.block_reward(2) + expected_tx0_fee;
 		assert_eq!(block.coinbase_tx.raw.total_spends(), expected_coinbase_value);

@@ -1,6 +1,6 @@
 use ser::Serializable;
 use crypto::Groth16VerifyingKey;
-use storage::{Nullifier, NullifierTracker, EpochTag, TransactionMetaProvider, TransactionOutputProvider,
+use storage::{EpochRef, NullifierTracker, EpochTag, TransactionMetaProvider, TransactionOutputProvider,
 	DuplexTransactionOutputProvider};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, SighashBase};
@@ -615,7 +615,7 @@ impl<'a> JoinSplitNullifiers<'a> {
 		if let Some(ref join_split) = self.transaction.raw.join_split {
 			for description in join_split.descriptions.iter() {
 				for nullifier in &description.nullifiers[..] {
-					let check = Nullifier::new(EpochTag::Sprout, H256::from(&nullifier[..]));
+					let check = EpochRef::new(EpochTag::Sprout, H256::from(&nullifier[..]));
 
 					if self.tracker.contains_nullifier(check) {
 						return Err(TransactionError::JoinSplitDeclared(*check.hash()))
@@ -664,7 +664,7 @@ impl<'a> SaplingNullifiers<'a> {
 	fn check(&self) -> Result<(), TransactionError> {
 		if let Some(ref sapling) = self.transaction.raw.sapling {
 			for spend in &sapling.spends {
-				let check = Nullifier::new(EpochTag::Sapling, H256::from(&spend.nullifier[..]));
+				let check = EpochRef::new(EpochTag::Sapling, H256::from(&spend.nullifier[..]));
 
 				if self.tracker.contains_nullifier(check) {
 					return Err(TransactionError::SaplingDeclared(*check.hash()))

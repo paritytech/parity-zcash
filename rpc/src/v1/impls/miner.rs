@@ -11,7 +11,7 @@ pub struct MinerClient<T: MinerClientCoreApi> {
 }
 
 pub trait MinerClientCoreApi: Send + Sync + 'static {
-	fn get_block_template(&self) -> Option<miner::BlockTemplate>;
+	fn get_block_template(&self) -> Result<miner::BlockTemplate, String>;
 }
 
 pub struct MinerClientCore {
@@ -29,9 +29,10 @@ impl MinerClientCore {
 }
 
 impl MinerClientCoreApi for MinerClientCore {
-	fn get_block_template(&self) -> Option<miner::BlockTemplate> {
+	fn get_block_template(&self) -> Result<miner::BlockTemplate, String> {
 		self.miner_address.as_ref()
-			.map(|miner_address| self.local_sync_node.get_block_template(miner_address))
+			.ok_or_else(|| "miner address not set".into())
+			.and_then(|miner_address| self.local_sync_node.get_block_template(miner_address))
 	}
 }
 
@@ -47,7 +48,7 @@ impl<T> Miner for MinerClient<T> where T: MinerClientCoreApi {
 	fn get_block_template(&self, _request: BlockTemplateRequest) -> Result<BlockTemplate, Error> {
 		self.core.get_block_template()
 			.map(Into::into)
-			.ok_or_else(|| execution("miner address not set"))
+			.map_err(|err| execution(&err))
 	}
 }
 
@@ -64,9 +65,9 @@ pub mod tests {
 	struct SuccessMinerClientCore;
 
 	impl MinerClientCoreApi for SuccessMinerClientCore {
-		fn get_block_template(&self) -> Option<miner::BlockTemplate> {
+		fn get_block_template(&self) -> Result<miner::BlockTemplate, String> {
 			let tx: chain::Transaction = "00000000013ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a0000000000000000000101000000000000000000000000".into();
-			Some(miner::BlockTemplate {
+			Ok(miner::BlockTemplate {
 				version: 777,
 				previous_header_hash: H256::from(1),
 				final_sapling_root_hash: H256::from(2),

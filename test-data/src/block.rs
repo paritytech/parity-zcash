@@ -199,6 +199,7 @@ pub struct BlockHeaderBuilder<F=Identity> {
 	bits: Compact,
 	version: u32,
 	merkle_root: H256,
+	final_sapling_root: H256,
 }
 
 impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
@@ -212,6 +213,7 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 			bits: Compact::max_value(),
 			// set to 4 to allow creating long test chains
 			version: 4,
+			final_sapling_root: Default::default(),
 		}
 	}
 
@@ -245,6 +247,11 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 		self
 	}
 
+	pub fn final_sapling_root(mut self, final_sapling_root: H256) -> Self {
+		self.final_sapling_root = final_sapling_root;
+		self
+	}
+
 	pub fn build(self) -> F::Result {
 		self.callback.invoke(
 			chain::BlockHeader {
@@ -254,7 +261,7 @@ impl<F> BlockHeaderBuilder<F> where F: Invoke<chain::BlockHeader> {
 				nonce: self.nonce.into(),
 				merkle_root_hash: self.merkle_root,
 				version: self.version,
-				final_sapling_root: Default::default(),
+				final_sapling_root: self.final_sapling_root,
 				solution: chain::EquihashSolution::default(),
 			}
 		)

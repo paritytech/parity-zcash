@@ -61,6 +61,12 @@ pub enum Error {
 	InvalidVersion,
 	/// Block' coinbase is missing founders reward output.
 	MissingFoundersReward,
+	/// Failed to read sapling commitment tree state from parent block.
+	MissingSaplingCommitmentTree,
+	/// Failed to append commitment note to sapling commitment tree.
+	FailedToAppendSaplingCommitmentNote(String),
+	/// Invalid value of sapling final root hash in the block header.
+	InvalidFinalSaplingRootHash { expected: H256, actual: H256 },
 }
 
 impl From<DBError> for Error {
