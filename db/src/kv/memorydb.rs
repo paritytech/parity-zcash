@@ -14,7 +14,6 @@ struct InnerDatabase {
 	meta: HashMap<&'static str, KeyState<Bytes>>,
 	block_hash: HashMap<u32, KeyState<H256>>,
 	sprout_block_root: HashMap<H256, KeyState<H256>>,
-	sapling_block_root: HashMap<H256, KeyState<H256>>,
 	block_header: HashMap<H256, KeyState<BlockHeader>>,
 	block_transactions: HashMap<H256, KeyState<List<H256>>>,
 	transaction: HashMap<H256, KeyState<ChainTransaction>>,
@@ -82,22 +81,13 @@ impl MemoryDatabase {
 					|k| Key::TreeRoot(EpochRef::new(EpochTag::Sprout, k))));
 
 		let sprout_block_root = replace(&mut db.sprout_block_root, HashMap::default()).into_iter()
-			.flat_map(|(key, state)|
-				state.into_operation(key,
-					|k, v| KeyValue::BlockRoot(EpochRef::new(EpochTag::Sprout, k), v),
-					|k| Key::BlockRoot(EpochRef::new(EpochTag::Sprout, k))));
+			.flat_map(|(key, state)| state.into_operation(key, KeyValue::SproutBlockRoot, Key::SproutBlockRoot));
 
 		let sapling_tree_state = replace(&mut db.sapling_tree_state, HashMap::default()).into_iter()
 			.flat_map(|(key, state)|
 				state.into_operation(key,
 					KeyValue::SaplingTreeState,
 					|k| Key::TreeRoot(EpochRef::new(EpochTag::Sapling, k))));
-
-		let sapling_block_root = replace(&mut db.sapling_block_root, HashMap::default()).into_iter()
-			.flat_map(|(key, state)|
-				state.into_operation(key,
-					|k, v| KeyValue::BlockRoot(EpochRef::new(EpochTag::Sapling, k), v),
-					|k| Key::BlockRoot(EpochRef::new(EpochTag::Sprout, k))));
 
 		Transaction {
 			operations: meta
@@ -111,7 +101,6 @@ impl MemoryDatabase {
 				.chain(sprout_tree_state)
 				.chain(sapling_tree_state)
 				.chain(sprout_block_root)
-				.chain(sapling_block_root)
 				.chain(sprout_nullifiers)
 				.chain(sapling_nullifiers)
 				.collect()
@@ -139,10 +128,7 @@ impl KeyValueDatabase for MemoryDatabase {
 					},
 					KeyValue::SproutTreeState(key, value) => { db.sprout_tree_state.insert(key, KeyState::Insert(value)); },
 					KeyValue::SaplingTreeState(key, value) => { db.sapling_tree_state.insert(key, KeyState::Insert(value)); },
-					KeyValue::BlockRoot(key, value) => match key.epoch() {
-						EpochTag::Sprout => { db.sprout_block_root.insert(*key.hash(), KeyState::Insert(value)); },
-						EpochTag::Sapling => { db.sapling_block_root.insert(*key.hash(), KeyState::Insert(value)); },
-					},
+					KeyValue::SproutBlockRoot(key, value) => { db.sprout_block_root.insert(key, KeyState::Insert(value)); },
 				},
 				Operation::Delete(delete) => match delete {
 					Key::Meta(key) => { db.meta.insert(key, KeyState::Delete); }
@@ -161,10 +147,7 @@ impl KeyValueDatabase for MemoryDatabase {
 						EpochTag::Sprout => { db.sprout_tree_state.insert(*key.hash(), KeyState::Delete); },
 						EpochTag::Sapling => { db.sapling_tree_state.insert(*key.hash(), KeyState::Delete); },
 					},
-					Key::BlockRoot(key) => match key.epoch() {
-						EpochTag::Sprout => { db.sprout_block_root.insert(*key.hash(), KeyState::Delete); },
-						EpochTag::Sapling => { db.sapling_block_root.insert(*key.hash(), KeyState::Delete); },
-					},
+					Key::SproutBlockRoot(key) => { db.sprout_block_root.insert(key, KeyState::Delete); },
 				},
 			}
 		}
@@ -190,10 +173,7 @@ impl KeyValueDatabase for MemoryDatabase {
 				EpochTag::Sprout => db.sprout_tree_state.get(key.hash()).cloned().unwrap_or_default().map(Value::SproutTreeState),
 				EpochTag::Sapling => db.sapling_tree_state.get(key.hash()).cloned().unwrap_or_default().map(Value::SaplingTreeState),
 			},
-			Key::BlockRoot(ref key) => match key.epoch() {
-				EpochTag::Sprout => db.sprout_block_root.get(key.hash()).cloned().unwrap_or_default().map(Value::TreeRoot),
-				EpochTag::Sapling => db.sapling_block_root.get(key.hash()).cloned().unwrap_or_default().map(Value::TreeRoot),
-			},
+			Key::SproutBlockRoot(ref key) => db.sprout_block_root.get(key).cloned().unwrap_or_default().map(Value::SproutTreeRoot),
 		};
 
 		Ok(result)
