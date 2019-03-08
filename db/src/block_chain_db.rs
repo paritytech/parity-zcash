@@ -19,7 +19,7 @@ use kv::{
 use kv::{
 	COL_COUNT, COL_BLOCK_HASHES, COL_BLOCK_HEADERS, COL_BLOCK_TRANSACTIONS, COL_TRANSACTIONS,
 	COL_TRANSACTIONS_META, COL_BLOCK_NUMBERS, COL_SAPLING_NULLIFIERS, COL_SPROUT_NULLIFIERS,
-	COL_SPROUT_BLOCK_ROOTS, COL_SAPLING_BLOCK_ROOTS, COL_TREE_STATES,
+	COL_SPROUT_BLOCK_ROOTS, COL_TREE_STATES,
 };
 use storage::{
 	BlockRef, Error, BlockHeaderProvider, BlockProvider, BlockOrigin, TransactionMeta, IndexedBlockProvider,
@@ -62,8 +62,7 @@ mod cache {
 	pub const CACHE_SPROUT_NULLIFIERS: u32 = 5;
 	pub const CACHE_SAPLING_NULLIFIERS: u32 = 5;
 	pub const CACHE_TREE_STATES: u32 = 10;
-	pub const CACHE_SPROUT_BLOCK_ROOTS: u32 = 2;
-	pub const CACHE_SAPLING_BLOCK_ROOTS: u32 = 3;
+	pub const CACHE_SPROUT_BLOCK_ROOTS: u32 = 5;
 
 	pub fn set(cfg: &mut ::kv::DatabaseConfig, total: usize, col: u32, distr: u32) {
 		cfg.set_cache(Some(col), (total as f32 * distr as f32 / 100f32).round() as usize)
@@ -81,8 +80,7 @@ mod cache {
 			CACHE_SPROUT_NULLIFIERS +
 			CACHE_SAPLING_NULLIFIERS +
 			CACHE_TREE_STATES +
-			CACHE_SPROUT_BLOCK_ROOTS +
-			CACHE_SAPLING_BLOCK_ROOTS
+			CACHE_SPROUT_BLOCK_ROOTS
 		);
 	}
 }
@@ -106,7 +104,6 @@ impl BlockChainDatabase<CacheDatabase<AutoFlushingOverlayDatabase<DiskDatabase>>
 		cache::set(&mut cfg, total_cache, COL_TREE_STATES, cache::CACHE_TREE_STATES);
 
 		cache::set(&mut cfg, total_cache, COL_SPROUT_BLOCK_ROOTS, cache::CACHE_SPROUT_BLOCK_ROOTS);
-		cache::set(&mut cfg, total_cache, COL_SAPLING_BLOCK_ROOTS, cache::CACHE_SAPLING_BLOCK_ROOTS);
 
 		cfg.bloom_filters.insert(Some(COL_TRANSACTIONS_META), 32);
 
@@ -268,6 +265,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 				.expect(&format!("Corrupted database - no sapling root for block {}", parent_hash))
 		};
 
+		let sapling_tree_root = block.header.raw.final_sapling_root;
 		let mut update = DBTransaction::new();
 		update.insert(KeyValue::BlockHeader(*block.hash(), block.header.raw));
 		let tx_hashes = block.transactions.iter().map(|tx| tx.hash).collect::<Vec<_>>();
@@ -299,12 +297,10 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 		}
 
 		let sprout_tree_root = sprout_tree_state.root();
-		update.insert(KeyValue::BlockRoot(EpochRef::new(EpochTag::Sprout, block.header.hash), sprout_tree_root));
+		update.insert(KeyValue::SproutBlockRoot(block.header.hash, sprout_tree_root));
 		update.insert(KeyValue::SproutTreeState(sprout_tree_root, sprout_tree_state));
 
 		// TODO: possible optimization is not to store sapling trees until sapling is activated
-		let sapling_tree_root = sapling_tree_state.root();
-		update.insert(KeyValue::BlockRoot(EpochRef::new(EpochTag::Sapling, block.header.hash), sapling_tree_root));
 		update.insert(KeyValue::SaplingTreeState(sapling_tree_root, sapling_tree_state));
 
 		self.db.write(update).map_err(Error::DatabaseError)
@@ -674,11 +670,12 @@ impl<T> TreeStateProvider for BlockChainDatabase<T> where T: KeyValueDatabase {
 	}
 
 	fn sprout_block_root(&self, block_hash: &H256) -> Option<H256> {
-		self.get(Key::BlockRoot(EpochRef::new(EpochTag::Sprout, *block_hash))).and_then(Value::as_block_root)
+		self.get(Key::SproutBlockRoot(*block_hash)).and_then(Value::as_sprout_block_root)
 	}
 
 	fn sapling_block_root(&self, block_hash: &H256) -> Option<H256> {
-		self.get(Key::BlockRoot(EpochRef::new(EpochTag::Sapling, *block_hash))).and_then(Value::as_block_root)
+		self.block_header(BlockRef::Hash(*block_hash))
+			.map(|header| header.final_sapling_root)
 	}
 }
 
