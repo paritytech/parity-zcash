@@ -1,5 +1,5 @@
 
-// blake2 hash of ('ZcashComputehSig', random_seed, nullifier[0], nullifier[1], pub_key_hash)
+// blake2 hash of (random_seed, nullifier[0], nullifier[1], pub_key_hash) with 'ZcashComputehSig' personal token
 pub fn compute_hsig(random_seed: [u8; 32], nullifiers: [[u8; 32]; 2], pub_key_hash: [u8; 32]) -> [u8; 32] {
 	use crypto::blake2::Params;
 
