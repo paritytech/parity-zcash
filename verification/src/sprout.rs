@@ -25,15 +25,6 @@ mod tests {
 
 	fn hash(s: &'static str) -> [u8; 32] {
 		use hex::FromHex;
-		let bytes: Vec<u8> = s.from_hex().expect(&format!("hash '{}' is not actually a hash somehow", s));
-		assert_eq!(bytes.len(), 32);
-		let mut result = [0u8; 32];
-		result.copy_from_slice(&bytes[..]);
-		result
-	}
-
-	fn reversed_hash(s: &'static str) -> [u8; 32] {
-		use hex::FromHex;
 		let mut bytes: Vec<u8> = s.from_hex().expect(&format!("hash '{}' is not actually a hash somehow", s));
 		bytes.reverse();
 		assert_eq!(bytes.len(), 32);
@@ -53,7 +44,7 @@ mod tests {
 				],
 				hash("6464646464646464646464646464646464646464646464646464646464646464"),
 			),
-			reversed_hash("a8cba69f1fa329c055756b4af900f8a00b61e44f4cb8a1824ceb58b90a5b8113"),
+			hash("a8cba69f1fa329c055756b4af900f8a00b61e44f4cb8a1824ceb58b90a5b8113"),
 		);
 	}
 
