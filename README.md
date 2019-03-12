@@ -101,7 +101,7 @@ cargo test --all
 
 By default parity connects to Zcash seednodes. Full list is [here](./pzec/seednodes.rs).
 
-To start syncing the main network, just start the client. For example:
+To start syncing the main network, just start the client without any arguments:
 
 ```
 ./target/release/pzec
@@ -121,9 +121,9 @@ To not print any syncing progress add `--quiet` flag:
 
 ## Importing zcashd database
 
-	It it is possible to import existing `zcashd` database:
+It it is possible to import existing `zcashd` database:
 
-	```
+```
 # where $ZCASH_DB is path to your zcashd database. By default:
 # on macOS: "/Users/user/Library/Application Support/Zcash"
 # on Linux: "~/.zcash"
