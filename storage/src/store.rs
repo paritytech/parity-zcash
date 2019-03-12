@@ -2,7 +2,7 @@ use std::sync::Arc;
 use chain::BlockHeader;
 use {
 	BestBlock, BlockProvider, BlockHeaderProvider, TransactionProvider, TransactionMetaProvider,
-	TransactionOutputProvider, BlockChain, IndexedBlockProvider, Forkable, Error, NullifierTracker,
+	TransactionOutputProvider, BlockChain, IndexedBlockProvider, Forkable, NullifierTracker,
 	TreeStateProvider,
 };
 

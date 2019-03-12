@@ -115,7 +115,6 @@ pub struct BlockSigops<'a> {
 	block: CanonBlock<'a>,
 	store: &'a TransactionOutputProvider,
 	bip16_active: bool,
-	checkdatasig_active: bool,
 	max_block_sigops: usize,
 }
 
@@ -126,13 +125,11 @@ impl<'a> BlockSigops<'a> {
 		consensus: &'a ConsensusParams,
 	) -> Self {
 		let bip16_active = block.header.raw.time >= consensus.bip16_time;
-		let checkdatasig_active = false;
 
 		BlockSigops {
 			block: block,
 			store: store,
 			bip16_active,
-			checkdatasig_active,
 			max_block_sigops: consensus.max_block_sigops(),
 		}
 	}
@@ -140,7 +137,7 @@ impl<'a> BlockSigops<'a> {
 	fn check(&self) -> Result<(), Error> {
 		let store = DuplexTransactionOutputProvider::new(self.store, &*self.block);
 		let sigops = self.block.transactions.iter()
-			.map(|tx| transaction_sigops(&tx.raw, &store, self.bip16_active, self.checkdatasig_active))
+			.map(|tx| transaction_sigops(&tx.raw, &store, self.bip16_active))
 			.fold(0, |acc, tx_sigops| (acc + tx_sigops));
 
 		if sigops > self.max_block_sigops {

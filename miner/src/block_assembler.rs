@@ -139,8 +139,6 @@ struct FittingTransactionsIterator<'a, T> {
 	block_height: u32,
 	/// New block time
 	block_time: u32,
-	/// Are OP_CHECKDATASIG && OP_CHECKDATASIGVERIFY enabled for this block.
-	checkdatasig_active: bool,
 	/// Size policy decides if transactions size fits the block
 	block_size: SizePolicy,
 	/// Sigops policy decides if transactions sigops fits the block
@@ -161,14 +159,12 @@ impl<'a, T> FittingTransactionsIterator<'a, T> where T: Iterator<Item = &'a Entr
 		max_block_sigops: u32,
 		block_height: u32,
 		block_time: u32,
-		checkdatasig_active: bool,
 	) -> Self {
 		FittingTransactionsIterator {
 			store: store,
 			iter: iter,
 			block_height: block_height,
 			block_time: block_time,
-			checkdatasig_active,
 			// reserve some space for header and transactions len field
 			block_size: SizePolicy::new(BLOCK_HEADER_SIZE + 4, max_block_size, 1_000, 50),
 			sigops: SizePolicy::new(0, max_block_sigops, 8, 50),
@@ -210,7 +206,7 @@ impl<'a, T> Iterator for FittingTransactionsIterator<'a, T> where T: Iterator<It
 
 			let transaction_size = entry.size as u32;
 			let bip16_active = true;
-			let sigops_count = transaction_sigops(&entry.transaction, self, bip16_active, self.checkdatasig_active) as u32;
+			let sigops_count = transaction_sigops(&entry.transaction, self, bip16_active) as u32;
 
 			let size_step = self.block_size.decide(transaction_size);
 			let sigops_step = self.sigops.decide(sigops_count);
@@ -284,8 +280,7 @@ impl<'a> BlockAssembler<'a> {
 			self.max_block_size,
 			self.max_block_sigops,
 			height,
-			time,
-			false);
+			time);
 		for entry in tx_iter {
 			// miner_fee is i64, but we can safely cast it to u64
 			// memory pool should restrict miner fee to be positive
