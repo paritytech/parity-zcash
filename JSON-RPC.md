@@ -38,7 +38,7 @@ Get the peer count.
 
 ### Blockchain
 
-The Parity-bitcoin `blockchain` data interface.
+The Parity Zcash `blockchain` data interface.
 
 #### getbestblockhash
 
@@ -84,7 +84,7 @@ Get statistics about the unspent transaction output set.
 
 ### Miner
 
-The Parity-bitcoin `miner` data interface.
+The Parity Zcash `miner` data interface.
 
 #### getblocktemplate
 
@@ -94,7 +94,7 @@ Get block template for mining.
 
 ### Raw
 
-The Parity-bitcoin `raw` data interface.
+The Parity Zcash `raw` data interface.
 
 
 #### getrawtransaction
