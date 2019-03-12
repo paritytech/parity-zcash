@@ -81,7 +81,11 @@ impl Network {
 	}
 
 	pub fn default_verification_edge(&self) -> H256 {
-		self.genesis_block().hash()
+		match *self {
+			// block #410100, best checkpoint of zcashd as of 12.03.2019
+			Network::Mainnet => H256::from_reversed_str("0000000002c565958f783a24a4ac17cde898ff525e75ed9baf66861b0b9fcada"),
+			_ => self.genesis_block().hash(),
+		}
 	}
 }
 
