@@ -1,6 +1,5 @@
 //! Script opcodes.
 use std::fmt;
-use flags::VerificationFlags;
 
 /// Script opcodes.
 #[repr(u8)]
@@ -213,10 +212,6 @@ pub enum Opcode {
 	OP_NOP8 = 0xb7,
 	OP_NOP9 = 0xb8,
 	OP_NOP10 = 0xb9,
-
-	// BCH crypto
-	OP_CHECKDATASIG = 0xba,
-	OP_CHECKDATASIGVERIFY = 0xbb,
 }
 
 impl fmt::Display for Opcode {
@@ -434,27 +429,15 @@ impl Opcode {
 			0xb8 => Some(OP_NOP9),
 			0xb9 => Some(OP_NOP10),
 
-			// BCH crypto
-			0xba => Some(OP_CHECKDATASIG),
-			0xbb => Some(OP_CHECKDATASIGVERIFY),
-
 			_ => None,
 		}
 	}
 
-	pub fn is_disabled(&self, flags: &VerificationFlags) -> bool {
+	pub fn is_disabled(&self) -> bool {
 		use self::Opcode::*;
 		match *self {
-			OP_CAT if !flags.verify_concat => true,
-			OP_SUBSTR if !flags.verify_split => true,
-			OP_AND if !flags.verify_and => true,
-			OP_OR if !flags.verify_or => true,
-			OP_XOR if !flags.verify_xor => true,
-			OP_DIV if !flags.verify_div => true,
-			OP_MOD if !flags.verify_mod => true,
-			OP_RIGHT if !flags.verify_bin2num => true,
-			OP_LEFT if !flags.verify_num2bin => true,
-			OP_INVERT | OP_2MUL | OP_2DIV |
+			OP_CAT | OP_SUBSTR | OP_AND | OP_OR | OP_XOR | OP_DIV |
+				OP_MOD | OP_RIGHT | OP_LEFT | OP_INVERT | OP_2MUL | OP_2DIV |
 				OP_MUL | OP_LSHIFT | OP_RSHIFT => true,
 			_ => false,
 		}
@@ -695,9 +678,5 @@ mod tests {
 		assert_eq!(Opcode::OP_NOP8, Opcode::from_u8(Opcode::OP_NOP8 as u8).unwrap());
 		assert_eq!(Opcode::OP_NOP9, Opcode::from_u8(Opcode::OP_NOP9 as u8).unwrap());
 		assert_eq!(Opcode::OP_NOP10, Opcode::from_u8(Opcode::OP_NOP10 as u8).unwrap());
-
-		// BCH crypto
-		assert_eq!(Opcode::OP_CHECKDATASIG, Opcode::from_u8(Opcode::OP_CHECKDATASIG as u8).unwrap());
-		assert_eq!(Opcode::OP_CHECKDATASIGVERIFY, Opcode::from_u8(Opcode::OP_CHECKDATASIGVERIFY as u8).unwrap());
 	}
 }

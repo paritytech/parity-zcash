@@ -313,8 +313,7 @@ impl<'a> TransactionSigops<'a> {
 
 	fn check(&self) -> Result<(), TransactionError> {
 		let bip16_active = self.time >= self.consensus_params.bip16_time;
-		let checkdatasig_active = false;
-		let sigops = transaction_sigops(&self.transaction.raw, &self.store, bip16_active, checkdatasig_active);
+		let sigops = transaction_sigops(&self.transaction.raw, &self.store, bip16_active);
 		if sigops > self.max_sigops {
 			Err(TransactionError::MaxSigops)
 		} else {
@@ -333,8 +332,6 @@ pub struct TransactionEval<'a> {
 	verify_checksequence: bool,
 	verify_dersig: bool,
 	verify_nulldummy: bool,
-	verify_monolith_opcodes: bool,
-	verify_magnetic_anomaly_opcodes: bool,
 	verify_sigpushonly: bool,
 	verify_cleanstack: bool,
 	consensus_branch_id: u32,
@@ -354,12 +351,10 @@ impl<'a> TransactionEval<'a> {
 		let verify_strictenc = false;
 		let verify_locktime = height >= params.bip65_height;
 		let verify_dersig = height >= params.bip66_height;
-		let verify_monolith_opcodes = false;
-		let verify_magnetic_anomaly_opcodes = false;
 
 		let verify_checksequence = deployments.csv();
-		let verify_sigpushonly = verify_magnetic_anomaly_opcodes;
-		let verify_cleanstack = verify_magnetic_anomaly_opcodes;
+		let verify_sigpushonly = false;
+		let verify_cleanstack = false;
 
 		let consensus_branch_id = params.consensus_branch_id(height);
 
@@ -373,8 +368,6 @@ impl<'a> TransactionEval<'a> {
 			verify_checksequence: verify_checksequence,
 			verify_dersig: verify_dersig,
 			verify_nulldummy: false,
-			verify_monolith_opcodes: verify_monolith_opcodes,
-			verify_magnetic_anomaly_opcodes: verify_magnetic_anomaly_opcodes,
 			verify_sigpushonly: verify_sigpushonly,
 			verify_cleanstack: verify_cleanstack,
 			consensus_branch_id: consensus_branch_id,
@@ -435,16 +428,6 @@ impl<'a> TransactionEval<'a> {
 				.verify_checksequence(self.verify_checksequence)
 				.verify_dersig(self.verify_dersig)
 				.verify_nulldummy(self.verify_nulldummy)
-				.verify_concat(self.verify_monolith_opcodes)
-				.verify_split(self.verify_monolith_opcodes)
-				.verify_and(self.verify_monolith_opcodes)
-				.verify_or(self.verify_monolith_opcodes)
-				.verify_xor(self.verify_monolith_opcodes)
-				.verify_div(self.verify_monolith_opcodes)
-				.verify_mod(self.verify_monolith_opcodes)
-				.verify_bin2num(self.verify_monolith_opcodes)
-				.verify_num2bin(self.verify_monolith_opcodes)
-				.verify_checkdatasig(self.verify_magnetic_anomaly_opcodes)
 				.verify_sigpushonly(self.verify_sigpushonly)
 				.verify_cleanstack(self.verify_cleanstack);
 

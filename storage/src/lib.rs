@@ -40,7 +40,7 @@ pub use block_provider::{BlockHeaderProvider, BlockProvider, IndexedBlockProvide
 pub use block_ref::BlockRef;
 pub use duplex_store::{DuplexTransactionOutputProvider, NoopStore};
 pub use error::Error;
-pub use store::{AsSubstore, Store, SharedStore, CanonStore, ConfigStore};
+pub use store::{AsSubstore, Store, SharedStore, CanonStore};
 pub use transaction_meta::TransactionMeta;
 pub use transaction_provider::{TransactionProvider, TransactionOutputProvider, TransactionMetaProvider};
 pub use nullifier_tracker::NullifierTracker;

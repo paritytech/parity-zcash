@@ -59,42 +59,6 @@ pub struct VerificationFlags {
 	///
 	/// See BIP112 for details
 	pub verify_checksequence: bool,
-
-	/// Support OP_CAT opcode
-	pub verify_concat: bool,
-
-	/// Support OP_SPLIT opcode
-	///
-	/// This opcode replaces OP_SUBSTR => enabling both OP_SPLIT && OP_SUBSTR would be an error
-	pub verify_split: bool,
-
-	/// Support OP_AND opcode
-	pub verify_and: bool,
-
-	/// Support OP_OR opcode
-	pub verify_or: bool,
-
-	/// Support OP_XOR opcode
-	pub verify_xor: bool,
-
-	/// Support OP_DIV opcode
-	pub verify_div: bool,
-
-	/// Support OP_MOD opcode
-	pub verify_mod: bool,
-
-	/// Support OP_BIN2NUM opcode
-	///
-	/// This opcode replaces OP_RIGHT => enabling both OP_BIN2NUM && OP_RIGHT would be an error
-	pub verify_bin2num: bool,
-
-	/// Support OP_NUM2BIN opcode
-	///
-	/// This opcode replaces OP_LEFT => enabling both OP_NUM2BIN && OP_LEFT would be an error
-	pub verify_num2bin: bool,
-
-	/// Support OP_CHECKDATASIG and OP_CHECKDATASIGVERIFY opcodes.
-	pub verify_checkdatasig: bool,
 }
 
 impl VerificationFlags {
@@ -138,53 +102,4 @@ impl VerificationFlags {
 		self
 	}
 
-	pub fn verify_concat(mut self, value: bool) -> Self {
-		self.verify_concat = value;
-		self
-	}
-
-	pub fn verify_split(mut self, value: bool) -> Self {
-		self.verify_split = value;
-		self
-	}
-
-	pub fn verify_and(mut self, value: bool) -> Self {
-		self.verify_and = value;
-		self
-	}
-
-	pub fn verify_or(mut self, value: bool) -> Self {
-		self.verify_or = value;
-		self
-	}
-
-	pub fn verify_xor(mut self, value: bool) -> Self {
-		self.verify_xor = value;
-		self
-	}
-
-	pub fn verify_div(mut self, value: bool) -> Self {
-		self.verify_div = value;
-		self
-	}
-
-	pub fn verify_mod(mut self, value: bool) -> Self {
-		self.verify_mod = value;
-		self
-	}
-
-	pub fn verify_bin2num(mut self, value: bool) -> Self {
-		self.verify_bin2num = value;
-		self
-	}
-
-	pub fn verify_num2bin(mut self, value: bool) -> Self {
-		self.verify_num2bin = value;
-		self
-	}
-
-	pub fn verify_checkdatasig(mut self, value: bool) -> Self {
-		self.verify_checkdatasig = value;
-		self
-	}
 }
