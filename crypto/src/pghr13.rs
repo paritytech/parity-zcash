@@ -96,7 +96,6 @@ fn fq2_sqrt(a: Fq2) -> Option<Fq2> {
 	}
 }
 
-
 fn g1_from_compressed(data: &[u8]) -> Result<G1, Error> {
 	if data.len() != 33 { return Err(Error::InvalidRawInput); }
 
@@ -148,6 +147,7 @@ mod tests {
 
 	#[test]
 	fn sqrt_fq() {
+		// from zcash test_proof.cpp
 		let fq1 = Fq::from_str("5204065062716160319596273903996315000119019512886596366359652578430118331601").unwrap();
 		let fq2 = Fq::from_str("348579348568").unwrap();
 
@@ -156,6 +156,7 @@ mod tests {
 
 	#[test]
 	fn sqrt_fq2() {
+		// from zcash test_proof.cpp
 		let x1 = Fq2::new(
 			Fq::from_str("12844195307879678418043983815760255909500142247603239203345049921980497041944").unwrap(),
 			Fq::from_str("7476417578426924565731404322659619974551724117137577781074613937423560117731").unwrap(),
@@ -167,6 +168,17 @@ mod tests {
 		);
 
 		assert_eq!(fq2_sqrt(x2).unwrap(), x1);
+
+		// i is sqrt(-1)
+		assert_eq!(
+			fq2_sqrt(Fq2::one().neg()).unwrap(),
+			Fq2::i(),
+		);
+
+		// no sqrt for (1 + 2i)
+		assert!(
+			fq2_sqrt(Fq2::new(Fq::from_str("1").unwrap(), Fq::from_str("2").unwrap())).is_none()
+		);
 	}
 
 	#[test]
