@@ -1,4 +1,4 @@
-pub use bn::{Fr, Fq, G1, G2, Group, arith::U256, AffineG1};
+pub use bn::{Fr, Fq, Fq2, G1, G2, Group, arith::U256, AffineG1};
 use bn::pairing;
 use std::ops::Neg;
 
@@ -53,6 +53,12 @@ lazy_static! {
 		Fq::from_u256(3.into()).expect("3 is a valid field element and static; qed").neg() *
 		Fq::from_u256(4.into()).expect("4 is a valid field element and static; qed").inverse()
 			.expect("4 has inverse in Fq and is static; qed");
+
+	pub static ref FQ_MINUS1_DIV2: Fq =
+		Fq::from_u256(1.into()).expect("1 is a valid field element and static; qed").neg() *
+		Fq::from_u256(2.into()).expect("2 is a valid field element and static; qed").inverse()
+			.expect("2 has inverse in Fq and is static; qed");
+
 }
 
 // Shanks’s algorithm for q ≡ 3 (mod 4)
@@ -71,6 +77,25 @@ fn fq_sqrt(a: Fq) -> Option<Fq> {
 		Some(a1a)
 	}
 }
+
+fn fq2_sqrt(a: Fq2) -> Option<Fq2> {
+	let a1 = a.pow(FQ_MINUS3_DIV4.into_u256());
+	let a1a = a1 * a;
+	let alpha = a1 * a1a;
+	let a0 = alpha.pow(*FQ) * alpha;
+
+	if a0 == Fq2::one().neg() {
+		return None;
+	}
+
+	if alpha == Fq2::one().neg() {
+		Some(Fq2::i() * a1a)
+	} else {
+		let b = (alpha + Fq2::one()).pow(FQ_MINUS1_DIV2.into_u256());
+		Some(b * a1a)
+	}
+}
+
 
 fn g1_from_compressed(data: &[u8]) -> Result<G1, Error> {
 	if data.len() != 33 { return Err(Error::InvalidRawInput); }
@@ -122,11 +147,26 @@ mod tests {
 	}
 
 	#[test]
-	fn sqrt() {
+	fn sqrt_fq() {
 		let fq1 = Fq::from_str("5204065062716160319596273903996315000119019512886596366359652578430118331601").unwrap();
 		let fq2 = Fq::from_str("348579348568").unwrap();
 
 		assert_eq!(fq1, fq_sqrt(fq2).expect("348579348568 is quadratic residue"));
+	}
+
+	#[test]
+	fn sqrt_fq2() {
+		let x1 = Fq2::new(
+			Fq::from_str("12844195307879678418043983815760255909500142247603239203345049921980497041944").unwrap(),
+			Fq::from_str("7476417578426924565731404322659619974551724117137577781074613937423560117731").unwrap(),
+		);
+
+		let x2 = Fq2::new(
+			Fq::from_str("3345897230485723946872934576923485762803457692345760237495682347502347589474").unwrap(),
+			Fq::from_str("1234912378405347958234756902345768290345762348957605678245967234857634857676").unwrap(),
+		);
+
+		assert_eq!(fq2_sqrt(x2).unwrap(), x1);
 	}
 
 	#[test]
