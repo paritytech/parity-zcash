@@ -1,4 +1,4 @@
-pub use bn::{Fr, Fq, Fq2, G1, G2, Group, arith::U256, AffineG1};
+pub use bn::{Fr, Fq, Fq2, G1, G2, Group, arith::{U256, U512}, AffineG1, AffineG2};
 use bn::pairing;
 use std::ops::Neg;
 
@@ -25,6 +25,10 @@ pub enum Error {
 	InvalidFieldElement,
 	InvalidCurvePoint,
 	InvalidRawInput,
+	InvalidU256Encoding,
+	InvalidU512Encoding,
+	NotFqMember,
+	NotFq2Member,
 }
 
 #[derive(Clone)]
@@ -110,8 +114,32 @@ fn g1_from_compressed(data: &[u8]) -> Result<G1, Error> {
 	AffineG1::new(x, y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
 }
 
+fn g2_from_compressed(data: &[u8]) -> Result<G2, Error> {
+	if data.len() != 65 { return Err(Error::InvalidRawInput); }
+
+	let sign = data[0];
+	let x = deseerialize_fq2(&data[1..])?;
+
+	let y_squared = (x * x * x) + G2::b();
+
+	let mut y = fq2_sqrt(y_squared).ok_or(Error::InvalidFieldElement)?;
+	if sign == 10 { y = y.neg(); }
+
+	AffineG2::new(x, y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
+}
+
 fn deseerialize_fq(data: &[u8]) -> Result<Fq, Error> {
-	Ok(Fq::from_slice(data).map_err(|_| Error::InvalidRawInput)?)
+	let mut u256 = U256::from_slice(data).map_err(|a| Error::InvalidU256Encoding)?;
+	Ok(Fq::from_u256(u256).map_err(|_| Error::NotFqMember)?)
+}
+
+fn deseerialize_fq2(data: &[u8]) -> Result<Fq2, Error> {
+	let mut u512 = U512::from_slice(data).map_err(|a| Error::InvalidU512Encoding)?;
+	let (res, c0) = u512.divrem(&Fq::modulus());
+	Ok(Fq2::new(
+		Fq::from_u256(c0).map_err(|_| Error::NotFqMember)?,
+		Fq::from_u256(res.ok_or(Error::NotFq2Member)?).map_err(|_| Error::NotFqMember)?,
+	))
 }
 
 pub fn verify(vk: &VerifyingKey, primary_input: &[Fr], proof: &Proof) -> bool {
@@ -187,5 +215,19 @@ mod tests {
 		assert_eq!(g1.x(), Fq::from_str("21888242871839275222246405745257275088696311157297823662689037894645226208582").unwrap());
 		assert_eq!(g1.y(), Fq::from_str("3969792565221544645472939191694882283483352126195956956354061729942568608776").unwrap());
 		assert_eq!(g1.z(), Fq::one());
+	}
+
+	#[test]
+	fn g2_deserialize() {
+		let g2 = g2_from_compressed(
+			&hex("0a023aed31b5a9e486366ea9988b05dba469c6206e58361d9c065bbea7d928204a761efc6e4fa08ed227650134b52c7f7dd0463963e8a4bf21f4899fe5da7f984a")
+		).expect("Valid g2 point hex encoding");
+
+		assert_eq!(g2.x(),
+			Fq2::new(
+				Fq::from_str("5923585509243758863255447226263146374209884951848029582715967108651637186684").unwrap(),
+				Fq::from_str("5336385337059958111259504403491065820971993066694750945459110579338490853570").unwrap(),
+			)
+		);
 	}
 }
