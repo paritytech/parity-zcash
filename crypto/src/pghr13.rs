@@ -44,7 +44,7 @@ pub struct Proof {
 }
 
 impl Proof {
-	fn from_raw(data: &[u8; 296]) -> Result<Self, Error> {
+	pub fn from_raw(data: &[u8; 296]) -> Result<Self, Error> {
 		Ok(Proof {
 			a: g1_from_compressed(&data[0..33])?,
 			a_prime: g1_from_compressed(&data[33..66])?,
@@ -145,12 +145,12 @@ fn g2_from_compressed(data: &[u8]) -> Result<G2, Error> {
 }
 
 fn deseerialize_fq(data: &[u8]) -> Result<Fq, Error> {
-	let mut u256 = U256::from_slice(data).map_err(|a| Error::InvalidU256Encoding)?;
+	let u256 = U256::from_slice(data).map_err(|_| Error::InvalidU256Encoding)?;
 	Ok(Fq::from_u256(u256).map_err(|_| Error::NotFqMember)?)
 }
 
 fn deseerialize_fq2(data: &[u8]) -> Result<Fq2, Error> {
-	let mut u512 = U512::from_slice(data).map_err(|a| Error::InvalidU512Encoding)?;
+	let u512 = U512::from_slice(data).map_err(|_| Error::InvalidU512Encoding)?;
 	let (res, c0) = u512.divrem(&Fq::modulus());
 	Ok(Fq2::new(
 		Fq::from_u256(c0).map_err(|_| Error::NotFqMember)?,
