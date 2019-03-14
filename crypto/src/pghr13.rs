@@ -43,7 +43,23 @@ pub struct Proof {
 	pub h: G1,
 }
 
+impl Proof {
+	fn from_raw(data: &[u8; 296]) -> Result<Self, Error> {
+		Ok(Proof {
+			a: g1_from_compressed(&data[0..33])?,
+			a_prime: g1_from_compressed(&data[33..66])?,
+			b: g2_from_compressed(&data[66..131])?,
+			b_prime: g1_from_compressed(&data[131..164])?,
+			c: g1_from_compressed(&data[164..197])?,
+			c_prime: g1_from_compressed(&data[197..230])?,
+			k: g1_from_compressed(&data[230..263])?,
+			h: g1_from_compressed(&data[263..296])?,
+		})
+	}
+}
+
 lazy_static! {
+	// integer modulus for Fq field
 	pub static ref FQ: U256 = U256::from([
         0x3c208c16d87cfd47,
         0x97816a916871ca8d,
