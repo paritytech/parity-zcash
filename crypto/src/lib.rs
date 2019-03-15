@@ -10,6 +10,7 @@ extern crate rustc_hex as hex;
 pub extern crate bellman;
 pub extern crate pairing;
 pub extern crate sapling_crypto;
+pub extern crate blake2b_simd as blake2;
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate serde_derive;

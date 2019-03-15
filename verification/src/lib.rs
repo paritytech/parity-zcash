@@ -83,6 +83,7 @@ mod equihash;
 mod error;
 mod sapling;
 mod sigops;
+mod sprout;
 mod timestamp;
 mod work;
 
