@@ -44,3 +44,6 @@ name = "pzec"
 
 [workspace]
 members = ["bencher"]
+
+[patch.crates-io]
+heapsize = { git = "https://github.com/cheme/heapsize.git", branch = "ec-macfix" }
