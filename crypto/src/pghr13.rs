@@ -120,7 +120,7 @@ fn g1_from_compressed(data: &[u8]) -> Result<G1, Error> {
 	if data.len() != 33 { return Err(Error::InvalidRawInput); }
 
 	let sign = data[0];
-	let fq = deseerialize_fq(&data[1..])?;
+	let fq = deserialize_fq(&data[1..])?;
 	let x = fq;
 	let y_squared = (fq * fq * fq) + *G1_B;
 	let mut y = fq_sqrt(y_squared).ok_or(Error::InvalidFieldElement)?;
@@ -134,7 +134,7 @@ fn g2_from_compressed(data: &[u8]) -> Result<G2, Error> {
 	if data.len() != 65 { return Err(Error::InvalidRawInput); }
 
 	let sign = data[0];
-	let x = deseerialize_fq2(&data[1..])?;
+	let x = deserialize_fq2(&data[1..])?;
 
 	let y_squared = (x * x * x) + G2::b();
 
@@ -144,12 +144,12 @@ fn g2_from_compressed(data: &[u8]) -> Result<G2, Error> {
 	AffineG2::new(x, y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
 }
 
-fn deseerialize_fq(data: &[u8]) -> Result<Fq, Error> {
+fn deserialize_fq(data: &[u8]) -> Result<Fq, Error> {
 	let u256 = U256::from_slice(data).map_err(|_| Error::InvalidU256Encoding)?;
 	Ok(Fq::from_u256(u256).map_err(|_| Error::NotFqMember)?)
 }
 
-fn deseerialize_fq2(data: &[u8]) -> Result<Fq2, Error> {
+fn deserialize_fq2(data: &[u8]) -> Result<Fq2, Error> {
 	let u512 = U512::from_slice(data).map_err(|_| Error::InvalidU512Encoding)?;
 	let (res, c0) = u512.divrem(&Fq::modulus());
 	Ok(Fq2::new(
