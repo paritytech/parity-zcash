@@ -98,6 +98,8 @@ fn fq_sqrt(a: Fq) -> Option<Fq> {
 	}
 }
 
+// Algorithm 9 Square root computation over Fq2, with q ≡ 3 (mod 4)
+// from https://eprint.iacr.org/2012/685.pdf (Square root computation over even extension fields)
 fn fq2_sqrt(a: Fq2) -> Option<Fq2> {
 	let a1 = a.pow(FQ_MINUS3_DIV4.into_u256());
 	let a1a = a1 * a;
