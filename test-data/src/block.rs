@@ -274,6 +274,7 @@ pub struct TransactionBuilder<F=Identity> {
 	lock_time: u32,
 	inputs: Vec<chain::TransactionInput>,
 	outputs: Vec<chain::TransactionOutput>,
+	sapling: Option<chain::Sapling>,
 }
 
 impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
@@ -284,6 +285,7 @@ impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
 			lock_time: 0,
 			inputs: Vec::new(),
 			outputs: Vec::new(),
+			sapling: None,
 		}
 	}
 
@@ -354,12 +356,18 @@ impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
 				version: self.version,
 				inputs: self.inputs,
 				outputs: self.outputs,
+				sapling: self.sapling,
 				..Default::default()
 			}
 		)
 	}
-}
 
+	pub fn with_sapling(mut self, sapling : chain::Sapling) -> Self {
+		self.sapling = Some(sapling);
+		self
+	}
+	
+}
 
 impl<F> Invoke<chain::TransactionInput> for TransactionBuilder<F>
 	where F: Invoke<chain::Transaction>
