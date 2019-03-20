@@ -35,7 +35,7 @@ pub use self::getaddr::GetAddr;
 pub use self::getblocks::{GetBlocks, GETBLOCKS_MAX_RESPONSE_HASHES};
 pub use self::getblocktxn::GetBlockTxn;
 pub use self::getdata::{GetData, GETDATA_MAX_INVENTORY_LEN};
-pub use self::getheaders::{GetHeaders, GETHEADERS_MAX_RESPONSE_HEADERS};
+pub use self::getheaders::{GetHeaders};
 pub use self::headers::{Headers, HEADERS_MAX_HEADERS_LEN};
 pub use self::inv::{Inv, INV_MAX_INVENTORY_LEN};
 pub use self::mempool::MemPool;
