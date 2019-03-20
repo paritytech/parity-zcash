@@ -326,7 +326,7 @@ impl<TExecutor> ServerTaskExecutor<TExecutor> where TExecutor: TaskExecutor {
 
 	fn serve_get_headers(&self, peer_index: PeerIndex, message: types::GetHeaders, request_id: RequestId) {
 		if let Some(block_height) = self.locate_best_common_block(&message.hash_stop, &message.block_locator_hashes) {
-			let headers: Vec<_> = (block_height + 1..block_height + 1 + (types::GETHEADERS_MAX_RESPONSE_HEADERS as BlockHeight))
+			let headers: Vec<_> = (block_height + 1..block_height + 1 + (types::HEADERS_MAX_HEADERS_LEN as BlockHeight))
 				.map(|block_height| self.storage.block_hash(block_height))
 				.take_while(Option::is_some)
 				.map(Option::unwrap)

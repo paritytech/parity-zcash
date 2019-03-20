@@ -3,7 +3,7 @@ use chain::BlockHeader;
 use ser::{Stream, Reader, Serializable, Deserializable, CompactInteger, Error as ReaderError};
 use {Payload, MessageResult};
 
-pub const HEADERS_MAX_HEADERS_LEN: usize = 2000;
+pub const HEADERS_MAX_HEADERS_LEN: usize = 160;
 
 #[derive(Debug, PartialEq)]
 pub struct Headers {

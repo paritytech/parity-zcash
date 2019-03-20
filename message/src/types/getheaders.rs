@@ -3,8 +3,6 @@ use hash::H256;
 use ser::{Stream, Reader};
 use {Payload, MessageResult};
 
-pub const GETHEADERS_MAX_RESPONSE_HEADERS: usize = 2_000;
-
 #[derive(Debug, PartialEq)]
 pub struct GetHeaders {
 	pub version: u32,
