@@ -4,7 +4,10 @@ use v1::traits::Raw;
 use v1::types::{RawTransaction, TransactionInput, TransactionOutput, TransactionOutputs, Transaction, GetRawTransactionResponse};
 use v1::types::H256;
 use v1::helpers::errors::{execution, invalid_params};
-use chain::{SAPLING_TX_VERSION, SAPLING_TX_VERSION_GROUP_ID, Transaction as GlobalTransaction};
+use chain::{
+	SAPLING_TX_VERSION, SAPLING_TX_VERSION_GROUP_ID,
+	Transaction as GlobalTransaction, IndexedTransaction as GlobalIndexedTransaction,
+};
 use primitives::bytes::Bytes as GlobalBytes;
 use primitives::hash::H256 as GlobalH256;
 use sync;
@@ -118,7 +121,7 @@ impl RawClientCore {
 
 impl RawClientCoreApi for RawClientCore {
 	fn accept_transaction(&self, transaction: GlobalTransaction) -> Result<GlobalH256, String> {
-		self.local_sync_node.accept_transaction(transaction)
+		self.local_sync_node.accept_transaction(GlobalIndexedTransaction::from_raw(transaction))
 	}
 
 	fn create_raw_transaction(
