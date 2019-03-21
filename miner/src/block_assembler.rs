@@ -338,7 +338,7 @@ impl<'a> BlockAssembler<'a> {
 			bits: bits,
 			height: height,
 			transactions: transactions,
-			coinbase_tx: coinbase_tx.into(),
+			coinbase_tx: IndexedTransaction::from_raw(coinbase_tx),
 			size_limit: self.max_block_size,
 			sigop_limit: self.max_block_sigops,
 		})
