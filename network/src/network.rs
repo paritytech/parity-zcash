@@ -11,12 +11,9 @@ const ZCASH_MAGIC_TESTNET: u32 = 0xbff91afa;
 const ZCASH_MAGIC_REGTEST: u32 = 0x5f3fe8aa;
 
 lazy_static! {
-	static ref ZCASH_MAX_BITS_MAINNET: U256 = "0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".parse()
-		.expect("hardcoded value should parse without errors");
-	static ref ZCASH_MAX_BITS_TESTNET: U256 = "07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".parse()
-		.expect("hardcoded value should parse without errors");
-	static ref ZCASH_MAX_BITS_REGTEST: U256 = "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f".parse()
-		.expect("hardcoded value should parse without errors");
+	static ref ZCASH_MAX_BITS_MAINNET: U256 = "0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into();
+	static ref ZCASH_MAX_BITS_TESTNET: U256 = "07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".into();
+	static ref ZCASH_MAX_BITS_REGTEST: U256 = "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f".into();
 }
 
 /// Network magic type.

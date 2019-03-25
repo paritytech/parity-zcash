@@ -1,6 +1,6 @@
 use primitives::compact::Compact;
 use primitives::hash::H256;
-use primitives::bigint::{Uint, U256};
+use primitives::bigint::U256;
 use network::ConsensusParams;
 use storage::{BlockHeaderProvider, BlockAncestors};
 use timestamp::median_timestamp_inclusive;
@@ -225,7 +225,7 @@ mod tests {
 		// Result should be unchanged, modulo integer division precision loss
 		let mut bits_expected: U256 = Compact::new(0x1e7fffff).into();
 		bits_expected = bits_expected / consensus.averaging_window_timespan().into();
-		bits_expected = bits_expected * consensus.averaging_window_timespan().into(); 
+		bits_expected = bits_expected * consensus.averaging_window_timespan().into();
 		assert_eq!(work_required(header_provider.last().hash(), header_provider.next_time(), header_provider.next_height(),
 			&header_provider, &consensus),
 			bits_expected.into());

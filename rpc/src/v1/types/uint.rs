@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 use serde;
 use serde::de::Unexpected;
-use primitives::bigint::{U256 as GlobalU256, Uint};
+use primitives::bigint::U256 as GlobalU256;
 
 macro_rules! impl_uint {
 	($name: ident, $other: ident, $size: expr) => {

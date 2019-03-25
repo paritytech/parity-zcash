@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Parity Technologies <admin@parity.io>"]
 
 [dependencies]
-elastic-array = "0.6"
-parking_lot = "0.4"
+elastic-array = "0.10"
+parking_lot = "0.7"
 bit-vec = "0.4"
 lru-cache = "0.1"
 primitives = { path = "../primitives" }
