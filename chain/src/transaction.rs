@@ -129,8 +129,9 @@ impl Transaction {
 		version
 	}
 
+	#[cfg(any(test, feature = "test-helpers"))]
 	pub fn hash(&self) -> H256 {
-		dhash256(&serialize(self))
+		transaction_hash(self)
 	}
 
 	pub fn inputs(&self) -> &[TransactionInput] {
@@ -326,6 +327,10 @@ impl Deserializable for Transaction {
 			sapling,
 		})
 	}
+}
+
+pub(crate) fn transaction_hash(transaction: &Transaction) -> H256 {
+	dhash256(&serialize(transaction))
 }
 
 #[cfg(test)]

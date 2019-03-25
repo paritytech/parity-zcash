@@ -36,7 +36,7 @@ pub use block_ancestors::BlockAncestors;
 pub use block_chain::{BlockChain, ForkChain, Forkable};
 pub use block_iterator::BlockIterator;
 pub use block_origin::{BlockOrigin, SideChainOrigin};
-pub use block_provider::{BlockHeaderProvider, BlockProvider, IndexedBlockProvider};
+pub use block_provider::{BlockHeaderProvider, BlockProvider};
 pub use block_ref::BlockRef;
 pub use duplex_store::{DuplexTransactionOutputProvider, NoopStore};
 pub use error::Error;
