@@ -49,23 +49,23 @@ pub fn work_required(parent_hash: H256, time: u32, height: u32, store: &BlockHea
 	// then allow mining of a min-difficulty block.
 	if let Some(allow_min_difficulty_after_height) = consensus.pow_allow_min_difficulty_after_height {
 		if height >= allow_min_difficulty_after_height {
-			if time > parent_header.time + consensus.pow_target_spacing * 6 {
+			if time > parent_header.raw.time + consensus.pow_target_spacing * 6 {
 				return max_bits;
 			}
 		}
 	}
 
 	// Find the first block in the averaging interval + calculate total difficulty for blocks in the interval
-	let (count, oldest_hash, bits_total) = BlockAncestors::new(parent_header.previous_header_hash.into(), store)
+	let (count, oldest_hash, bits_total) = BlockAncestors::new(parent_header.raw.previous_header_hash.into(), store)
 		.take(consensus.pow_averaging_window as usize - 1)
-		.fold((1, Default::default(), U256::from(parent_header.bits)), |(count, _, bits_total), header|
-			(count + 1, header.previous_header_hash, bits_total.overflowing_add(header.bits.into()).0));
+		.fold((1, Default::default(), U256::from(parent_header.raw.bits)), |(count, _, bits_total), header|
+			(count + 1, header.raw.previous_header_hash, bits_total.overflowing_add(header.raw.bits.into()).0));
 	if count != consensus.pow_averaging_window {
 		return max_bits;
 	}
 
 	let bits_avg = bits_total / consensus.pow_averaging_window.into();
-	let parent_mtp = median_timestamp_inclusive(parent_header.hash(), store);
+	let parent_mtp = median_timestamp_inclusive(parent_hash, store);
 	let oldest_mtp = median_timestamp_inclusive(oldest_hash, store);
 
 	calculate_work_required(bits_avg, parent_mtp, oldest_mtp, consensus, max_bits)
@@ -108,7 +108,7 @@ mod tests {
 	use primitives::bigint::U256;
 	use primitives::hash::H256;
 	use network::{Network, ConsensusParams};
-	use chain::BlockHeader;
+	use chain::{BlockHeader, IndexedBlockHeader};
 	use storage::{BlockHeaderProvider, BlockRef};
 	use timestamp::median_timestamp_inclusive;
 	use super::{work_required, calculate_work_required};
@@ -150,11 +150,11 @@ mod tests {
 			unimplemented!()
 		}
 
-		fn block_header(&self, block_ref: BlockRef) -> Option<BlockHeader> {
+		fn block_header(&self, block_ref: BlockRef) -> Option<IndexedBlockHeader> {
 			match block_ref {
 				BlockRef::Hash(ref hash) => self.by_hash.get(hash).map(|h| &self.by_height[*h]).cloned(),
 				BlockRef::Number(height) => self.by_height.get(height as usize).cloned(),
-			}
+			}.map(Into::into)
 		}
 	}
 
