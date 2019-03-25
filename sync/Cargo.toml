@@ -4,11 +4,11 @@ version = "0.1.0"
 authors = ["Ethcore <admin@ethcore.io>"]
 
 [dependencies]
-parking_lot = "0.4"
+parking_lot = "0.7"
 log = "0.4"
 time = "0.1"
 futures = "0.1"
-linked-hash-map = "0.3"
+linked-hash-map = "0.4"
 bit-vec = "0.4.3"
 murmur3 = "0.4"
 rand = "0.4"

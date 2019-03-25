@@ -243,7 +243,7 @@ fn to_big_endian(num: u32) -> [u8; 4] {
 
 #[cfg(test)]
 mod tests {
-	use primitives::bigint::{U256, Uint};
+	use primitives::bigint::U256;
 	use byteorder::WriteBytesExt;
 	use super::*;
 

@@ -1,6 +1,6 @@
 //! Compact representation of `U256`
 
-use bigint::{U256, Uint};
+use bigint::U256;
 
 /// Compact representation of `U256`
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -102,7 +102,7 @@ impl Compact {
 
 #[cfg(test)]
 mod tests {
-	use bigint::{U256, Uint};
+	use bigint::U256;
 	use super::Compact;
 
 	#[test]
@@ -146,7 +146,7 @@ mod tests {
 		let limit = Compact::new(486604799);
 
 		assert!(compare_f64(Compact::new(0x1b0404cb).to_f64(limit), 16307.42094));
-	
+
 		// tests from original bitcoin client:
 		// https://github.com/bitcoin/bitcoin/blob/1e8f88e071019907785b260477bd359bef6f9a8f/src/test/blockchain_tests.cpp
 
