@@ -39,7 +39,7 @@ pub use json::groth16::{
 
 pub use pghr13::{
 	VerifyingKey as Pghr13VerifyingKey, Proof as Pghr13Proof, verify as pghr13_verify,
-	G1, G2, Fr, Group,
+	G1, G2, Fr, Group, U256 as BnU256,
 };
 
 pub struct Groth16VerifyingKey(pub bellman::groth16::PreparedVerifyingKey<pairing::bls12_381::Bls12>);

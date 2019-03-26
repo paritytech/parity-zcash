@@ -69,6 +69,8 @@ extern crate primitives;
 extern crate serialization as ser;
 extern crate script;
 extern crate bitcrypto as crypto;
+extern crate bitvec;
+
 #[cfg(test)]
 extern crate db;
 

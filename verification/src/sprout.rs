@@ -18,6 +18,50 @@ pub fn compute_hsig(random_seed: [u8; 32], nullifiers: [[u8; 32]; 2], pub_key_ha
 	result
 }
 
+#[derive(Debug, Clone)]
+pub struct Input {
+	bits: bitvec::BitVec,
+}
+
+impl Input {
+	fn new(size: usize) -> Self {
+		Input { bits: bitvec::BitVec::with_capacity(size) }
+	}
+
+	fn push_u256(&mut self, val: crypto::BnU256) {
+		for i in 0..256 {
+			self.bits.push(val.get_bit(i).expect("for 0..256 index range will always return some; qeed"))
+		}
+	}
+
+	fn push_u64(&mut self, val: u64) {
+		for i in 0..64 {
+			self.bits.push(val & (1 << (63-i)) > 0)
+		}
+	}
+
+	#[cfg(test)]
+	pub(crate) fn bits(&self) -> &bitvec::BitVec {
+		&self.bits
+	}
+
+	pub fn into_frs(self) -> Vec<crypto::Fr> {
+		let mut res = Vec::new();
+		let mut u256 = crypto::BnU256::zero();
+		for i in 0..self.bits.len() {
+			u256.set_bit(i % 256, self.bits[i]);
+			if i % 256 == 255 {
+				res.push(crypto::Fr::new_mul_factor(u256));
+			}
+		}
+		if self.bits.len() % 256 != 0 {
+			res.push(crypto::Fr::new_mul_factor(u256));
+		}
+
+		res
+	}
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -97,4 +141,21 @@ mod tests {
 		);
 	}
 
+
+	fn input_to_str(v: &super::Input) -> String {
+		let mut s = String::new();
+		for i in 0..v.bits().len() { if v.bits()[i] { s.push('1') } else { s.push('0') } }
+		s
+	}
+
+	#[test]
+	fn inputs() {
+		let mut inputs = super::Input::new(128);
+		inputs.push_u64(0x6dea2059e200bd39);
+		inputs.push_u64(0xa953d79b83f6ab59);
+		assert_eq!(
+			&input_to_str(&inputs),
+			"01101101111010100010000001011001111000100000000010111101001110011010100101010011110101111001101110000011111101101010101101011001"
+		);
+	}
 }
