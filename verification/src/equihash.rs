@@ -401,7 +401,7 @@ mod tests {
 	}
 
 	#[test]
-	fn verify_equihash2_solution_works() {
+	fn verify_equihash_solution_works() {
 		assert!(test_equihash_verifier(
 			b"Equihash is an asymmetric PoW based on the Generalised Birthday problem.",
 			U256::one(), &vec![
@@ -411,7 +411,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_equihash2_on_real_block() {
+	fn test_equihash_on_real_block() {
 		let block = test_data::block_h170();
 		assert!(verify_block_equihash_solution((200, 9), &block.block_header));
 	}
