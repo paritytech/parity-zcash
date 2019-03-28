@@ -1,6 +1,36 @@
+#![allow(dead_code)]
+
+use chain::{JoinSplit, JoinSplitProof};
+use crypto::{BnU256, Pghr13Proof, pghr13_verify};
+
+/// Join split verification error kind
+pub enum ErrorKind {
+	/// Invalid join split zkp statement
+	InvalidProof,
+	/// Invalid raw bytes econding of proof
+	InvalidEncoding,
+}
+
+/// Join split verification error
+pub struct Error {
+	index: usize,
+	kind: ErrorKind,
+}
+
+impl Error {
+	pub fn proof(idx: usize) -> Self {
+		Error { kind: ErrorKind::InvalidProof, index: idx }
+	}
+
+	pub fn encoding(idx: usize) -> Self {
+		Error { kind: ErrorKind::InvalidEncoding, index: idx }
+	}
+
+	pub fn index(&self) -> usize { self.index }
+}
 
 // blake2 hash of (random_seed, nullifier[0], nullifier[1], pub_key_hash) with 'ZcashComputehSig' personal token
-pub fn compute_hsig(random_seed: [u8; 32], nullifiers: [[u8; 32]; 2], pub_key_hash: [u8; 32]) -> [u8; 32] {
+pub fn compute_hsig(random_seed: &[u8; 32], nullifiers: &[[u8; 32]; 2], pub_key_hash: &[u8; 32]) -> [u8; 32] {
 	use crypto::blake2::Params;
 
 	let res = Params::new()
@@ -18,6 +48,50 @@ pub fn compute_hsig(random_seed: [u8; 32], nullifiers: [[u8; 32]; 2], pub_key_ha
 	result
 }
 
+pub fn verify(
+	root: &[u8; 32],
+	join_split: &JoinSplit,
+	verifying_key: &crypto::Pghr13VerifyingKey,
+) -> Result<(), Error>
+{
+	let mut desc_index = 0;
+	for desc in join_split.descriptions.iter() {
+
+		match desc.zkproof {
+			JoinSplitProof::PHGR(ref proof_raw) => {
+				let hsig = compute_hsig(&desc.random_seed, &desc.nullifiers, &join_split.pubkey.into());
+
+				let mut input = Input::new(1024);
+				input.push_hash(&root);
+				input.push_hash(&hsig);
+
+				input.push_hash(&desc.nullifiers[0]);
+				input.push_hash(&desc.macs[0]);
+
+				input.push_hash(&desc.nullifiers[1]);
+				input.push_hash(&desc.macs[1]);
+
+				input.push_hash(&desc.commitments[0]);
+				input.push_hash(&desc.commitments[1]);
+
+				input.push_u64(desc.value_pub_old);
+				input.push_u64(desc.value_pub_new);
+
+				let proof = Pghr13Proof::from_raw(proof_raw).map_err(|_| Error::encoding(desc_index))?;
+
+				if !pghr13_verify(verifying_key, &input.into_frs(), &proof) {
+					return Err(Error::proof(desc_index));
+				}
+			},
+			_ => continue,
+		}
+
+		desc_index += 1;
+	}
+
+	Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct Input {
 	bits: bitvec::BitVec,
@@ -28,10 +102,14 @@ impl Input {
 		Input { bits: bitvec::BitVec::with_capacity(size) }
 	}
 
-	fn push_u256(&mut self, val: crypto::BnU256) {
+	fn push_u256(&mut self, val: BnU256) {
 		for i in 0..256 {
-			self.bits.push(val.get_bit(i).expect("for 0..256 index range will always return some; qeed"))
+			self.bits.push(val.get_bit(255-i).expect("for 0..256 index range will always return some; qeed"))
 		}
+	}
+
+	fn push_hash(&mut self, val: &[u8; 32]) {
+		self.push_u256(BnU256::from_slice(&val[..]).expect("has 32 elements in slice; qed"))
 	}
 
 	fn push_u64(&mut self, val: u64) {
@@ -81,48 +159,48 @@ mod tests {
 	fn test_vectors() {
 		assert_eq!(
 			compute_hsig(
-				hash("6161616161616161616161616161616161616161616161616161616161616161"),
-				[
+				&hash("6161616161616161616161616161616161616161616161616161616161616161"),
+				&[
 					hash("6262626262626262626262626262626262626262626262626262626262626262"),
 					hash("6363636363636363636363636363636363636363636363636363636363636363"),
 				],
-				hash("6464646464646464646464646464646464646464646464646464646464646464"),
+				&hash("6464646464646464646464646464646464646464646464646464646464646464"),
 			),
 			hash("a8cba69f1fa329c055756b4af900f8a00b61e44f4cb8a1824ceb58b90a5b8113"),
 		);
 
 		assert_eq!(
 			compute_hsig(
-				hash("0000000000000000000000000000000000000000000000000000000000000000"),
-				[
+				&hash("0000000000000000000000000000000000000000000000000000000000000000"),
+				&[
 					hash("0000000000000000000000000000000000000000000000000000000000000000"),
 					hash("0000000000000000000000000000000000000000000000000000000000000000"),
 				],
-				hash("0000000000000000000000000000000000000000000000000000000000000000"),
+				&hash("0000000000000000000000000000000000000000000000000000000000000000"),
 			),
 			hash("697322276b5dd93b12fb1fcbd2144b2960f24c73aac6c6a0811447be1e7f1e19"),
 		);
 
 		assert_eq!(
 			compute_hsig(
-				hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
-				[
+				&hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
+				&[
 					hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
 					hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
 				],
-				hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
+				&hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
 			),
 			hash("b61110ec162693bc3d9ca7fb0eec3afd2e278e2f41394b3ff11d7cb761ad4b27"),
 		);
 
 		assert_eq!(
 			compute_hsig(
-				hash("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
-				[
+				&hash("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+				&[
 					hash("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 					hash("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 				],
-				hash("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+				&hash("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 			),
 			hash("4961048919f0ca79d49c9378c36a91a8767060001f4212fe6f7d426f3ccf9f32"),
 		);
@@ -130,12 +208,12 @@ mod tests {
 
 		assert_eq!(
 			compute_hsig(
-				hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
-				[
+				&hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
+				&[
 					hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
 					hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
 				],
-				hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
+				&hash("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"),
 			),
 			hash("b61110ec162693bc3d9ca7fb0eec3afd2e278e2f41394b3ff11d7cb761ad4b27"),
 		);

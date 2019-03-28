@@ -150,5 +150,7 @@ pub enum TransactionError {
 	Expired,
 	/// Transaction overwintered flag is invalid.
 	InvalidOverwintered,
+	/// Invalid joinsplit statement
+	InvalidJoinSplit(usize),
 }
 

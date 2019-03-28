@@ -55,7 +55,7 @@ impl<'a> TransactionAcceptor<'a> {
 			overspent: TransactionOverspent::new(transaction, output_store),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, deployments),
-			join_split: JoinSplitVerification::new(transaction, nullifier_tracker),
+			join_split: JoinSplitVerification::new(consensus, transaction, nullifier_tracker),
 			sapling: SaplingVerification::new(
 				nullifier_tracker,
 				consensus.sapling_spend_verifying_key,
@@ -125,7 +125,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 			sigops: TransactionSigops::new(transaction, output_store, consensus, max_block_sigops, time),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, VerificationLevel::Full, height, time, deployments),
-			join_split: JoinSplitVerification::new(transaction, nullifier_tracker),
+			join_split: JoinSplitVerification::new(consensus, transaction, nullifier_tracker),
 			sapling: SaplingVerification::new(
 				nullifier_tracker,
 				consensus.sapling_spend_verifying_key,
@@ -571,14 +571,26 @@ impl<'a> TransactionVersion<'a> {
 
 /// Check the joinsplit proof of the transaction
 pub struct JoinSplitProof<'a> {
-	_transaction: CanonTransaction<'a>,
+	transaction: CanonTransaction<'a>,
+	consensus_params: &'a ConsensusParams,
 }
 
 impl<'a> JoinSplitProof<'a> {
-	fn new(transaction: CanonTransaction<'a>) -> Self { JoinSplitProof { _transaction: transaction }}
+	fn new(transaction: CanonTransaction<'a>, consensus_params: &'a ConsensusParams) -> Self {
+		JoinSplitProof {
+			transaction: transaction,
+			consensus_params: consensus_params,
+		}
+	}
 
 	fn check(&self) -> Result<(), TransactionError> {
-		// TODO: Zero-knowledge proof
+		use sprout;
+
+		if let Some(ref join_split) = self.transaction.raw.join_split {
+			sprout::verify(&[0u8;32], &join_split, &self.consensus_params.joinsplit_verification_key)
+				.map_err(|e| TransactionError::InvalidJoinSplit(e.index()))?;
+		}
+
 		Ok(())
 	}
 }
@@ -618,11 +630,11 @@ pub struct JoinSplitVerification<'a> {
 }
 
 impl<'a> JoinSplitVerification<'a> {
-	pub fn new(transaction: CanonTransaction<'a>, tracker: &'a NullifierTracker)
+	pub fn new(consensus_params: &'a ConsensusParams, transaction: CanonTransaction<'a>, tracker: &'a NullifierTracker)
 		-> Self
 	{
 		JoinSplitVerification {
-			proof: JoinSplitProof::new(transaction),
+			proof: JoinSplitProof::new(transaction, consensus_params),
 			nullifiers: JoinSplitNullifiers::new(tracker, transaction),
 		}
 	}
