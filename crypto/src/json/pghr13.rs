@@ -8,6 +8,12 @@ use serde::de::{self, Visitor, Deserialize, Deserializer};
 #[derive(Clone)]
 pub struct G1(bn::G1);
 
+impl Into<bn::G1> for G1 {
+	fn into(self) -> bn::G1 {
+		self.0
+	}
+}
+
 struct G1Visitor;
 
 pub(crate) fn clean_0x(s: &str) -> &str {
@@ -60,6 +66,12 @@ impl<'de> Deserialize<'de> for G1 {
 
 #[derive(Clone)]
 pub struct G2(bn::G2);
+
+impl Into<bn::G2> for G2 {
+	fn into(self) -> bn::G2 {
+		self.0
+	}
+}
 
 struct G2Visitor;
 
@@ -116,6 +128,10 @@ pub struct VerifyingKey {
 	pub gamma_beta_2: G2,
 	#[serde(rename = "ic")]
 	pub ic: Vec<G1>,
+}
+
+pub fn decode(json: &[u8]) -> Result<VerifyingKey, serde_json::Error> {
+	serde_json::from_slice(json)
 }
 
 #[cfg(test)]

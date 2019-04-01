@@ -4,6 +4,7 @@ use chain::{JoinSplit, JoinSplitProof};
 use crypto::{BnU256, Pghr13Proof, pghr13_verify};
 
 /// Join split verification error kind
+#[derive(Debug)]
 pub enum ErrorKind {
 	/// Invalid join split zkp statement
 	InvalidProof,
@@ -12,6 +13,7 @@ pub enum ErrorKind {
 }
 
 /// Join split verification error
+#[derive(Debug)]
 pub struct Error {
 	index: usize,
 	kind: ErrorKind,
@@ -143,7 +145,9 @@ impl Input {
 #[cfg(test)]
 mod tests {
 
-	use super::compute_hsig;
+	use super::{compute_hsig, verify};
+	use crypto;
+	use chain::{JoinSplit, JoinSplitProof, JoinSplitDescription};
 
 	fn hash(s: &'static str) -> [u8; 32] {
 		use hex::FromHex;
@@ -235,5 +239,47 @@ mod tests {
 			&input_to_str(&inputs),
 			"01101101111010100010000001011001111000100000000010111101001110011010100101010011110101111001101110000011111101101010101101011001"
 		);
+	}
+
+	fn vkey() -> crypto::Pghr13VerifyingKey {
+		crypto::json::pghr13::decode(include_bytes!("../../res/sprout-verifying-key.json")).expect("known to be good").into()
+	}
+
+	fn pgh13_proof(hex: &'static str) -> JoinSplitProof {
+		use hex::FromHex;
+
+		let bytes: Vec<u8> = hex.from_hex().expect("is static and should be good");
+		let mut arr = [0u8; 296];
+		arr[..].copy_from_slice(&bytes[..]);
+
+		JoinSplitProof::PHGR(arr)
+	}
+
+	fn sample_pghr_proof() -> JoinSplitProof {
+		pgh13_proof("022cbbb59465c880f50d42d0d49d6422197b5f823c2b3ffdb341869b98ed2eb2fd031b271702bda61ff885788363a7cf980a134c09a24c9911dc94cbe970bd613b700b0891fe8b8b05d9d2e7e51df9d6959bdf0a3f2310164afb197a229486a0e8e3808d76c75662b568839ebac7fbf740db9d576523282e6cdd1adf8b0f9c183ae95b0301fa1146d35af869cc47c51cfd827b7efceeca3c55884f54a68e38ee7682b5d102131b9b1198ed371e7e3da9f5a8b9ad394ab5a29f67a1d9b6ca1b8449862c69a5022e5d671e6989d33c182e0a6bbbe4a9da491dbd93ca3c01490c8f74a780479c7c031fb473670cacde779713dcd8cbdad802b8d418e007335919837becf46a3b1d0e02120af9d926bed2b28ed8a2b8307b3da2a171b3ee1bc1e6196773b570407df6b4")
+	}
+
+	#[test]
+	fn smoky() {
+		let js = JoinSplit {
+			descriptions: vec![
+				JoinSplitDescription {
+					value_pub_new: 0,
+					value_pub_old: 1000000,
+					anchor: [0u8; 32],
+					nullifiers: [[0u8; 32]; 2],
+					commitments: [[0u8; 32]; 2],
+					ephemeral_key: [0u8; 32],
+					random_seed: [0u8; 32],
+					macs: [[0u8; 32]; 2],
+					zkproof: sample_pghr_proof(),
+					ciphertexts: [[0u8; 601]; 2],
+				}
+			],
+			pubkey: [0u8; 32].into(),
+			sig: [0u8; 64].into(),
+		};
+
+		verify(&[0u8; 32], &js, &vkey()).unwrap();
 	}
 }

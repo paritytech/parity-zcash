@@ -1,6 +1,7 @@
 pub use bn::{Fr, Fq, Fq2, G1, G2, Group, arith::{U256, U512}, AffineG1, AffineG2};
 use bn::pairing;
 use std::ops::Neg;
+use json::pghr13 as json;
 
 #[derive(Clone)]
 pub struct VerifyingKey {
@@ -12,6 +13,21 @@ pub struct VerifyingKey {
 	pub gamma_beta_1: G1,
 	pub gamma_beta_2: G2,
 	pub ic: Vec<G1>,
+}
+
+impl From<json::VerifyingKey> for VerifyingKey {
+	fn from(v: json::VerifyingKey) -> Self {
+		VerifyingKey {
+			a: v.a.into(),
+			b: v.b.into(),
+			c: v.c.into(),
+			z: v.z.into(),
+			gamma: v.gamma.into(),
+			gamma_beta_1: v.gamma_beta_1.into(),
+			gamma_beta_2: v.gamma_beta_2.into(),
+			ic: v.ic.into_iter().map(Into::into).collect(),
+		}
+	}
 }
 
 impl ::std::fmt::Debug for VerifyingKey {

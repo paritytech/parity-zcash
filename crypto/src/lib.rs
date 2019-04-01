@@ -15,7 +15,7 @@ pub extern crate blake2b_simd as blake2;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate serde_derive;
 
-mod json;
+pub mod json;
 mod pghr13;
 
 pub use rcrypto::digest::Digest;
