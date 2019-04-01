@@ -248,6 +248,8 @@ mod tests {
 	fn pgh13_proof(hex: &'static str) -> JoinSplitProof {
 		use hex::FromHex;
 
+		assert_eq!(hex.len(), 296*2);
+
 		let bytes: Vec<u8> = hex.from_hex().expect("is static and should be good");
 		let mut arr = [0u8; 296];
 		arr[..].copy_from_slice(&bytes[..]);
@@ -265,21 +267,30 @@ mod tests {
 			descriptions: vec![
 				JoinSplitDescription {
 					value_pub_new: 0,
-					value_pub_old: 1000000,
-					anchor: [0u8; 32],
-					nullifiers: [[0u8; 32]; 2],
-					commitments: [[0u8; 32]; 2],
-					ephemeral_key: [0u8; 32],
-					random_seed: [0u8; 32],
-					macs: [[0u8; 32]; 2],
+					value_pub_old: 14250000,
+					anchor: hash("d7c612c817793191a1e68652121876d6b3bde40f4fa52bc314145ce6e5cdd259"),
+					nullifiers: [
+						hash("7ae7c48e86173b231e84fbdcb4d8f569f28f71ebf0f9b5867f9d4c12e031a2ac"),
+						hash("c0108235936d2fa2d2c968654fbea2a89fde8522ec7c227d2ff3c10bff9c1197"),
+					],
+					commitments: [
+						hash("d8a290cca91f23792df8e56aed6c142eaa322e66360b5c49132b940689fb2bc5"),
+						hash("e77f7877bba6d2c4425d9861515cbe8a5c87dfd7cf159e9d4ac9ff63c096fbcd"),
+					],
+					ephemeral_key: [0u8; 32], // not used
+					random_seed: hash("b1624b703774e138c706ba394698fd33c58424bb1a8d22be0d7bc8fe58d369e8"),
+					macs: [
+						hash("9836fe673c246d8d0cb1d7e1cc94acfa5b8d76010db8d53a36a3f0e33f0ccbc0"),
+						hash("f861b5e3d0a92e1c05c6bca775ba7389f6444f0e6cbd34141953220718594664"),
+					],
 					zkproof: sample_pghr_proof(),
 					ciphertexts: [[0u8; 601]; 2],
 				}
 			],
-			pubkey: [0u8; 32].into(),
-			sig: [0u8; 64].into(),
+			pubkey: hash("cdb0469ee67776480be090cad2c7adc0bf59551ef6f1ac3119e5c29ab3b82dd9").into(),
+			sig: [0u8; 64].into(), // not used
 		};
 
-		verify(&[0u8; 32], &js, &vkey()).unwrap();
+		verify(&hash("d7c612c817793191a1e68652121876d6b3bde40f4fa52bc314145ce6e5cdd259"), &js, &vkey()).unwrap();
 	}
 }
