@@ -1,7 +1,6 @@
 //! Bitcoin chain verifier
 
-use hash::H256;
-use chain::{IndexedBlock, IndexedBlockHeader, BlockHeader, IndexedTransaction};
+use chain::{IndexedBlock, IndexedBlockHeader, IndexedTransaction};
 use storage::{SharedStore, TransactionOutputProvider, BlockHeaderProvider, BlockOrigin,
 	DuplexTransactionOutputProvider, NoopStore};
 use network::ConsensusParams;
@@ -85,15 +84,10 @@ impl BackwardsCompatibleChainVerifier {
 
 	pub fn verify_block_header(
 		&self,
-		_block_header_provider: &BlockHeaderProvider,
-		hash: &H256,
-		header: &BlockHeader
+		header: &IndexedBlockHeader,
 	) -> Result<(), Error> {
-		// let's do only preverifcation
-		// TODO: full verification
 		let current_time = ::time::get_time().sec as u32;
-		let header = IndexedBlockHeader::new(hash.clone(), header.clone());
-		let header_verifier = HeaderVerifier::new(&header, &self.consensus, current_time);
+		let header_verifier = HeaderVerifier::new(header, &self.consensus, current_time);
 		header_verifier.check()
 	}
 

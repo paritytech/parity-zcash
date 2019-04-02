@@ -282,7 +282,6 @@ pub mod tests {
 	use synchronization_server::tests::DummyServer;
 	use synchronization_verifier::tests::DummyVerifier;
 	use primitives::bytes::Bytes;
-	use verification::BackwardsCompatibleChainVerifier as ChainVerifier;
 	use std::iter::repeat;
 	use synchronization_peers::PeersImpl;
 	use utils::SynchronizationState;
@@ -312,14 +311,15 @@ pub mod tests {
 		let executor = DummyTaskExecutor::new();
 		let server = Arc::new(DummyServer::new());
 		let config = Config { close_connection_on_bad_block: true };
-		let chain_verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Mainnet)));
-		let client_core = SynchronizationClientCore::new(config, sync_state.clone(), sync_peers.clone(), executor.clone(), chain, chain_verifier);
-		let mut verifier = match verifier {
+		let client_core = SynchronizationClientCore::new(config, sync_state.clone(), sync_peers.clone(), executor.clone(), chain);
+		let mut light_verifier = DummyVerifier::default();
+		light_verifier.set_sink(Arc::new(CoreVerificationSink::new(client_core.clone())));
+		let mut heavy_verifier = match verifier {
 			Some(verifier) => verifier,
 			None => DummyVerifier::default(),
 		};
-		verifier.set_sink(Arc::new(CoreVerificationSink::new(client_core.clone())));
-		let client = SynchronizationClient::new(sync_state.clone(), client_core, verifier);
+		heavy_verifier.set_sink(Arc::new(CoreVerificationSink::new(client_core.clone())));
+		let client = SynchronizationClient::new(sync_state.clone(), client_core, light_verifier, heavy_verifier);
 		let local_node = LocalNode::new(ConsensusParams::new(Network::Mainnet), storage, memory_pool, sync_peers, sync_state, client, server.clone());
 		(executor, server, local_node)
 	}
