@@ -350,8 +350,6 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 
 		// peer has supplied us with new headers => useful indeed
 		self.peers_tasks.useful_peer(peer_index);
-		// execute tasks
-//		self.execute_synchronization_tasks(None, None);
 
 		Some(headers)
 	}
