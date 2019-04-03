@@ -26,9 +26,9 @@ use utils::{AverageSpeedMeter, OrphanBlocksPool, OrphanTransactionsPool, HashPos
 /// Approximate maximal number of blocks hashes in scheduled queue.
 const MAX_SCHEDULED_HASHES: BlockHeight = 4 * 1024;
 /// Approximate maximal number of blocks hashes in requested queue.
-const MAX_REQUESTED_BLOCKS: BlockHeight = 256;
+const MAX_REQUESTED_BLOCKS: BlockHeight = 512;
 /// Approximate maximal number of blocks in verifying queue.
-const MAX_VERIFYING_BLOCKS: BlockHeight = 256;
+const MAX_VERIFYING_BLOCKS: BlockHeight = 512;
 /// Minimum number of blocks to request from peer
 const MIN_BLOCKS_IN_REQUEST: BlockHeight = 32;
 /// Maximum number of blocks to request from peer
