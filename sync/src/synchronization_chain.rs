@@ -305,18 +305,15 @@ impl Chain {
 		scheduled
 	}
 
-	/// Add block to verifying queue
-	pub fn verify_block(&mut self, header: IndexedBlockHeader) {
+	/// Add block to verifying queue.
+	///
+	/// Returns true if the header has already been in the headers chain. The fact that it is in the
+	/// chain, guarantees the header has already been pre-verified. The opposite isn't true -
+	/// if the header isn't in the chain, it could have been (in rare cases) pre-verified.
+	pub fn verify_block(&mut self, header: IndexedBlockHeader) -> bool {
 		// insert header to the in-memory chain in case when it is not already there (non-headers-first sync)
 		self.hash_chain.push_back_at(VERIFYING_QUEUE, header.hash.clone());
-		self.headers_chain.insert(header);
-	}
-
-	/// Add blocks to verifying queue
-	pub fn verify_blocks(&mut self, blocks: Vec<IndexedBlockHeader>) {
-		for block in blocks {
-			self.verify_block(block);
-		}
+		self.headers_chain.insert(header)
 	}
 
 	/// Moves n blocks from requested queue to verifying queue

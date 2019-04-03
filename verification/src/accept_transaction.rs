@@ -124,7 +124,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 			overspent: TransactionOverspent::new(transaction, output_store),
 			sigops: TransactionSigops::new(transaction, output_store, consensus, max_block_sigops, time),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
-			eval: TransactionEval::new(transaction, output_store, consensus, VerificationLevel::Full, height, time, deployments),
+			eval: TransactionEval::new(transaction, output_store, consensus, VerificationLevel::FULL, height, time, deployments),
 			join_split: JoinSplitVerification::new(transaction, nullifier_tracker),
 			sapling: SaplingVerification::new(
 				nullifier_tracker,
@@ -402,8 +402,7 @@ impl<'a> TransactionEval<'a> {
 			false => Default::default(),
 		};
 
-		if self.verification_level == VerificationLevel::Header
-			|| self.verification_level == VerificationLevel::NoVerification {
+		if self.verification_level.intersects(VerificationLevel::HEADER | VerificationLevel::NO_VERIFICATION) {
 			return Ok(no_input_sighash);
 		}
 

@@ -104,7 +104,7 @@ pub fn main(benchmark: &mut Benchmark) {
 	// bench
 	benchmark.start();
 	for block in verification_blocks.iter() {
-		chain_verifier.verify(VerificationLevel::Full, block).unwrap();
+		chain_verifier.verify(VerificationLevel::FULL, block).unwrap();
 	 }
 	benchmark.stop();
 }
