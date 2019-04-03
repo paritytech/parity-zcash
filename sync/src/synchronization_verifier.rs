@@ -81,8 +81,6 @@ pub struct ChainVerifierWrapper {
 	verification_params: VerificationParameters,
 	/// True if we have passed verification edge && full verification is required.
 	pub enforce_full_verification: AtomicBool,
-	/// True if we need to actually verify headers.
-	verify_headers: bool,
 }
 
 impl ChainVerifierWrapper {
@@ -93,16 +91,12 @@ impl ChainVerifierWrapper {
 			verifier: verifier,
 			verification_params: verification_params,
 			enforce_full_verification: enforce_full_verification,
-			verify_headers: false,
 		}
 	}
 
 	/// Verify header.
 	pub fn verify_block_header(&self, header: &IndexedBlockHeader) -> Result<(), VerificationError> {
-		match self.verify_headers {
-			true => self.verifier.verify_block_header(header),
-			false => Ok(()),
-		}
+		self.verifier.verify_block_header(header)
 	}
 
 	/// Verify block.
