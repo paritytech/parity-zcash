@@ -14,8 +14,10 @@ use synchronization_chain::{Chain, BlockState, TransactionState, BlockInsertionR
 use synchronization_executor::{Task, TaskExecutor};
 use synchronization_manager::ManagementWorker;
 use synchronization_peers_tasks::PeersTasks;
-use synchronization_verifier::{VerificationSink, HeadersVerificationSink, BlockVerificationSink,
-	TransactionVerificationSink, VerificationTask};
+use synchronization_verifier::{
+	VerificationSink, HeadersVerificationSink, BlockVerificationSink,
+	TransactionVerificationSink, VerificationTask, PartiallyVerifiedBlock,
+};
 use types::{BlockHeight, ClientCoreRef, PeersRef, PeerIndex, SynchronizationStateRef, EmptyBoxFuture, SyncListenerRef};
 use utils::{AverageSpeedMeter, OrphanBlocksPool, OrphanTransactionsPool, HashPosition};
 #[cfg(test)] use synchronization_peers_tasks::{Information as PeersTasksInformation};
@@ -68,7 +70,7 @@ pub trait ClientCore {
 	fn on_disconnect(&mut self, peer_index: PeerIndex);
 	fn on_inventory(&self, peer_index: PeerIndex, message: types::Inv);
 	fn on_headers(&mut self, peer_index: PeerIndex, message: types::Headers) -> Option<Vec<IndexedBlockHeader>>;
-	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<IndexedBlock>>;
+	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<PartiallyVerifiedBlock>>;
 	fn on_transaction(&mut self, peer_index: PeerIndex, transaction: IndexedTransaction) -> Option<VecDeque<IndexedTransaction>>;
 	fn on_notfound(&mut self, peer_index: PeerIndex, message: types::NotFound);
 	fn after_peer_nearly_blocks_verified(&mut self, peer_index: PeerIndex, future: EmptyBoxFuture);
@@ -354,12 +356,12 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 		Some(headers)
 	}
 
-	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<IndexedBlock>> {
+	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<PartiallyVerifiedBlock>> {
 		// update peers to select next tasks
 		self.peers_tasks.on_block_received(peer_index, &block.header.hash);
 
 		// prepare list of blocks to verify + make all required changes to the chain
-		let mut result: Option<VecDeque<IndexedBlock>> = None;
+		let mut result = None;
 		let block_state = self.chain.block_state(&block.header.hash);
 		match block_state {
 			BlockState::Verifying | BlockState::Stored => {
@@ -419,27 +421,29 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 						self.sync_speed_meter.checkpoint();
 						// remember peer as useful
 						self.peers_tasks.useful_peer(peer_index);
-						// schedule verification
-						let mut blocks_to_verify: VecDeque<IndexedBlock> = VecDeque::new();
-						blocks_to_verify.extend(self.orphaned_blocks_pool.remove_blocks_for_parent(&block.header.hash));
-						blocks_to_verify.push_front(block);
 						// forget blocks we are going to process
-						let blocks_hashes_to_forget: Vec<_> = blocks_to_verify.iter().map(|b| b.hash().clone()).collect();
-						self.chain.forget_blocks_leave_header(&blocks_hashes_to_forget);
+						let mut blocks_to_verify_hashes = vec![*block.hash()];
+						let orphaned_blocks = self.orphaned_blocks_pool.remove_blocks_for_parent(&block.header.hash);
+						blocks_to_verify_hashes.extend(orphaned_blocks.iter().map(IndexedBlock::hash).cloned());
+						self.chain.forget_blocks_leave_header(&blocks_to_verify_hashes);
 						// remember that we are verifying these blocks
-						let blocks_headers: Vec<_> = blocks_to_verify.iter().map(|b| b.header.clone()).collect();
-						self.chain.verify_blocks(blocks_headers);
+						let blocks_to_verify = ::std::iter::once(block).chain(orphaned_blocks)
+							.map(|block| if self.chain.verify_block(block.header.clone()) {
+								PartiallyVerifiedBlock::HeaderPreVerified(block)
+							} else {
+								PartiallyVerifiedBlock::NotVerified(block)
+							})
+							.collect::<VecDeque<_>>();
 						// remember that we are verifying block from this peer
-						for verifying_block_hash in blocks_to_verify.iter().map(|b| b.hash().clone()) {
-							self.verifying_blocks_by_peer.insert(verifying_block_hash, peer_index);
+						for verifying_block_hash in &blocks_to_verify_hashes {
+							self.verifying_blocks_by_peer.insert(*verifying_block_hash, peer_index);
 						}
 						match self.verifying_blocks_futures.entry(peer_index) {
 							Entry::Occupied(mut entry) => {
-								entry.get_mut().0.extend(blocks_to_verify.iter().map(|b| b.hash().clone()));
+								entry.get_mut().0.extend(blocks_to_verify_hashes);
 							},
 							Entry::Vacant(entry) => {
-								let block_hashes: HashSet<_> = blocks_to_verify.iter().map(|b| b.hash().clone()).collect();
-								entry.insert((block_hashes, Vec::new()));
+								entry.insert((blocks_to_verify_hashes.into_iter().collect(), Vec::new()));
 							}
 						}
 						result = Some(blocks_to_verify);
