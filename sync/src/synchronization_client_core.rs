@@ -1028,11 +1028,9 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 
 	fn on_headers_verification_success(&mut self, headers: Vec<IndexedBlockHeader>) {
 		let headers = self.find_unknown_headers(headers);
-		if headers.is_empty() {
-			return;
+		if !headers.is_empty() {
+			self.chain.schedule_blocks_headers(headers);
 		}
-
-		self.chain.schedule_blocks_headers(headers);
 
 		// switch to synchronization state
 		if !self.state.is_synchronizing() {
