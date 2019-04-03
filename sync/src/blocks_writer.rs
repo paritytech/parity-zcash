@@ -6,9 +6,9 @@ use storage;
 use network::ConsensusParams;
 use primitives::hash::H256;
 use super::Error;
-use synchronization_verifier::{Verifier, SyncVerifier, VerificationTask,
+use synchronization_verifier::{Verifier, SyncVerifier, VerificationTask, HeadersVerificationSink,
 	VerificationSink, BlockVerificationSink, TransactionVerificationSink};
-use types::StorageRef;
+use types::{PeerIndex, StorageRef};
 use utils::OrphanBlocksPool;
 use VerificationParameters;
 
@@ -138,6 +138,16 @@ impl TransactionVerificationSink for BlocksWriterSink {
 
 	fn on_transaction_verification_error(&self, _err: &str, _hash: &H256) {
 		unreachable!("not intended to verify transactions")
+	}
+}
+
+impl HeadersVerificationSink for BlocksWriterSink {
+	fn on_headers_verification_success(&self, _headers: Vec<chain::IndexedBlockHeader>) {
+		unreachable!("not intended to verify headers")
+	}
+
+	fn on_headers_verification_error(&self, _peer: PeerIndex, _err: String, _hash: H256) {
+		unreachable!("not intended to verify headers")
 	}
 }
 

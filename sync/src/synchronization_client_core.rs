@@ -10,14 +10,14 @@ use message::types;
 use message::common::{InventoryType, InventoryVector};
 use miner::transaction_fee_rate;
 use primitives::hash::H256;
-use verification::BackwardsCompatibleChainVerifier as ChainVerifier;
 use synchronization_chain::{Chain, BlockState, TransactionState, BlockInsertionResult};
 use synchronization_executor::{Task, TaskExecutor};
 use synchronization_manager::ManagementWorker;
 use synchronization_peers_tasks::PeersTasks;
-use synchronization_verifier::{VerificationSink, BlockVerificationSink, TransactionVerificationSink, VerificationTask};
+use synchronization_verifier::{VerificationSink, HeadersVerificationSink, BlockVerificationSink,
+	TransactionVerificationSink, VerificationTask};
 use types::{BlockHeight, ClientCoreRef, PeersRef, PeerIndex, SynchronizationStateRef, EmptyBoxFuture, SyncListenerRef};
-use utils::{AverageSpeedMeter, MessageBlockHeadersProvider, OrphanBlocksPool, OrphanTransactionsPool, HashPosition};
+use utils::{AverageSpeedMeter, OrphanBlocksPool, OrphanTransactionsPool, HashPosition};
 #[cfg(test)] use synchronization_peers_tasks::{Information as PeersTasksInformation};
 #[cfg(test)] use synchronization_chain::{Information as ChainInformation};
 
@@ -67,7 +67,7 @@ pub trait ClientCore {
 	fn on_connect(&mut self, peer_index: PeerIndex);
 	fn on_disconnect(&mut self, peer_index: PeerIndex);
 	fn on_inventory(&self, peer_index: PeerIndex, message: types::Inv);
-	fn on_headers(&mut self, peer_index: PeerIndex, message: types::Headers);
+	fn on_headers(&mut self, peer_index: PeerIndex, message: types::Headers) -> Option<Vec<IndexedBlockHeader>>;
 	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<IndexedBlock>>;
 	fn on_transaction(&mut self, peer_index: PeerIndex, transaction: IndexedTransaction) -> Option<VecDeque<IndexedTransaction>>;
 	fn on_notfound(&mut self, peer_index: PeerIndex, message: types::NotFound);
@@ -105,10 +105,6 @@ pub struct SynchronizationClientCore<T: TaskExecutor> {
 	orphaned_blocks_pool: OrphanBlocksPool,
 	/// Orphaned transactions pool.
 	orphaned_transactions_pool: OrphanTransactionsPool,
-	/// Chain verifier
-	chain_verifier: Arc<ChainVerifier>,
-	/// Verify block headers?
-	verify_headers: bool,
 	/// Verifying blocks by peer
 	verifying_blocks_by_peer: HashMap<H256, PeerIndex>,
 	/// Verifying blocks futures
@@ -164,16 +160,6 @@ pub struct BlocksRequestLimits {
 enum AppendTransactionError {
 	Synchronizing,
 	Orphan(HashSet<H256>),
-}
-
-/// Blocks headers verification result
-enum BlocksHeadersVerificationResult {
-	/// Skip these blocks headers
-	Skip,
-	/// Error during verification of header with given index
-	Error(usize),
-	/// Successful verification
-	Success,
 }
 
 impl State {
@@ -259,11 +245,11 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 	}
 
 	/// Try to queue synchronization of unknown blocks when blocks headers are received.
-	fn on_headers(&mut self, peer_index: PeerIndex, message: types::Headers) {
+	fn on_headers(&mut self, peer_index: PeerIndex, message: types::Headers) -> Option<Vec<IndexedBlockHeader>> {
 		assert!(!message.headers.is_empty(), "This must be checked in incoming connection");
 
 		// transform to indexed headers
-		let mut headers: Vec<_> = message.headers.into_iter().map(IndexedBlockHeader::from_raw).collect();
+		let headers: Vec<_> = message.headers.into_iter().map(IndexedBlockHeader::from_raw).collect();
 
 		// update peers to select next tasks
 		self.peers_tasks.on_headers_received(peer_index);
@@ -287,71 +273,85 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 				self.peers.misbehaving(peer_index, "Too many failures.");
 			}
 
-			return;
+			return None;
 		}
 
 		// find first unknown header position
 		// optimization: normally, the first header will be unknown
-		let num_headers = headers.len();
-		let first_unknown_index = match self.chain.block_state(&header0.hash) {
-			BlockState::Unknown => 0,
-			_ => {
-				// optimization: if last header is known, then all headers are also known
-				let header_last = &headers[num_headers - 1];
-				match self.chain.block_state(&header_last.hash) {
-					BlockState::Unknown => 1 + headers.iter().skip(1)
-						.position(|header| self.chain.block_state(&header.hash) == BlockState::Unknown)
-						.expect("last header has UnknownState; we are searching for first unknown header; qed"),
-					// else all headers are known
-					_ => {
-						trace!(target: "sync", "Ignoring {} known headers from peer#{}", headers.len(), peer_index);
-						// but this peer is still useful for synchronization
-						self.peers_tasks.useful_peer(peer_index);
-						return;
-					},
-				}
-			}
-		};
+		let headers_in_message = headers.len();
+		let headers = self.find_unknown_headers(headers);
+		if headers.is_empty() {
+			trace!(target: "sync", "Ignoring {} known headers from peer#{}", headers_in_message, peer_index);
+			// but this peer is still useful for synchronization
+			self.peers_tasks.useful_peer(peer_index);
+			return None;
+		}
 
 		// validate blocks headers before scheduling
-		let last_known_hash = if first_unknown_index > 0 { headers[first_unknown_index - 1].hash.clone() } else { header0.raw.previous_header_hash.clone() };
+		let mut last_known_hash = headers[0].raw.previous_header_hash;
 		if self.config.close_connection_on_bad_block && self.chain.block_state(&last_known_hash) == BlockState::DeadEnd {
 			self.peers.misbehaving(peer_index, &format!("Provided after dead-end block {}", last_known_hash.to_reversed_str()));
-			return;
+			return None;
 		}
-		match self.verify_headers(peer_index, last_known_hash, &headers[first_unknown_index..num_headers]) {
-			BlocksHeadersVerificationResult::Error(error_index) => self.chain.mark_dead_end_block(&headers[first_unknown_index + error_index].hash),
-			BlocksHeadersVerificationResult::Skip => (),
-			BlocksHeadersVerificationResult::Success => {
-				// report progress
-				let num_new_headers = num_headers - first_unknown_index;
-				trace!(target: "sync", "New {} headers from peer#{}. First {:?}, last: {:?}",
-					num_new_headers,
+
+		for (header_index, header) in headers.iter().enumerate() {
+			// check that this header is direct child of previous header
+			if header.raw.previous_header_hash != last_known_hash {
+				self.peers.misbehaving(
 					peer_index,
-					headers[first_unknown_index].hash.to_reversed_str(),
-					headers[num_headers - 1].hash.to_reversed_str()
+					&format!(
+						"Neighbour headers in `headers` message are unlinked: Prev: {}, PrevLink: {}, Curr: {}",
+						last_known_hash.to_reversed_str(),
+						header.raw.previous_header_hash.to_reversed_str(),
+						header.hash.to_reversed_str(),
+					),
 				);
+				return None;
+			}
 
-				// prepare new headers array
-				let new_headers = headers.split_off(first_unknown_index);
-				self.chain.schedule_blocks_headers(new_headers);
+			// check that we do not know all blocks in range [first_unknown_index..]
+			// if we know some block => there has been verification error => all headers should be ignored
+			// see when_previous_block_verification_failed_fork_is_not_requested for details
+			match self.chain.block_state(&header.hash) {
+				BlockState::Unknown => (),
+				BlockState::DeadEnd if self.config.close_connection_on_bad_block => {
+					self.peers.misbehaving(
+						peer_index,
+						&format!(
+							"Provided dead-end block {:?}",
+							header.hash.to_reversed_str(),
+						),
+					);
+					return None;
+				},
+				block_state => {
+					trace!(
+						target: "sync",
+						"Ignoring {} headers from peer#{} - known ({:?}) header {} at the {}/{} ({}...{})",
+						headers.len(), peer_index, block_state, header.hash.to_reversed_str(), header_index,
+						headers.len(), headers[0].hash.to_reversed_str(),
+						headers[headers.len() - 1].hash.to_reversed_str());
+					self.peers_tasks.useful_peer(peer_index);
+					return None;
+				},
+			}
 
-				// switch to synchronization state
-				if !self.state.is_synchronizing() {
-					if self.chain.length_of_blocks_state(BlockState::Scheduled) +
-						self.chain.length_of_blocks_state(BlockState::Requested) == 1 {
-						self.switch_to_nearly_saturated_state();
-					} else {
-						self.switch_to_synchronization_state();
-					}
-				}
-
-				// these peers have supplied us with new headers => useful indeed
-				self.peers_tasks.useful_peer(peer_index);
-				// and execute tasks
-				self.execute_synchronization_tasks(None, None);
-			},
+			last_known_hash = header.hash;
 		}
+
+		// report progress
+		let num_new_headers = headers_in_message - headers.len();
+		trace!(target: "sync", "New {} headers from peer#{}. First {:?}, last: {:?}",
+			num_new_headers,
+			peer_index,
+			headers[0].hash.to_reversed_str(),
+			headers[headers.len() - 1].hash.to_reversed_str()
+		);
+
+		// peer has supplied us with new headers => useful indeed
+		self.peers_tasks.useful_peer(peer_index);
+
+		Some(headers)
 	}
 
 	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<IndexedBlock>> {
@@ -427,8 +427,8 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 						let blocks_hashes_to_forget: Vec<_> = blocks_to_verify.iter().map(|b| b.hash().clone()).collect();
 						self.chain.forget_blocks_leave_header(&blocks_hashes_to_forget);
 						// remember that we are verifying these blocks
-						let blocks_headers_to_verify: Vec<_> = blocks_to_verify.iter().map(|b| b.header.clone()).collect();
-						self.chain.verify_blocks(blocks_headers_to_verify);
+						let blocks_headers: Vec<_> = blocks_to_verify.iter().map(|b| b.header.clone()).collect();
+						self.chain.verify_blocks(blocks_headers);
 						// remember that we are verifying block from this peer
 						for verifying_block_hash in blocks_to_verify.iter().map(|b| b.hash().clone()) {
 							self.verifying_blocks_by_peer.insert(verifying_block_hash, peer_index);
@@ -717,6 +717,16 @@ impl<T> CoreVerificationSink<T> where T: TaskExecutor {
 impl<T> VerificationSink for CoreVerificationSink<T> where T: TaskExecutor {
 }
 
+impl<T> HeadersVerificationSink for CoreVerificationSink<T> where T: TaskExecutor {
+	fn on_headers_verification_success(&self, headers: Vec<IndexedBlockHeader>) {
+		self.core.lock().on_headers_verification_success(headers)
+	}
+
+	fn on_headers_verification_error(&self, peer: PeerIndex, error: String, hash: H256) {
+		self.core.lock().on_headers_verification_error(peer, error, hash)
+	}
+}
+
 impl<T> BlockVerificationSink for CoreVerificationSink<T> where T: TaskExecutor {
 	/// Process successful block verification
 	fn on_block_verification_success(&self, block: IndexedBlock) -> Option<Vec<VerificationTask>> {
@@ -743,7 +753,7 @@ impl<T> TransactionVerificationSink for CoreVerificationSink<T> where T: TaskExe
 
 impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 	/// Create new synchronization client core
-	pub fn new(config: Config, shared_state: SynchronizationStateRef, peers: PeersRef, executor: Arc<T>, chain: Chain, chain_verifier: Arc<ChainVerifier>) -> ClientCoreRef<Self> {
+	pub fn new(config: Config, shared_state: SynchronizationStateRef, peers: PeersRef, executor: Arc<T>, chain: Chain) -> ClientCoreRef<Self> {
 		let sync = Arc::new(Mutex::new(
 			SynchronizationClientCore {
 				shared_state: shared_state,
@@ -755,8 +765,6 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 				chain: chain,
 				orphaned_blocks_pool: OrphanBlocksPool::new(),
 				orphaned_transactions_pool: OrphanTransactionsPool::new(),
-				chain_verifier: chain_verifier,
-				verify_headers: true,
 				verifying_blocks_by_peer: HashMap::new(),
 				verifying_blocks_futures: HashMap::new(),
 				verifying_transactions_sinks: HashMap::new(),
@@ -820,12 +828,6 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 		&mut self.orphaned_transactions_pool
 	}
 
-	/// Verify block headers or not?
-	#[cfg(test)]
-	pub fn set_verify_headers(&mut self, verify: bool) {
-		self.verify_headers = verify;
-	}
-
 	/// Print synchronization information
 	pub fn print_synchronization_information(&mut self) {
 		if let State::Synchronizing(timestamp, num_of_blocks) = self.state {
@@ -855,56 +857,6 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 		for block_to_forget in blocks_to_forget {
 			self.chain.forget_block_with_children(block_to_forget);
 		}
-	}
-
-	/// Verify and select unknown headers for scheduling
-	fn verify_headers(&mut self, peer_index: PeerIndex, last_known_hash: H256, headers: &[IndexedBlockHeader]) -> BlocksHeadersVerificationResult {
-		// validate blocks headers before scheduling
-		let mut last_known_hash = &last_known_hash;
-		let mut headers_provider = MessageBlockHeadersProvider::new(&self.chain, self.chain.best_block_header().number);
-		for (header_index, header) in headers.iter().enumerate() {
-			// check that this header is direct child of previous header
-			if &header.raw.previous_header_hash != last_known_hash {
-				self.peers.misbehaving(peer_index, &format!("Neighbour headers in `headers` message are unlinked: Prev: {}, PrevLink: {}, Curr: {}",
-					last_known_hash.to_reversed_str(), header.raw.previous_header_hash.to_reversed_str(), header.hash.to_reversed_str()));
-				return BlocksHeadersVerificationResult::Skip;
-			}
-
-			// check that we do not know all blocks in range [first_unknown_index..]
-			// if we know some block => there has been verification error => all headers should be ignored
-			// see when_previous_block_verification_failed_fork_is_not_requested for details
-			match self.chain.block_state(&header.hash) {
-				BlockState::Unknown => (),
-				BlockState::DeadEnd if self.config.close_connection_on_bad_block => {
-					self.peers.misbehaving(peer_index, &format!("Provided dead-end block {:?}", header.hash.to_reversed_str()));
-					return BlocksHeadersVerificationResult::Skip;
-				},
-				block_state => {
-					trace!(target: "sync", "Ignoring {} headers from peer#{} - known ({:?}) header {} at the {}/{} ({}...{})",
-						headers.len(), peer_index, block_state, header.hash.to_reversed_str(), header_index, headers.len(),
-						headers[0].hash.to_reversed_str(), headers[headers.len() - 1].hash.to_reversed_str());
-					self.peers_tasks.useful_peer(peer_index);
-					return BlocksHeadersVerificationResult::Skip;
-				},
-			}
-
-			// verify header
-			if self.verify_headers {
-				if let Err(error) = self.chain_verifier.verify_block_header(&headers_provider, &header.hash, &header.raw) {
-					if self.config.close_connection_on_bad_block {
-						self.peers.misbehaving(peer_index, &format!("Error verifying header {} from `headers`: {:?}", header.hash.to_reversed_str(), error));
-					} else {
-						warn!(target: "sync", "Error verifying header {} from `headers` message: {:?}", header.hash.to_reversed_str(), error);
-					}
-					return BlocksHeadersVerificationResult::Error(header_index);
-				}
-			}
-
-			last_known_hash = &header.hash;
-			headers_provider.append_header(header.hash.clone(), header.clone());
-		}
-
-		BlocksHeadersVerificationResult::Success
 	}
 
 	/// Process new peer transaction
@@ -1050,6 +1002,71 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 				self.executor.execute(Task::MemoryPool(*peer));
 			}
 		}
+	}
+
+	fn find_unknown_headers(&self, mut headers: Vec<IndexedBlockHeader>) -> Vec<IndexedBlockHeader> {
+		// find first unknown header position
+		// optimization: normally, the first header will be unknown
+		let num_headers = headers.len();
+		let first_unknown_index = match self.chain.block_state(&headers[0].hash) {
+			BlockState::Unknown => 0,
+			_ => {
+				// optimization: if last header is known, then all headers are also known
+				let header_last = &headers[num_headers - 1];
+				match self.chain.block_state(&header_last.hash) {
+					BlockState::Unknown => 1 + headers.iter().skip(1)
+						.position(|header| self.chain.block_state(&header.hash) == BlockState::Unknown)
+						.expect("last header has UnknownState; we are searching for first unknown header; qed"),
+					// else all headers are known
+					_ => headers.len(),
+				}
+			}
+		};
+
+		if first_unknown_index == 0 { headers } else { headers.split_off(first_unknown_index) }
+	}
+
+	fn on_headers_verification_success(&mut self, headers: Vec<IndexedBlockHeader>) {
+		let headers = self.find_unknown_headers(headers);
+		if headers.is_empty() {
+			return;
+		}
+
+		self.chain.schedule_blocks_headers(headers);
+
+		// switch to synchronization state
+		if !self.state.is_synchronizing() {
+			if self.chain.length_of_blocks_state(BlockState::Scheduled) +
+				self.chain.length_of_blocks_state(BlockState::Requested) == 1 {
+				self.switch_to_nearly_saturated_state();
+			} else {
+				self.switch_to_synchronization_state();
+			}
+		}
+		self.execute_synchronization_tasks(None, None);
+	}
+
+	fn on_headers_verification_error(&mut self, peer: PeerIndex, error: String, hash: H256) {
+		if self.config.close_connection_on_bad_block {
+			self.peers.misbehaving(
+				peer,
+				&format!(
+					"Error verifying header {} from `headers`: {:?}",
+					hash.to_reversed_str(),
+					error,
+				),
+			);
+		} else {
+			warn!(
+				target: "sync",
+				"Error verifying header {} from `headers` message: {:?}",
+				hash.to_reversed_str(),
+				error,
+			);
+		}
+
+		self.chain.mark_dead_end_block(&hash);
+		self.execute_synchronization_tasks(None, None);
 	}
 
 	fn on_block_verification_success(&mut self, block: IndexedBlock) -> Option<Vec<VerificationTask>> {
@@ -1301,17 +1318,16 @@ pub mod tests {
 		let config = Config { close_connection_on_bad_block: true };
 
 		let chain_verifier = Arc::new(ChainVerifier::new(storage.clone(), ConsensusParams::new(Network::Unitest)));
-		let client_core = SynchronizationClientCore::new(config, sync_state.clone(), sync_peers.clone(), executor.clone(), chain, chain_verifier.clone());
-		{
-			client_core.lock().set_verify_headers(false);
-		}
-		let mut verifier = verifier.unwrap_or_default();
-		verifier.set_sink(Arc::new(CoreVerificationSink::new(client_core.clone())));
-		verifier.set_storage(storage);
-		verifier.set_memory_pool(memory_pool);
-		verifier.set_verifier(chain_verifier);
+		let client_core = SynchronizationClientCore::new(config, sync_state.clone(), sync_peers.clone(), executor.clone(), chain);
+		let mut light_verifier = DummyVerifier::default();
+		light_verifier.set_sink(Arc::new(CoreVerificationSink::new(client_core.clone())));
+		let mut heavy_verifier = verifier.unwrap_or_default();
+		heavy_verifier.set_sink(Arc::new(CoreVerificationSink::new(client_core.clone())));
+		heavy_verifier.set_storage(storage);
+		heavy_verifier.set_memory_pool(memory_pool);
+		heavy_verifier.set_verifier(chain_verifier);
 
-		let client = SynchronizationClient::new(sync_state, client_core.clone(), verifier);
+		let client = SynchronizationClient::new(sync_state, client_core.clone(), light_verifier, heavy_verifier);
 		(executor, client_core, client)
 	}
 
@@ -2125,7 +2141,7 @@ pub mod tests {
 			chain.mark_dead_end_block(&b1.hash());
 		}
 
-		core.lock().set_verify_headers(true);
+//		core.lock().set_verify_headers(true);
 		core.lock().peers.insert(0, Services::default(), DummyOutboundSyncConnection::new());
 		assert!(core.lock().peers.enumerate().contains(&0));
 
