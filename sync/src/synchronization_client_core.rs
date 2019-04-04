@@ -342,9 +342,8 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 		}
 
 		// report progress
-		let num_new_headers = headers_in_message - headers.len();
 		trace!(target: "sync", "New {} headers from peer#{}. First {:?}, last: {:?}",
-			num_new_headers,
+			headers.len(),
 			peer_index,
 			headers[0].hash.to_reversed_str(),
 			headers[headers.len() - 1].hash.to_reversed_str()
