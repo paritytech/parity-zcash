@@ -149,7 +149,7 @@ impl HeadersVerificationSink for BlocksWriterSink {
 		unreachable!("not intended to verify headers")
 	}
 
-	fn on_headers_verification_error(&self, _peer: PeerIndex, _err: String, _hash: H256) {
+	fn on_headers_verification_error(&self, _peer: PeerIndex, _err: String, _hash: H256, _headers: Vec<chain::IndexedBlockHeader>) {
 		unreachable!("not intended to verify headers")
 	}
 }

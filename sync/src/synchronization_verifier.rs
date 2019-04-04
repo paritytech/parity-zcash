@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use parking_lot::Mutex;
@@ -28,7 +28,7 @@ pub trait HeadersVerificationSink : Send + Sync + 'static {
 	/// When headers verification has completed successfully.
 	fn on_headers_verification_success(&self, headers: Vec<IndexedBlockHeader>);
 	/// When headers verification has failed.
-	fn on_headers_verification_error(&self, peer: PeerIndex, error: String, hash: H256);
+	fn on_headers_verification_error(&self, peer: PeerIndex, error: String, hash: H256, headers: Vec<IndexedBlockHeader>);
 }
 
 /// Block verification events sink
@@ -66,8 +66,6 @@ pub enum VerificationTask {
 
 /// Synchronization verifier
 pub trait Verifier : Send + Sync + 'static {
-	/// Returns true if there are no scheduled or currently executing tasks.
-	fn is_idle(&self) -> bool;
 	/// Verify headers
 	fn verify_headers(&self, peer: PeerIndex, headers: Vec<IndexedBlockHeader>);
 	/// Verify block
@@ -78,8 +76,6 @@ pub trait Verifier : Send + Sync + 'static {
 
 /// Asynchronous synchronization verifier
 pub struct AsyncVerifier {
-	/// Is verification thread idle?
-	is_idle: Arc<AtomicBool>,
 	/// Verification work transmission channel.
 	verification_work_sender: Mutex<Sender<VerificationTask>>,
 	/// Verification thread.
@@ -180,16 +176,14 @@ impl VerificationTask {
 impl AsyncVerifier {
 	/// Create new async verifier
 	pub fn new<T: VerificationSink>(verifier: Arc<ChainVerifier>, storage: StorageRef, memory_pool: MemoryPoolRef, sink: Arc<T>, verification_params: VerificationParameters) -> Self {
-		let is_idle = Arc::new(AtomicBool::new(true));
 		let (verification_work_sender, verification_work_receiver) = channel();
 		AsyncVerifier {
-			is_idle: is_idle.clone(),
 			verification_work_sender: Mutex::new(verification_work_sender),
 			verification_worker_thread: Some(thread::Builder::new()
 				.name("Sync verification thread".to_string())
 				.spawn(move || {
 					let verifier = ChainVerifierWrapper::new(verifier, &storage, verification_params);
-					AsyncVerifier::verification_worker_proc(sink, storage, memory_pool, verifier, verification_work_receiver, is_idle)
+					AsyncVerifier::verification_worker_proc(sink, storage, memory_pool, verifier, verification_work_receiver)
 				})
 				.expect("Error creating sync verification thread"))
 		}
@@ -202,22 +196,8 @@ impl AsyncVerifier {
 		memory_pool: MemoryPoolRef,
 		verifier: ChainVerifierWrapper,
 		work_receiver: Receiver<VerificationTask>,
-		is_idle: Arc<AtomicBool>,
 	) {
-		loop {
-			let task = match work_receiver.try_recv() {
-				Ok(task) => task,
-				Err(TryRecvError::Empty) => {
-					is_idle.store(true, Ordering::SeqCst);
-					match work_receiver.recv() {
-						Ok(task) => task,
-						Err(_) => break,
-					}
-				},
-				Err(TryRecvError::Disconnected) => break,
-			};
-
-			is_idle.store(false, Ordering::SeqCst);
+		while let Some(task) = work_receiver.recv().ok() {
 			if !AsyncVerifier::execute_single_task(&sink, &storage, &memory_pool, &verifier, task) {
 				break;
 			}
@@ -249,7 +229,7 @@ impl AsyncVerifier {
 							.map_err(|error| (error, header.hash)));
 					match result {
 						Ok(_) => sink.on_headers_verification_success(headers),
-						Err((error, hash)) => sink.on_headers_verification_error(peer, format!("{:?}", error), hash),
+						Err((error, hash)) => sink.on_headers_verification_error(peer, format!("{:?}", error), hash, headers),
 					}
 				},
 				VerificationTask::VerifyBlock(block) => {
@@ -303,10 +283,6 @@ impl Drop for AsyncVerifier {
 }
 
 impl Verifier for AsyncVerifier {
-	fn is_idle(&self) -> bool {
-		self.is_idle.load(Ordering::SeqCst)
-	}
-
 	fn verify_headers(&self, peer: PeerIndex, headers: Vec<IndexedBlockHeader>) {
 		self.verification_work_sender.lock()
 			.send(VerificationTask::VerifyHeaders(peer, headers))
@@ -347,10 +323,6 @@ impl<T> SyncVerifier<T> where T: VerificationSink {
 }
 
 impl<T> Verifier for SyncVerifier<T> where T: VerificationSink {
-	fn is_idle(&self) -> bool {
-		true
-	}
-
 	/// Verify headers
 	fn verify_headers(&self, _peer: PeerIndex, _headers: Vec<IndexedBlockHeader>) {
 		unreachable!("SyncVerifier is used only for blocks verification")
@@ -435,10 +407,6 @@ pub mod tests {
 	}
 
 	impl Verifier for DummyVerifier {
-		fn is_idle(&self) -> bool {
-			true
-		}
-
 		fn verify_headers(&self, _peer: PeerIndex, headers: Vec<IndexedBlockHeader>) {
 			match self.sink {
 				Some(ref sink) => sink.on_headers_verification_success(headers),

@@ -187,11 +187,9 @@ impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Veri
 
 		// in case if verification was synchronous
 		// => try to switch to saturated state OR execute sync tasks
-		if self.light_verifier.is_idle() {
-			let mut client = self.core.lock();
-			if !client.try_switch_to_saturated_state() {
-				client.execute_synchronization_tasks(None, None);
-			}
+		let mut client = self.core.lock();
+		if !client.try_switch_to_saturated_state() {
+			client.execute_synchronization_tasks(None, None);
 		}
 	}
 
