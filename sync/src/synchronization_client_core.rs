@@ -4,6 +4,7 @@ use std::collections::hash_map::Entry;
 use std::sync::Arc;
 use futures::Future;
 use parking_lot::Mutex;
+use rand::{thread_rng, Rng};
 use time::precise_time_s;
 use chain::{IndexedBlockHeader, IndexedTransaction, IndexedBlock};
 use message::types;
@@ -14,8 +15,10 @@ use synchronization_chain::{Chain, BlockState, TransactionState, BlockInsertionR
 use synchronization_executor::{Task, TaskExecutor};
 use synchronization_manager::ManagementWorker;
 use synchronization_peers_tasks::PeersTasks;
-use synchronization_verifier::{VerificationSink, HeadersVerificationSink, BlockVerificationSink,
-	TransactionVerificationSink, VerificationTask};
+use synchronization_verifier::{
+	VerificationSink, HeadersVerificationSink, BlockVerificationSink,
+	TransactionVerificationSink, VerificationTask, PartiallyVerifiedBlock,
+};
 use types::{BlockHeight, ClientCoreRef, PeersRef, PeerIndex, SynchronizationStateRef, EmptyBoxFuture, SyncListenerRef};
 use utils::{AverageSpeedMeter, OrphanBlocksPool, OrphanTransactionsPool, HashPosition};
 #[cfg(test)] use synchronization_peers_tasks::{Information as PeersTasksInformation};
@@ -24,9 +27,9 @@ use utils::{AverageSpeedMeter, OrphanBlocksPool, OrphanTransactionsPool, HashPos
 /// Approximate maximal number of blocks hashes in scheduled queue.
 const MAX_SCHEDULED_HASHES: BlockHeight = 4 * 1024;
 /// Approximate maximal number of blocks hashes in requested queue.
-const MAX_REQUESTED_BLOCKS: BlockHeight = 256;
+const MAX_REQUESTED_BLOCKS: BlockHeight = 512;
 /// Approximate maximal number of blocks in verifying queue.
-const MAX_VERIFYING_BLOCKS: BlockHeight = 256;
+const MAX_VERIFYING_BLOCKS: BlockHeight = 512;
 /// Minimum number of blocks to request from peer
 const MIN_BLOCKS_IN_REQUEST: BlockHeight = 32;
 /// Maximum number of blocks to request from peer
@@ -41,6 +44,8 @@ const SYNC_SPEED_BLOCKS_TO_INSPECT: usize = 512;
 const BLOCKS_SPEED_BLOCKS_TO_INSPECT: usize = 512;
 /// Minimal time between duplicated blocks requests.
 const MIN_BLOCK_DUPLICATION_INTERVAL_S: f64 = 10_f64;
+/// Time before we will duplicate headers request.
+const MIN_HEADERS_DUPLICATION_INTERVAL_S: f64 = 2_f64;
 /// Maximal number of blocks in duplicate requests.
 const MAX_BLOCKS_IN_DUPLICATE_REQUEST: BlockHeight = 4;
 /// Minimal number of blocks in duplicate requests.
@@ -68,7 +73,7 @@ pub trait ClientCore {
 	fn on_disconnect(&mut self, peer_index: PeerIndex);
 	fn on_inventory(&self, peer_index: PeerIndex, message: types::Inv);
 	fn on_headers(&mut self, peer_index: PeerIndex, message: types::Headers) -> Option<Vec<IndexedBlockHeader>>;
-	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<IndexedBlock>>;
+	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<PartiallyVerifiedBlock>>;
 	fn on_transaction(&mut self, peer_index: PeerIndex, transaction: IndexedTransaction) -> Option<VecDeque<IndexedTransaction>>;
 	fn on_notfound(&mut self, peer_index: PeerIndex, message: types::NotFound);
 	fn after_peer_nearly_blocks_verified(&mut self, peer_index: PeerIndex, future: EmptyBoxFuture);
@@ -123,6 +128,10 @@ pub struct SynchronizationClientCore<T: TaskExecutor> {
 	listener: Option<SyncListenerRef>,
 	/// Time of last duplicated blocks request.
 	last_dup_time: f64,
+	/// Last NEW headers receival timestamp.
+	new_headers_receival_timestamp: f64,
+	/// Best block number when the last headers request has been sent.
+	last_headers_request_best_number: u32,
 }
 
 /// Verification sink for synchronization client core
@@ -340,9 +349,8 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 		}
 
 		// report progress
-		let num_new_headers = headers_in_message - headers.len();
 		trace!(target: "sync", "New {} headers from peer#{}. First {:?}, last: {:?}",
-			num_new_headers,
+			headers.len(),
 			peer_index,
 			headers[0].hash.to_reversed_str(),
 			headers[headers.len() - 1].hash.to_reversed_str()
@@ -351,18 +359,24 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 		// peer has supplied us with new headers => useful indeed
 		self.peers_tasks.useful_peer(peer_index);
 
+		// remember the moment we have last seen new headers
+		self.new_headers_receival_timestamp = precise_time_s();
+
+		// remember headers that we're verifying
+		self.chain.verify_headers(&headers);
+
 		Some(headers)
 	}
 
-	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<IndexedBlock>> {
+	fn on_block(&mut self, peer_index: PeerIndex, block: IndexedBlock) -> Option<VecDeque<PartiallyVerifiedBlock>> {
 		// update peers to select next tasks
 		self.peers_tasks.on_block_received(peer_index, &block.header.hash);
 
 		// prepare list of blocks to verify + make all required changes to the chain
-		let mut result: Option<VecDeque<IndexedBlock>> = None;
+		let mut result = None;
 		let block_state = self.chain.block_state(&block.header.hash);
 		match block_state {
-			BlockState::Verifying | BlockState::Stored => {
+			BlockState::VerifyingHeader | BlockState::Verifying | BlockState::Stored => {
 				// remember peer as useful
 				// and do nothing else, because we have already processed this block before
 				self.peers_tasks.useful_peer(peer_index);
@@ -414,32 +428,34 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 							}
 						}
 					},
-					BlockState::Verifying | BlockState::Stored => {
+					BlockState::VerifyingHeader | BlockState::Verifying | BlockState::Stored => {
 						// update synchronization speed
 						self.sync_speed_meter.checkpoint();
 						// remember peer as useful
 						self.peers_tasks.useful_peer(peer_index);
-						// schedule verification
-						let mut blocks_to_verify: VecDeque<IndexedBlock> = VecDeque::new();
-						blocks_to_verify.extend(self.orphaned_blocks_pool.remove_blocks_for_parent(&block.header.hash));
-						blocks_to_verify.push_front(block);
 						// forget blocks we are going to process
-						let blocks_hashes_to_forget: Vec<_> = blocks_to_verify.iter().map(|b| b.hash().clone()).collect();
-						self.chain.forget_blocks_leave_header(&blocks_hashes_to_forget);
+						let mut blocks_to_verify_hashes = vec![*block.hash()];
+						let orphaned_blocks = self.orphaned_blocks_pool.remove_blocks_for_parent(&block.header.hash);
+						blocks_to_verify_hashes.extend(orphaned_blocks.iter().map(IndexedBlock::hash).cloned());
+						self.chain.forget_blocks_leave_header(&blocks_to_verify_hashes);
 						// remember that we are verifying these blocks
-						let blocks_headers: Vec<_> = blocks_to_verify.iter().map(|b| b.header.clone()).collect();
-						self.chain.verify_blocks(blocks_headers);
+						let blocks_to_verify = ::std::iter::once(block).chain(orphaned_blocks)
+							.map(|block| if self.chain.verify_block(block.header.clone()) {
+								PartiallyVerifiedBlock::HeaderPreVerified(block)
+							} else {
+								PartiallyVerifiedBlock::NotVerified(block)
+							})
+							.collect::<VecDeque<_>>();
 						// remember that we are verifying block from this peer
-						for verifying_block_hash in blocks_to_verify.iter().map(|b| b.hash().clone()) {
-							self.verifying_blocks_by_peer.insert(verifying_block_hash, peer_index);
+						for verifying_block_hash in &blocks_to_verify_hashes {
+							self.verifying_blocks_by_peer.insert(*verifying_block_hash, peer_index);
 						}
 						match self.verifying_blocks_futures.entry(peer_index) {
 							Entry::Occupied(mut entry) => {
-								entry.get_mut().0.extend(blocks_to_verify.iter().map(|b| b.hash().clone()));
+								entry.get_mut().0.extend(blocks_to_verify_hashes);
 							},
 							Entry::Vacant(entry) => {
-								let block_hashes: HashSet<_> = blocks_to_verify.iter().map(|b| b.hash().clone()).collect();
-								entry.insert((block_hashes, Vec::new()));
+								entry.insert((blocks_to_verify_hashes.into_iter().collect(), Vec::new()));
 							}
 						}
 						result = Some(blocks_to_verify);
@@ -579,20 +595,31 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 		let mut blocks_requests: Option<Vec<H256>> = None;
 		let blocks_idle_peers: Vec<_> = self.peers_tasks.idle_peers_for_blocks().iter().cloned().collect();
 		{
-			// check if we can query some blocks headers
-			let headers_idle_peers: Vec<_> = self.peers_tasks.idle_peers_for_headers().iter().cloned().collect();
-			if !headers_idle_peers.is_empty() {
+			// check if we can query some blocks headers. Since the same block locator hashes are sent to all
+			// peers, it makes sense to send request to one peer only. But if we haven't received new headers
+			// for some non-neglected time, we could ask >1 peers for same headers
+			let num_headers_idle_peers = self.compute_num_peers_for_headers_request();
+			if num_headers_idle_peers > 0 {
 				let scheduled_hashes_len = self.chain.length_of_blocks_state(BlockState::Scheduled);
 				if scheduled_hashes_len < MAX_SCHEDULED_HASHES {
-					for header_peer in &headers_idle_peers {
-						self.peers_tasks.on_headers_requested(*header_peer);
-					}
+					let mut headers_idle_peers: Vec<_> = self.peers_tasks.idle_peers_for_headers().iter().cloned().collect();
+					thread_rng().shuffle(headers_idle_peers.as_mut_slice());
 
-					let block_locator_hashes = self.chain.block_locator_hashes();
-					let headers_tasks = headers_idle_peers
-						.iter()
-						.map(move |peer_index| Task::GetHeaders(*peer_index, types::GetHeaders::with_block_locator_hashes(block_locator_hashes.clone())));
-					tasks.extend(headers_tasks);
+					let num_headers_idle_peers = ::std::cmp::min(num_headers_idle_peers, headers_idle_peers.len());
+					let headers_idle_peers = &headers_idle_peers[..num_headers_idle_peers];
+					if !headers_idle_peers.is_empty() {
+						for header_peer in headers_idle_peers {
+							self.peers_tasks.on_headers_requested(*header_peer);
+						}
+
+						let block_locator_hashes = self.chain.block_locator_hashes();
+						let headers_tasks = headers_idle_peers
+							.iter()
+							.map(move |peer_index| Task::GetHeaders(*peer_index, types::GetHeaders::with_block_locator_hashes(block_locator_hashes.clone())));
+						tasks.extend(headers_tasks);
+
+						self.last_headers_request_best_number = self.chain.best_block().number;
+					}
 				}
 			}
 
@@ -694,7 +721,8 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 	fn try_switch_to_saturated_state(&mut self) -> bool {
 		let switch_to_saturated = {
 			// requested block is received => move to saturated state if there are no more blocks
-			self.chain.length_of_blocks_state(BlockState::Scheduled) == 0
+			self.chain.length_of_blocks_state(BlockState::VerifyingHeader) == 0
+				&& self.chain.length_of_blocks_state(BlockState::Scheduled) == 0
 				&& self.chain.length_of_blocks_state(BlockState::Requested) == 0
 		};
 
@@ -722,8 +750,8 @@ impl<T> HeadersVerificationSink for CoreVerificationSink<T> where T: TaskExecuto
 		self.core.lock().on_headers_verification_success(headers)
 	}
 
-	fn on_headers_verification_error(&self, peer: PeerIndex, error: String, hash: H256) {
-		self.core.lock().on_headers_verification_error(peer, error, hash)
+	fn on_headers_verification_error(&self, peer: PeerIndex, error: String, hash: H256, headers: Vec<IndexedBlockHeader>) {
+		self.core.lock().on_headers_verification_error(peer, error, hash, headers)
 	}
 }
 
@@ -774,6 +802,8 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 				config: config,
 				listener: None,
 				last_dup_time: 0f64,
+				new_headers_receival_timestamp: 0f64,
+				last_headers_request_best_number: 0,
 			}
 		));
 
@@ -904,6 +934,10 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 	fn prepare_blocks_requests_tasks(&mut self, limits: &BlocksRequestLimits, mut peers: Vec<PeerIndex>, mut hashes: Vec<H256>) -> Vec<Task> {
 		use std::mem::swap;
 
+		if hashes.is_empty() {
+			return Vec::new();
+		}
+
 		// ask fastest peers for hashes at the beginning of `hashes`
 		self.peers_tasks.sort_peers_for_blocks(&mut peers);
 
@@ -1027,14 +1061,14 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 	}
 
 	fn on_headers_verification_success(&mut self, headers: Vec<IndexedBlockHeader>) {
-		let headers = self.find_unknown_headers(headers);
-		if !headers.is_empty() {
-			self.chain.schedule_blocks_headers(headers);
-		}
+		self.chain.headers_verified(&headers);
+
+		self.chain.schedule_blocks_headers(headers);
 
 		// switch to synchronization state
 		if !self.state.is_synchronizing() {
-			if self.chain.length_of_blocks_state(BlockState::Scheduled) +
+			if self.chain.length_of_blocks_state(BlockState::VerifyingHeader) +
+				self.chain.length_of_blocks_state(BlockState::Scheduled) +
 				self.chain.length_of_blocks_state(BlockState::Requested) == 1 {
 				self.switch_to_nearly_saturated_state();
 			} else {
@@ -1044,7 +1078,9 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 		self.execute_synchronization_tasks(None, None);
 	}
 
-	fn on_headers_verification_error(&mut self, peer: PeerIndex, error: String, hash: H256) {
+	fn on_headers_verification_error(&mut self, peer: PeerIndex, error: String, hash: H256, headers: Vec<IndexedBlockHeader>) {
+		self.chain.headers_verified(&headers);
+
 		if self.config.close_connection_on_bad_block {
 			self.peers.misbehaving(
 				peer,
@@ -1230,6 +1266,27 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 			}
 			block_entry.remove_entry();
 		}
+	}
+
+	fn compute_num_peers_for_headers_request(&self) -> usize {
+		// if there are no active requests => ask immediately
+		if self.peers_tasks.ordered_headers_requests().is_empty() {
+			return 1;
+		}
+
+		// if last headers request has been sent with different block locator hashes
+		// => ask immediately
+		if self.chain.best_block().number != self.last_headers_request_best_number {
+			return 1;
+		}
+
+		// if there are active requests, but we haven't seen NEW headers in last
+		// N secs, we need to duplicate request
+		if precise_time_s() - self.new_headers_receival_timestamp > MIN_HEADERS_DUPLICATION_INTERVAL_S {
+			return ::std::usize::MAX;
+		}
+
+		0
 	}
 }
 
@@ -1505,10 +1562,7 @@ pub mod tests {
 		sync.on_block(2, block.clone().into());
 
 		let tasks = executor.take_tasks();
-		assert_eq!(tasks.len(), 6);
-		// TODO: when saturating, RequestBlocksHeaders is sent twice to the peer who has supplied last block:
-		// 1) from on_block_verification_success
-		// 2) from switch_to_saturated_state
+		assert_eq!(tasks.len(), 5);
 		assert!(tasks.iter().any(|t| t == &request_block_headers_genesis_and(1, vec![block.hash()])));
 		assert!(tasks.iter().any(|t| t == &request_block_headers_genesis_and(2, vec![block.hash()])));
 		assert!(tasks.iter().any(|t| t == &Task::MemoryPool(1)));

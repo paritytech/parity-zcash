@@ -6,8 +6,11 @@ use storage;
 use network::ConsensusParams;
 use primitives::hash::H256;
 use super::Error;
-use synchronization_verifier::{Verifier, SyncVerifier, VerificationTask, HeadersVerificationSink,
-	VerificationSink, BlockVerificationSink, TransactionVerificationSink};
+use synchronization_verifier::{
+	Verifier, SyncVerifier, VerificationTask, HeadersVerificationSink,
+	VerificationSink, BlockVerificationSink, TransactionVerificationSink,
+	PartiallyVerifiedBlock,
+};
 use types::{PeerIndex, StorageRef};
 use utils::OrphanBlocksPool;
 use VerificationParameters;
@@ -76,7 +79,7 @@ impl BlocksWriter {
 		let mut verification_queue: VecDeque<chain::IndexedBlock> = self.orphaned_blocks_pool.remove_blocks_for_parent(block.hash());
 		verification_queue.push_front(block);
 		while let Some(block) = verification_queue.pop_front() {
-			self.verifier.verify_block(block);
+			self.verifier.verify_block(PartiallyVerifiedBlock::NotVerified(block));
 			if let Some(err) = self.sink.error() {
 				return Err(err);
 			}
@@ -146,7 +149,7 @@ impl HeadersVerificationSink for BlocksWriterSink {
 		unreachable!("not intended to verify headers")
 	}
 
-	fn on_headers_verification_error(&self, _peer: PeerIndex, _err: String, _hash: H256) {
+	fn on_headers_verification_error(&self, _peer: PeerIndex, _err: String, _hash: H256, _headers: Vec<chain::IndexedBlockHeader>) {
 		unreachable!("not intended to verify headers")
 	}
 }
@@ -165,7 +168,7 @@ mod tests {
 
 	fn default_verification_params() -> VerificationParameters {
 		VerificationParameters {
-			verification_level: VerificationLevel::Full,
+			verification_level: VerificationLevel::FULL,
 			verification_edge: 0u8.into(),
 		}
 	}

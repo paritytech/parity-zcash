@@ -5,27 +5,39 @@ use error::Error;
 use verify_block::BlockVerifier;
 use verify_header::HeaderVerifier;
 use verify_transaction::TransactionVerifier;
+use VerificationLevel;
 
 pub struct ChainVerifier<'a> {
 	pub block: BlockVerifier<'a>,
-	pub header: HeaderVerifier<'a>,
+	pub header: Option<HeaderVerifier<'a>>,
 	pub transactions: Vec<TransactionVerifier<'a>>,
 }
 
 impl<'a> ChainVerifier<'a> {
-	pub fn new(block: &'a IndexedBlock, consensus: &'a ConsensusParams, current_time: u32) -> Self {
+	pub fn new(
+		block: &'a IndexedBlock,
+		consensus: &'a ConsensusParams,
+		current_time: u32,
+		verification_level: VerificationLevel,
+	) -> Self {
 		trace!(target: "verification", "Block pre-verification {}", block.hash().to_reversed_str());
 		ChainVerifier {
 			block: BlockVerifier::new(block, consensus),
-			header: HeaderVerifier::new(&block.header, consensus, current_time),
+			header: if !verification_level.intersects(VerificationLevel::HINT_HEADER_PRE_VERIFIED) {
+				Some(HeaderVerifier::new(&block.header, consensus, current_time))
+			} else {
+				None
+			},
 			transactions: block.transactions.iter().map(|tx| TransactionVerifier::new(tx, consensus)).collect(),
 		}
 	}
 
 	pub fn check(&self) -> Result<(), Error> {
-		try!(self.block.check());
-		try!(self.header.check());
-		try!(self.check_transactions());
+		self.block.check()?;
+		if let Some(ref header) = self.header {
+			header.check()?;
+		}
+		self.check_transactions()?;
 		Ok(())
 	}
 

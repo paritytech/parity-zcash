@@ -30,13 +30,13 @@ impl BackwardsCompatibleChainVerifier {
 	}
 
 	fn verify_block(&self, verification_level: VerificationLevel, block: &IndexedBlock) -> Result<(), Error> {
-		if verification_level == VerificationLevel::NoVerification {
+		if verification_level.intersects(VerificationLevel::NO_VERIFICATION) {
 			return Ok(());
 		}
 
 		let current_time = ::time::get_time().sec as u32;
 		// first run pre-verification
-		let chain_verifier = ChainVerifier::new(block, &self.consensus, current_time);
+		let chain_verifier = ChainVerifier::new(block, &self.consensus, current_time, verification_level);
 		chain_verifier.check()?;
 
 		assert_eq!(Some(self.store.best_block().hash), self.store.block_hash(self.store.best_block().number));
@@ -153,7 +153,7 @@ mod tests {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let b2 = test_data::block_h2().into();
 		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Unitest));
-		assert_eq!(Err(Error::Database(DBError::UnknownParent)), verifier.verify(VerificationLevel::Full, &b2));
+		assert_eq!(Err(Error::Database(DBError::UnknownParent)), verifier.verify(VerificationLevel::FULL, &b2));
 	}
 
 	#[test]
@@ -161,7 +161,7 @@ mod tests {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let b1 = test_data::block_h1();
 		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Mainnet));
-		assert_eq!(verifier.verify(VerificationLevel::Full, &b1.into()), Ok(()));
+		assert_eq!(verifier.verify(VerificationLevel::FULL, &b1.into()), Ok(()));
 	}
 
 	#[test]
@@ -173,7 +173,7 @@ mod tests {
 			]);
 		let b1 = test_data::block_h2();
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Mainnet));
-		assert_eq!(verifier.verify(VerificationLevel::Full, &b1.into()), Ok(()));
+		assert_eq!(verifier.verify(VerificationLevel::FULL, &b1.into()), Ok(()));
 	}
 
 	#[test]
@@ -210,7 +210,7 @@ mod tests {
 			TransactionError::Maturity,
 		));
 
-		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
+		assert_eq!(expected, verifier.verify(VerificationLevel::FULL, &block.into()));
 	}
 
 	#[test]
@@ -245,7 +245,7 @@ mod tests {
 			.build();
 
 		let verifier = ChainVerifier::new(Arc::new(storage), consensus);
-		assert_eq!(verifier.verify(VerificationLevel::Full, &block.into()), Ok(()));
+		assert_eq!(verifier.verify(VerificationLevel::FULL, &block.into()), Ok(()));
 	}
 
 	#[test]
@@ -284,7 +284,7 @@ mod tests {
 			.build();
 
 		let verifier = ChainVerifier::new(Arc::new(storage), consensus);
-		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
+		assert!(verifier.verify(VerificationLevel::FULL, &block.into()).is_ok());
 	}
 
 	#[test]
@@ -325,7 +325,7 @@ mod tests {
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 
 		let expected = Err(Error::Transaction(2, TransactionError::Overspend));
-		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
+		assert_eq!(expected, verifier.verify(VerificationLevel::FULL, &block.into()));
 	}
 
 	#[test]
@@ -365,7 +365,7 @@ mod tests {
 			.build();
 
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
-		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
+		assert!(verifier.verify(VerificationLevel::FULL, &block.into()).is_ok());
 	}
 
 	#[test]
@@ -413,7 +413,7 @@ mod tests {
 
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 		let expected = Err(Error::MaximumSigops);
-		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
+		assert_eq!(expected, verifier.verify(VerificationLevel::FULL, &block.into()));
 	}
 
 	#[test]
@@ -440,6 +440,6 @@ mod tests {
 			actual: 1250000001,
 		});
 
-		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
+		assert_eq!(expected, verifier.verify(VerificationLevel::FULL, &block.into()));
 	}
 }
