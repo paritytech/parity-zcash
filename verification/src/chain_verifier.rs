@@ -2,7 +2,7 @@
 
 use chain::{IndexedBlock, IndexedBlockHeader, IndexedTransaction};
 use storage::{SharedStore, TransactionOutputProvider, BlockHeaderProvider, BlockOrigin,
-	DuplexTransactionOutputProvider, NoopStore};
+	DuplexTransactionOutputProvider, NoopStore, CachedTransactionOutputProvider};
 use network::ConsensusParams;
 use error::{Error, TransactionError};
 use canon::{CanonBlock, CanonTransaction};
@@ -41,42 +41,91 @@ impl BackwardsCompatibleChainVerifier {
 
 		assert_eq!(Some(self.store.best_block().hash), self.store.block_hash(self.store.best_block().number));
 		let block_origin = self.store.block_origin(&block.header)?;
-		trace!(target: "verification", "verify_block: {:?} best_block: {:?} block_origin: {:?}", block.hash().reversed(), self.store.best_block(), block_origin);
+		trace!(
+			target: "verification",
+			"verify_block: {:?} best_block: {:?} block_origin: {:?}",
+			block.hash().reversed(),
+			self.store.best_block(),
+			block_origin,
+		);
 
+		let canon_block = CanonBlock::new(block);
 		match block_origin {
 			BlockOrigin::KnownBlock => {
 				// there should be no known blocks at this point
 				unreachable!();
 			},
 			BlockOrigin::CanonChain { block_number } => {
+				let tx_out_provider = CachedTransactionOutputProvider::new(self.store.as_store().as_transaction_output_provider());
+				let tx_meta_provider = self.store.as_store().as_transaction_meta_provider();
 				let header_provider = self.store.as_store().as_block_header_provider();
+				let tree_state_provider = self.store.as_store().as_tree_state_provider();
+				let nullifier_tracker = self.store.as_store().as_nullifier_tracker();
 				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
-				let canon_block = CanonBlock::new(block);
-				let chain_acceptor = ChainAcceptor::new(self.store.as_store(), &self.consensus, verification_level,
-					canon_block, block_number, block.header.raw.time, &deployments);
+				let chain_acceptor = ChainAcceptor::new(
+					&tx_out_provider,
+					tx_meta_provider,
+					header_provider,
+					tree_state_provider,
+					nullifier_tracker,
+					&self.consensus,
+					verification_level,
+					canon_block,
+					block_number,
+					block.header.raw.time,
+					&deployments,
+				);
 				chain_acceptor.check()?;
 			},
 			BlockOrigin::SideChain(origin) => {
 				let block_number = origin.block_number;
-				let header_provider = self.store.as_store().as_block_header_provider();
-				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
 				let fork = self.store.fork(origin)?;
-				let canon_block = CanonBlock::new(block);
-				let chain_acceptor = ChainAcceptor::new(fork.store(), &self.consensus, verification_level, canon_block,
-					block_number, block.header.raw.time, &deployments);
+				let tx_out_provider = CachedTransactionOutputProvider::new(fork.store().as_transaction_output_provider());
+				let tx_meta_provider = fork.store().as_transaction_meta_provider();
+				let header_provider = fork.store().as_block_header_provider();
+				let tree_state_provider = fork.store().as_tree_state_provider();
+				let nullifier_tracker = fork.store().as_nullifier_tracker();
+				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
+				let chain_acceptor = ChainAcceptor::new(
+					&tx_out_provider,
+					tx_meta_provider,
+					header_provider,
+					tree_state_provider,
+					nullifier_tracker,
+					&self.consensus,
+					verification_level,
+					canon_block,
+					block_number,
+					block.header.raw.time,
+					&deployments,
+				);
 				chain_acceptor.check()?;
 			},
 			BlockOrigin::SideChainBecomingCanonChain(origin) => {
 				let block_number = origin.block_number;
-				let header_provider = self.store.as_store().as_block_header_provider();
-				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
 				let fork = self.store.fork(origin)?;
-				let canon_block = CanonBlock::new(block);
-				let chain_acceptor = ChainAcceptor::new(fork.store(), &self.consensus, verification_level, canon_block,
-					block_number, block.header.raw.time, &deployments);
+				let tx_out_provider = CachedTransactionOutputProvider::new(fork.store().as_transaction_output_provider());
+				let tx_meta_provider = fork.store().as_transaction_meta_provider();
+				let header_provider = fork.store().as_block_header_provider();
+				let tree_state_provider = fork.store().as_tree_state_provider();
+				let nullifier_tracker = fork.store().as_nullifier_tracker();
+				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
+				let chain_acceptor = ChainAcceptor::new(
+					&tx_out_provider,
+					tx_meta_provider,
+					header_provider,
+					tree_state_provider,
+					nullifier_tracker,
+					&self.consensus,
+					verification_level,
+					canon_block,
+					block_number,
+					block.header.raw.time,
+					&deployments,
+				);
 				chain_acceptor.check()?;
 			},
-		}
+		};
 
 		assert_eq!(Some(self.store.best_block().hash), self.store.block_hash(self.store.best_block().number));
 		Ok(())
