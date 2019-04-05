@@ -1,5 +1,8 @@
 use rayon::prelude::{IntoParallelRefIterator, IndexedParallelIterator, ParallelIterator};
-use storage::{DuplexTransactionOutputProvider, Store};
+use storage::{
+	DuplexTransactionOutputProvider, TransactionOutputProvider, TransactionMetaProvider,
+	BlockHeaderProvider, TreeStateProvider, NullifierTracker,
+};
 use network::ConsensusParams;
 use error::Error;
 use canon::CanonBlock;
@@ -16,29 +19,40 @@ pub struct ChainAcceptor<'a> {
 }
 
 impl<'a> ChainAcceptor<'a> {
-	pub fn new(store: &'a Store, consensus: &'a ConsensusParams, verification_level: VerificationLevel, block: CanonBlock<'a>, height: u32, time: u32, deployments: &'a BlockDeployments) -> Self {
+	pub fn new(
+		tx_out_provider: &'a TransactionOutputProvider,
+		tx_meta_provider: &'a TransactionMetaProvider,
+		header_provider: &'a BlockHeaderProvider,
+		tree_state_provider: &'a TreeStateProvider,
+		nullifier_tracker: &'a NullifierTracker,
+		consensus: &'a ConsensusParams,
+		verification_level: VerificationLevel,
+		block: CanonBlock<'a>,
+		height: u32,
+		time: u32,
+		deployments: &'a BlockDeployments,
+	) -> Self {
 		trace!(target: "verification", "Block verification {}", block.hash().to_reversed_str());
-		let output_store = DuplexTransactionOutputProvider::new(store.as_transaction_output_provider(), block.raw());
-		let headers = store.as_block_header_provider();
+		let output_store = DuplexTransactionOutputProvider::new(tx_out_provider, block.raw());
 
 		ChainAcceptor {
 			block: BlockAcceptor::new(
-				store.as_transaction_output_provider(),
-				store.as_tree_state_provider(),
+				tx_out_provider,
+				tree_state_provider,
 				consensus,
 				block,
 				height,
 				deployments,
-				headers,
+				header_provider,
 			),
-			header: HeaderAcceptor::new(headers, consensus, block.header(), height, time, deployments),
+			header: HeaderAcceptor::new(header_provider, consensus, block.header(), height, time, deployments),
 			transactions: block.transactions()
 				.into_iter()
 				.enumerate()
 				.map(|(tx_index, tx)| TransactionAcceptor::new(
-						store.as_transaction_meta_provider(),
+						tx_meta_provider,
 						output_store,
-						store.as_nullifier_tracker(),
+						nullifier_tracker,
 						consensus,
 						tx,
 						verification_level,

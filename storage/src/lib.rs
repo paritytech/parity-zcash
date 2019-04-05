@@ -42,7 +42,9 @@ pub use duplex_store::{DuplexTransactionOutputProvider, NoopStore};
 pub use error::Error;
 pub use store::{AsSubstore, Store, SharedStore, CanonStore};
 pub use transaction_meta::TransactionMeta;
-pub use transaction_provider::{TransactionProvider, TransactionOutputProvider, TransactionMetaProvider};
+pub use transaction_provider::{
+	TransactionProvider, TransactionOutputProvider, TransactionMetaProvider, CachedTransactionOutputProvider,
+};
 pub use nullifier_tracker::NullifierTracker;
 pub use tree_state::{TreeState, H32 as H32TreeDim, Dim as TreeDim, SproutTreeState, SaplingTreeState};
 pub use tree_state_provider::TreeStateProvider;
