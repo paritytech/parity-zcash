@@ -175,12 +175,19 @@ impl VerificationTask {
 
 impl AsyncVerifier {
 	/// Create new async verifier
-	pub fn new<T: VerificationSink>(verifier: Arc<ChainVerifier>, storage: StorageRef, memory_pool: MemoryPoolRef, sink: Arc<T>, verification_params: VerificationParameters) -> Self {
+	pub fn new<T: VerificationSink>(
+		thread_name: String,
+		verifier: Arc<ChainVerifier>,
+		storage: StorageRef,
+		memory_pool: MemoryPoolRef,
+		sink: Arc<T>,
+		verification_params: VerificationParameters,
+	) -> Self {
 		let (verification_work_sender, verification_work_receiver) = channel();
 		AsyncVerifier {
 			verification_work_sender: Mutex::new(verification_work_sender),
 			verification_worker_thread: Some(thread::Builder::new()
-				.name("Sync verification thread".to_string())
+				.name(thread_name)
 				.spawn(move || {
 					let verifier = ChainVerifierWrapper::new(verifier, &storage, verification_params);
 					AsyncVerifier::verification_worker_proc(sink, storage, memory_pool, verifier, verification_work_receiver)
