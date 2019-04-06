@@ -130,10 +130,10 @@ It it is possible to import existing `zcashd` database:
 ./target/release/pzec import "$ZCASH_DB/blocks"
 ```
 
-By default import verifies imported the blocks. You can disable this, by adding `--verification-level=none` flag.
+By default, import verifies the imported blocks. You can disable this, by adding the `--verification-level=none` option.
 
 ```
-./target/release/pzec import "$ZCASH_DB/blocks" --verification-level=none
+./target/release/pzec --verification-level=none import "$ZCASH_DB/blocks"
 ```
 
 ## Command line interface
