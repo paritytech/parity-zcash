@@ -152,14 +152,11 @@ fn g1_from_compressed(data: &[u8]) -> Result<G1, Error> {
 
 	let mut y = fq_sqrt(y_squared).ok_or(Error::InvalidFieldElement)?;
 
-	if sign == 2 && !y.into_u256().get_bit(0).expect("bit 0 always exist; qed") { y = y.neg(); }
-	else if sign == 3 && y.into_u256().get_bit(0).expect("bit 0 always exist; qed") { y = y.neg(); }
+	if sign == 2 && y.into_u256().get_bit(0).expect("bit 0 always exist; qed") { y = y.neg(); }
+	else if sign == 3 && !y.into_u256().get_bit(0).expect("bit 0 always exist; qed") { y = y.neg(); }
 	else if sign != 3 && sign != 2 {
 		return Err(Error::InvalidSignPrefix);
 	}
-
-	y = y.neg();
-
 	AffineG1::new(x, y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
 }
 
