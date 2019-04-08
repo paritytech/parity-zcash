@@ -115,6 +115,13 @@ fn fq_sqrt(a: Fq) -> Option<Fq> {
 	}
 }
 
+fn fq2_to_u512(e: Fq2) -> U512 {
+    let c0 = e.real().into_u256();
+    let c1 = e.imaginary().into_u256();
+
+    U512::new(&c1, &c0, &FQ)
+}
+
 // Algorithm 9 Square root computation over Fq2, with q ≡ 3 (mod 4)
 // from https://eprint.iacr.org/2012/685.pdf (Square root computation over even extension fields)
 fn fq2_sqrt(a: Fq2) -> Option<Fq2> {
@@ -163,14 +170,18 @@ fn g2_from_compressed(data: &[u8]) -> Result<G2, Error> {
 	let x = deserialize_fq2(&data[1..])?;
 
 	let y_squared = (x * x * x) + G2::b();
+	let y = fq2_sqrt(y_squared).ok_or(Error::InvalidFieldElement)?;
+	let y_neg = -y;
 
-	let mut y = fq2_sqrt(y_squared).ok_or(Error::InvalidFieldElement)?;
-	if sign == 10 { y = y.neg(); }
-	else if sign != 11 {
-		return Err(Error::InvalidSignPrefix);
-	}
+	let y_gt = fq2_to_u512(y) > fq2_to_u512(y_neg);
 
-	AffineG2::new(x, y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
+	let e_y = if sign == 10 { if y_gt { y_neg } else { y } }
+		else if sign == 11 { if y_gt { y } else { y_neg } }
+		else {
+			return Err(Error::InvalidSignPrefix);
+		};
+
+	AffineG2::new(x, e_y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
 }
 
 fn deserialize_fq(data: &[u8]) -> Result<Fq, Error> {
