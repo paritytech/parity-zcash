@@ -80,19 +80,7 @@ pub struct ConsensusParams {
 }
 
 fn mainnet_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
-	use crypto::{G1, G2, Group};
-
-	// TODO: Actually use group elements from ceremony
-	crypto::Pghr13VerifyingKey {
-		a: G2::one(),
-		b: G1::one(),
-		c: G2::one(),
-		z: G2::one(),
-		gamma: G2::one(),
-		gamma_beta_1: G1::one(),
-		gamma_beta_2: G2::one(),
-		ic: Vec::new(),
-	}
+	crypto::json::pghr13::decode(include_bytes!("../../res/sprout-verifying-key.json")).expect("verifying key json invalid").into()
 }
 
 fn testnet_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
