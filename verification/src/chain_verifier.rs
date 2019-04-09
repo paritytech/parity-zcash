@@ -13,7 +13,7 @@ use verify_transaction::MemoryPoolTransactionVerifier;
 use accept_chain::ChainAcceptor;
 use accept_transaction::MemoryPoolTransactionAcceptor;
 use deployments::{Deployments, BlockDeployments};
-use {Verify, VerificationLevel};
+use {Verify, VerificationLevel, TreeCache};
 
 pub struct BackwardsCompatibleChainVerifier {
 	store: SharedStore,
@@ -114,6 +114,7 @@ impl BackwardsCompatibleChainVerifier {
 		// now let's do full verification
 		let noop = NoopStore;
 		let output_store = DuplexTransactionOutputProvider::new(prevout_provider, &noop);
+		let tree_cache = TreeCache::new(self.store.as_tree_state_provider());
 		let tx_acceptor = MemoryPoolTransactionAcceptor::new(
 			self.store.as_transaction_meta_provider(),
 			output_store,
@@ -123,6 +124,7 @@ impl BackwardsCompatibleChainVerifier {
 			height,
 			time,
 			&deployments,
+			tree_cache,
 		);
 		tx_acceptor.check()
 	}

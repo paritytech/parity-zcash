@@ -8,6 +8,7 @@ use accept_header::HeaderAcceptor;
 use accept_transaction::TransactionAcceptor;
 use deployments::BlockDeployments;
 use VerificationLevel;
+use tree_cache::TreeCache;
 
 pub struct ChainAcceptor<'a> {
 	pub block: BlockAcceptor<'a>,
@@ -19,6 +20,7 @@ impl<'a> ChainAcceptor<'a> {
 	pub fn new(store: &'a Store, consensus: &'a ConsensusParams, verification_level: VerificationLevel, block: CanonBlock<'a>, height: u32, time: u32, deployments: &'a BlockDeployments) -> Self {
 		trace!(target: "verification", "Block verification {}", block.hash().to_reversed_str());
 		let output_store = DuplexTransactionOutputProvider::new(store.as_transaction_output_provider(), block.raw());
+		let tree_cache = TreeCache::new(store.as_tree_state_provider());
 		let headers = store.as_block_header_provider();
 
 		ChainAcceptor {
@@ -46,6 +48,7 @@ impl<'a> ChainAcceptor<'a> {
 						block.header.raw.time,
 						tx_index,
 						deployments,
+						tree_cache.clone(),
 				))
 				.collect(),
 		}

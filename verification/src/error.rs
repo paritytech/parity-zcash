@@ -152,5 +152,7 @@ pub enum TransactionError {
 	InvalidOverwintered,
 	/// Invalid joinsplit statement
 	InvalidJoinSplit(usize),
+	/// Unknown anchor used in join split
+	UnknownAnchor(H256),
 }
 

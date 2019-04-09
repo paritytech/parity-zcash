@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use chain::{JoinSplit, JoinSplitProof};
+use chain::{JoinSplit, JoinSplitProof, JoinSplitDescription};
 use crypto::{BnU256, Pghr13Proof, pghr13_verify};
 
 /// Join split verification error kind
@@ -51,44 +51,38 @@ pub fn compute_hsig(random_seed: &[u8; 32], nullifiers: &[[u8; 32]; 2], pub_key_
 }
 
 pub fn verify(
-	root: &[u8; 32],
+	desc: &JoinSplitDescription,
 	join_split: &JoinSplit,
 	verifying_key: &crypto::Pghr13VerifyingKey,
-) -> Result<(), Error>
+) -> Result<(), ErrorKind>
 {
-	let mut desc_index = 0;
-	for desc in join_split.descriptions.iter() {
+	match desc.zkproof {
+		JoinSplitProof::PHGR(ref proof_raw) => {
+			let hsig = compute_hsig(&desc.random_seed, &desc.nullifiers, &join_split.pubkey.into());
 
-		match desc.zkproof {
-			JoinSplitProof::PHGR(ref proof_raw) => {
-				let hsig = compute_hsig(&desc.random_seed, &desc.nullifiers, &join_split.pubkey.into());
+			let mut input = Input::new(2176);
+			input.push_hash(&desc.anchor);
+			input.push_hash(&hsig);
 
-				let mut input = Input::new(2176);
-				input.push_hash(&root);
-				input.push_hash(&hsig);
+			input.push_hash(&desc.nullifiers[0]);
+			input.push_hash(&desc.macs[0]);
 
-				input.push_hash(&desc.nullifiers[0]);
-				input.push_hash(&desc.macs[0]);
+			input.push_hash(&desc.nullifiers[1]);
+			input.push_hash(&desc.macs[1]);
 
-				input.push_hash(&desc.nullifiers[1]);
-				input.push_hash(&desc.macs[1]);
+			input.push_hash(&desc.commitments[0]);
+			input.push_hash(&desc.commitments[1]);
 
-				input.push_hash(&desc.commitments[0]);
-				input.push_hash(&desc.commitments[1]);
+			input.push_u64(desc.value_pub_old);
+			input.push_u64(desc.value_pub_new);
 
-				input.push_u64(desc.value_pub_old);
-				input.push_u64(desc.value_pub_new);
+			let proof = Pghr13Proof::from_raw(proof_raw).map_err(|_| ErrorKind::InvalidEncoding)?;
 
-				let proof = Pghr13Proof::from_raw(proof_raw).map_err(|_| Error::encoding(desc_index))?;
-
-				if !pghr13_verify(verifying_key, &input.into_frs(), &proof) {
-					return Err(Error::proof(desc_index));
-				}
-			},
-			_ => continue,
-		}
-
-		desc_index += 1;
+			if !pghr13_verify(verifying_key, &input.into_frs(), &proof) {
+				return Err(ErrorKind::InvalidProof);
+			}
+		},
+		JoinSplitProof::Groth(_) => {},
 	}
 
 	Ok(())
@@ -325,6 +319,6 @@ mod tests {
 			sig: [0u8; 64].into(), // not used
 		};
 
-		verify(&hash2("d7c612c817793191a1e68652121876d6b3bde40f4fa52bc314145ce6e5cdd259"), &js, &vkey()).unwrap();
+		verify(&js.descriptions[0], &js, &vkey()).unwrap();
 	}
 }
