@@ -172,7 +172,7 @@ dependencies = [
 [[package]]
 name = "bn"
 version = "0.4.4"
-source = "git+https://github.com/paritytech/bn?branch=upgrade2#5c41e9fda0478b0e74c45b87da26f46122f4d8ba"
+source = "git+https://github.com/paritytech/bn?branch=upgrade2#78fddbb743a43a74f02c0a2b2b43d860f1a4f56d"
 dependencies = [
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "crunchy 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",

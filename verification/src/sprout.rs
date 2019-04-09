@@ -111,12 +111,22 @@ impl Input {
 	}
 
 	fn push_hash(&mut self, val: &[u8; 32]) {
-		self.push_u256(BnU256::from_slice(&val[..]).expect("has 32 elements in slice; qed"))
+		self.push_bytes(&val[..])
 	}
 
 	fn push_u64(&mut self, val: u64) {
-		for i in 0..64 {
-			self.bits.push(val & (1 << (63-i)) > 0)
+		let mut le = [0u8; 8];
+		for i in 0..8 {
+			le[i] = (val >> i*8) as u8;
+		}
+		self.push_bytes(&le[..]);
+	}
+
+	fn push_bytes(&mut self, vals: &[u8]) {
+		for b in vals.iter()
+			.flat_map(|&m| (0..8).rev().map(move |i| m >> i & 1 == 1))
+		{
+			self.bits.push(b);
 		}
 	}
 
@@ -126,19 +136,23 @@ impl Input {
 	}
 
 	pub fn into_frs(self) -> Vec<crypto::Fr> {
-		let mut res = Vec::new();
-		let mut u256 = crypto::BnU256::zero();
-		for i in 0..self.bits.len() {
-			u256.set_bit(i % 256, self.bits[i]);
-			if i % 256 == 255 {
-				res.push(crypto::Fr::new_mul_factor(u256));
+		use crypto::Fr;
+
+		let mut frs = Vec::new();
+
+		for bits in self.bits.chunks(253)
+		{
+			let mut num = Fr::zero();
+			let mut coeff = Fr::one();
+			for bit in bits {
+				num = if bit { num + coeff } else { num };
+				coeff = coeff + coeff;
 			}
-		}
-		if self.bits.len() % 256 != 0 {
-			res.push(crypto::Fr::new_mul_factor(u256));
+
+			frs.push(num);
 		}
 
-		res
+		frs
 	}
 }
 
@@ -240,13 +254,24 @@ mod tests {
 	}
 
 	#[test]
-	fn inputs() {
-		let mut inputs = super::Input::new(128);
-		inputs.push_u64(0x6dea2059e200bd39);
-		inputs.push_u64(0xa953d79b83f6ab59);
+	fn input1() {
+		let mut input = super::Input::new(64);
+		input.push_bytes(&[0x00, 0x01, 0x03, 0x12, 0xFF][..]);
+
 		assert_eq!(
-			&input_to_str(&inputs),
-			"01101101111010100010000001011001111000100000000010111101001110011010100101010011110101111001101110000011111101101010101101011001"
+			&input_to_str(&input),
+			"0000000000000001000000110001001011111111"
+		);
+	}
+
+	#[test]
+	fn input2() {
+		let mut input = super::Input::new(64);
+		input.push_u64(14250000);
+		input.push_u64(0);
+		assert_eq!(
+			input.into_frs()[0].into_u256(),
+			10161672.into()
 		);
 	}
 
@@ -300,6 +325,6 @@ mod tests {
 			sig: [0u8; 64].into(), // not used
 		};
 
-		verify(&hash("d7c612c817793191a1e68652121876d6b3bde40f4fa52bc314145ce6e5cdd259"), &js, &vkey()).unwrap();
+		verify(&hash2("d7c612c817793191a1e68652121876d6b3bde40f4fa52bc314145ce6e5cdd259"), &js, &vkey()).unwrap();
 	}
 }
