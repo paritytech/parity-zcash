@@ -36,13 +36,15 @@ pub use block_ancestors::BlockAncestors;
 pub use block_chain::{BlockChain, ForkChain, Forkable};
 pub use block_iterator::BlockIterator;
 pub use block_origin::{BlockOrigin, SideChainOrigin};
-pub use block_provider::{BlockHeaderProvider, BlockProvider, IndexedBlockProvider};
+pub use block_provider::{BlockHeaderProvider, BlockProvider};
 pub use block_ref::BlockRef;
 pub use duplex_store::{DuplexTransactionOutputProvider, NoopStore};
 pub use error::Error;
 pub use store::{AsSubstore, Store, SharedStore, CanonStore};
 pub use transaction_meta::TransactionMeta;
-pub use transaction_provider::{TransactionProvider, TransactionOutputProvider, TransactionMetaProvider};
+pub use transaction_provider::{
+	TransactionProvider, TransactionOutputProvider, TransactionMetaProvider, CachedTransactionOutputProvider,
+};
 pub use nullifier_tracker::NullifierTracker;
 pub use tree_state::{TreeState, H32 as H32TreeDim, Dim as TreeDim, SproutTreeState, SaplingTreeState};
 pub use tree_state_provider::TreeStateProvider;

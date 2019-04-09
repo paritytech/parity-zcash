@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use parking_lot::Mutex;
-use chain::{IndexedTransaction, IndexedBlock};
+use chain::{IndexedTransaction, IndexedBlock, IndexedBlockHeader};
 use message::types;
 use synchronization_executor::TaskExecutor;
 use synchronization_verifier::{Verifier, TransactionVerificationSink};
@@ -124,7 +124,7 @@ pub trait Client : Send + Sync + 'static {
 	fn on_connect(&self, peer_index: PeerIndex);
 	fn on_disconnect(&self, peer_index: PeerIndex);
 	fn on_inventory(&self, peer_index: PeerIndex, message: types::Inv);
-	fn on_headers(&self, peer_index: PeerIndex, message: types::Headers);
+	fn on_headers(&self, peer_index: PeerIndex, headers: Vec<IndexedBlockHeader>);
 	fn on_block(&self, peer_index: PeerIndex, block: IndexedBlock);
 	fn on_transaction(&self, peer_index: PeerIndex, transaction: IndexedTransaction);
 	fn on_notfound(&self, peer_index: PeerIndex, message: types::NotFound);
@@ -135,14 +135,16 @@ pub trait Client : Send + Sync + 'static {
 
 /// Synchronization client facade
 pub struct SynchronizationClient<T: TaskExecutor, U: Verifier> {
-	/// Verification mutex
-	verification_lock: Mutex<()>,
 	/// Shared client state
 	shared_state: SynchronizationStateRef,
 	/// Client core
 	core: ClientCoreRef<SynchronizationClientCore<T>>,
-	/// Verifier
-	verifier: U,
+	/// Verification mutex
+	heavy_verification_lock: Mutex<()>,
+	/// Verifier that performs heavy verifications (blocks during sync + transactions).
+	heavy_verifier: U,
+	/// Verifier that performs lightweight verifications (headers during sync).
+	light_verifier: U,
 }
 
 impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Verifier {
@@ -158,8 +160,11 @@ impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Veri
 		self.core.lock().on_inventory(peer_index, message);
 	}
 
-	fn on_headers(&self, peer_index: PeerIndex, message: types::Headers) {
-		self.core.lock().on_headers(peer_index, message);
+	fn on_headers(&self, peer_index: PeerIndex, headers: Vec<IndexedBlockHeader>) {
+		let headers_to_verify = self.core.lock().on_headers(peer_index, headers);
+		if let Some(headers_to_verify) = headers_to_verify {
+			self.light_verifier.verify_headers(peer_index, headers_to_verify);
+		}
 	}
 
 	fn on_block(&self, peer_index: PeerIndex, block: IndexedBlock) {
@@ -169,13 +174,13 @@ impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Veri
 		{
 			// verification tasks must be scheduled in the same order as they were built in on_block
 			// => here we use verification_lock for this
-			let _verification_lock = self.verification_lock.lock();
+			let _verification_lock = self.heavy_verification_lock.lock();
 			let blocks_to_verify = self.core.lock().on_block(peer_index, block);
 
 			// verify blocks
 			if let Some(mut blocks_to_verify) = blocks_to_verify {
 				while let Some(block) = blocks_to_verify.pop_front() {
-					self.verifier.verify_block(block);
+					self.heavy_verifier.verify_block(block);
 				}
 			}
 		}
@@ -201,7 +206,7 @@ impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Veri
 			// => we should verify blocks we mine
 			let next_block_height = self.shared_state.best_storage_block_height() + 1;
 			while let Some(tx) = transactions_to_verify.pop_front() {
-				self.verifier.verify_transaction(next_block_height, tx);
+				self.heavy_verifier.verify_transaction(next_block_height, tx);
 			}
 		}
 	}
@@ -219,7 +224,7 @@ impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Veri
 
 		let next_block_height = self.shared_state.best_storage_block_height() + 1;
 		while let Some(tx) = transactions_to_verify.pop_front() {
-			self.verifier.verify_transaction(next_block_height, tx);
+			self.heavy_verifier.verify_transaction(next_block_height, tx);
 		}
 		Ok(())
 	}
@@ -231,12 +236,18 @@ impl<T, U> Client for SynchronizationClient<T, U> where T: TaskExecutor, U: Veri
 
 impl<T, U> SynchronizationClient<T, U> where T: TaskExecutor, U: Verifier {
 	/// Create new synchronization client
-	pub fn new(shared_state: SynchronizationStateRef, core: ClientCoreRef<SynchronizationClientCore<T>>, verifier: U) -> Arc<Self> {
+	pub fn new(
+		shared_state: SynchronizationStateRef,
+		core: ClientCoreRef<SynchronizationClientCore<T>>,
+		light_verifier: U,
+		heavy_verifier: U,
+	) -> Arc<Self> {
 		Arc::new(SynchronizationClient {
-			verification_lock: Mutex::new(()),
 			shared_state: shared_state,
 			core: core,
-			verifier: verifier,
+			light_verifier: light_verifier,
+			heavy_verification_lock: Mutex::new(()),
+			heavy_verifier: heavy_verifier,
 		})
 	}
 }

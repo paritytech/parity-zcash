@@ -1,7 +1,7 @@
 use std::collections::{VecDeque, HashSet};
 use std::fmt;
 use linked_hash_map::LinkedHashMap;
-use chain::{BlockHeader, Transaction, IndexedBlockHeader, IndexedBlock, IndexedTransaction, OutPoint, TransactionOutput};
+use chain::{IndexedBlockHeader, IndexedBlock, IndexedTransaction, OutPoint, TransactionOutput};
 use storage;
 use miner::{MemoryPoolOrderingStrategy, MemoryPoolInformation, FeeCalculator};
 use primitives::bytes::Bytes;
@@ -51,6 +51,8 @@ impl BlockInsertionResult {
 pub enum BlockState {
 	/// Block is unknown
 	Unknown,
+	/// Block header is currently verifying
+	VerifyingHeader,
 	/// Scheduled for requesting
 	Scheduled,
 	/// Requested from peers
@@ -78,6 +80,8 @@ pub enum TransactionState {
 
 /// Synchronization chain information
 pub struct Information {
+	/// Number of blocks that are currently passing header verification state
+	pub headers_verifying: BlockHeight,
 	/// Number of blocks hashes currently scheduled for requesting
 	pub scheduled: BlockHeight,
 	/// Number of blocks hashes currently requested from peers
@@ -104,6 +108,8 @@ pub struct Chain {
 	best_storage_block: storage::BestBlock,
 	/// Local blocks storage
 	storage: StorageRef,
+	/// The set of headers we currently verifying.
+	verifying_headers: HashSet<H256>,
 	/// In-memory queue of blocks hashes
 	hash_chain: HashQueueChain,
 	/// In-memory queue of blocks headers
@@ -149,6 +155,7 @@ impl Chain {
 			genesis_block_hash: genesis_block_hash,
 			best_storage_block: best_storage_block,
 			storage: storage,
+			verifying_headers: HashSet::new(),
 			hash_chain: HashQueueChain::with_number_of_queues(NUMBER_OF_QUEUES),
 			headers_chain: BestHeadersChain::new(best_storage_block_hash),
 			verifying_transactions: LinkedHashMap::new(),
@@ -160,6 +167,7 @@ impl Chain {
 	/// Get information on current blockchain state
 	pub fn information(&self) -> Information {
 		Information {
+			headers_verifying: self.verifying_headers.len() as BlockHeight,
 			scheduled: self.hash_chain.len_of(SCHEDULED_QUEUE),
 			requested: self.hash_chain.len_of(REQUESTED_QUEUE),
 			verifying: self.hash_chain.len_of(VERIFYING_QUEUE),
@@ -183,6 +191,7 @@ impl Chain {
 	pub fn length_of_blocks_state(&self, state: BlockState) -> BlockHeight {
 		match state {
 			BlockState::Stored => self.best_storage_block.number + 1,
+			BlockState::VerifyingHeader => self.verifying_headers.len() as BlockHeight,
 			_ => self.hash_chain.len_of(state.to_queue_index()),
 		}
 	}
@@ -246,7 +255,7 @@ impl Chain {
 	/// Get block header by number
 	pub fn block_header_by_number(&self, number: BlockHeight) -> Option<IndexedBlockHeader> {
 		if number <= self.best_storage_block.number {
-			self.storage.indexed_block_header(storage::BlockRef::Number(number))
+			self.storage.block_header(storage::BlockRef::Number(number))
 		} else {
 			self.headers_chain.at(number - self.best_storage_block.number)
 		}
@@ -254,7 +263,7 @@ impl Chain {
 
 	/// Get block header by hash
 	pub fn block_header_by_hash(&self, hash: &H256) -> Option<IndexedBlockHeader> {
-		if let Some(header) = self.storage.indexed_block_header(storage::BlockRef::Hash(hash.clone())) {
+		if let Some(header) = self.storage.block_header(storage::BlockRef::Hash(hash.clone())) {
 			return Some(header);
 		}
 		self.headers_chain.by_hash(hash)
@@ -262,6 +271,10 @@ impl Chain {
 
 	/// Get block state
 	pub fn block_state(&self, hash: &H256) -> BlockState {
+		if self.verifying_headers.contains(hash) {
+			return BlockState::VerifyingHeader;
+		}
+
 		match self.hash_chain.contains_in(hash) {
 			Some(queue_index) => BlockState::from_queue_index(queue_index),
 			None => if self.storage.contains_block(storage::BlockRef::Hash(hash.clone())) {
@@ -292,6 +305,18 @@ impl Chain {
 		block_locator_hashes
 	}
 
+	/// Add headers to verifying queue
+	pub fn verify_headers(&mut self, headers: &[IndexedBlockHeader]) {
+		self.verifying_headers.extend(headers.iter().map(|h| h.hash))
+	}
+
+	/// Remove headers from verifying queue
+	pub fn headers_verified(&mut self, headers: &[IndexedBlockHeader]) {
+		for header in headers {
+			self.verifying_headers.remove(&header.hash);
+		}
+	}
+
 	/// Schedule blocks hashes for requesting
 	pub fn schedule_blocks_headers(&mut self, headers: Vec<IndexedBlockHeader>) {
 		self.hash_chain.push_back_n_at(SCHEDULED_QUEUE, headers.iter().map(|h| h.hash.clone()).collect());
@@ -305,18 +330,15 @@ impl Chain {
 		scheduled
 	}
 
-	/// Add block to verifying queue
-	pub fn verify_block(&mut self, header: IndexedBlockHeader) {
+	/// Add block to verifying queue.
+	///
+	/// Returns true if the header has already been in the headers chain. The fact that it is in the
+	/// chain, guarantees the header has already been pre-verified. The opposite isn't true -
+	/// if the header isn't in the chain, it could have been (in rare cases) pre-verified.
+	pub fn verify_block(&mut self, header: IndexedBlockHeader) -> bool {
 		// insert header to the in-memory chain in case when it is not already there (non-headers-first sync)
 		self.hash_chain.push_back_at(VERIFYING_QUEUE, header.hash.clone());
-		self.headers_chain.insert(header);
-	}
-
-	/// Add blocks to verifying queue
-	pub fn verify_blocks(&mut self, blocks: Vec<IndexedBlockHeader>) {
-		for block in blocks {
-			self.verify_block(block);
-		}
+		self.headers_chain.insert(header)
 	}
 
 	/// Moves n blocks from requested queue to verifying queue
@@ -406,7 +428,7 @@ impl Chain {
 
 				// reverify all transactions from old main branch' blocks
 				let old_main_blocks_transactions = origin.decanonized_route.into_iter()
-					.flat_map(|block_hash| self.storage.indexed_block_transactions(block_hash.into()))
+					.flat_map(|block_hash| self.storage.block_transactions(block_hash.into()))
 					.collect::<Vec<_>>();
 
 				trace!(target: "sync", "insert_best_block, old_main_blocks_transactions: {:?}",
@@ -661,7 +683,7 @@ impl storage::TransactionProvider for Chain {
 			.or_else(|| self.storage.transaction_bytes(hash))
 	}
 
-	fn transaction(&self, hash: &H256) -> Option<Transaction> {
+	fn transaction(&self, hash: &H256) -> Option<IndexedTransaction> {
 		self.memory_pool.read().transaction(hash)
 			.or_else(|| self.storage.transaction(hash))
 	}
@@ -682,20 +704,27 @@ impl storage::TransactionOutputProvider for Chain {
 impl storage::BlockHeaderProvider for Chain {
 	fn block_header_bytes(&self, block_ref: storage::BlockRef) -> Option<Bytes> {
 		use ser::serialize;
-		self.block_header(block_ref).map(|h| serialize(&h))
+		self.block_header(block_ref).map(|h| serialize(&h.raw))
 	}
 
-	fn block_header(&self, block_ref: storage::BlockRef) -> Option<BlockHeader> {
+	fn block_header(&self, block_ref: storage::BlockRef) -> Option<IndexedBlockHeader> {
 		match block_ref {
-			storage::BlockRef::Hash(hash) => self.block_header_by_hash(&hash).map(|h| h.raw),
-			storage::BlockRef::Number(n) => self.block_header_by_number(n).map(|h| h.raw),
+			storage::BlockRef::Hash(hash) => self.block_header_by_hash(&hash),
+			storage::BlockRef::Number(n) => self.block_header_by_number(n),
 		}
 	}
 }
 
 impl fmt::Debug for Information {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "[sch:{} -> req:{} -> vfy:{} -> stored: {}]", self.scheduled, self.requested, self.verifying, self.stored)
+		write!(
+			f,
+			"[sch:{} > req:{} > vfy:{} > db:{}]",
+			self.scheduled,
+			self.requested,
+			self.verifying,
+			self.stored,
+		)
 	}
 }
 

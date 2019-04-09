@@ -5,14 +5,31 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use parking_lot::Mutex;
 use time::get_time;
-use chain::{IndexedBlock, IndexedTransaction};
+use chain::{IndexedBlockHeader, IndexedBlock, IndexedTransaction};
 use network::ConsensusParams;
 use primitives::hash::H256;
 use verification::{BackwardsCompatibleChainVerifier as ChainVerifier, Verify as VerificationVerify,
 	Error as VerificationError, VerificationLevel};
-use types::{BlockHeight, StorageRef, MemoryPoolRef};
+use types::{PeerIndex, BlockHeight, StorageRef, MemoryPoolRef};
 use utils::MemoryPoolTransactionOutputProvider;
 use VerificationParameters;
+
+//// Block that is (possibly) partially verified.
+#[derive(Debug)]
+pub enum PartiallyVerifiedBlock {
+	/// Block that isn't verified at all.
+	NotVerified(IndexedBlock),
+	/// Block that has its header pre-verified (mind that AcceptHeader isn't called).
+	HeaderPreVerified(IndexedBlock),
+}
+
+/// Headers verification events sink
+pub trait HeadersVerificationSink : Send + Sync + 'static {
+	/// When headers verification has completed successfully.
+	fn on_headers_verification_success(&self, headers: Vec<IndexedBlockHeader>);
+	/// When headers verification has failed.
+	fn on_headers_verification_error(&self, peer: PeerIndex, error: String, hash: H256, headers: Vec<IndexedBlockHeader>);
+}
 
 /// Block verification events sink
 pub trait BlockVerificationSink : Send + Sync + 'static {
@@ -31,14 +48,16 @@ pub trait TransactionVerificationSink : Send + Sync + 'static {
 }
 
 /// Verification events sink
-pub trait VerificationSink : BlockVerificationSink + TransactionVerificationSink {
+pub trait VerificationSink : HeadersVerificationSink + BlockVerificationSink + TransactionVerificationSink {
 }
 
 /// Verification thread tasks
 #[derive(Debug)]
 pub enum VerificationTask {
+	/// Verify headers
+	VerifyHeaders(PeerIndex, Vec<IndexedBlockHeader>),
 	/// Verify single block
-	VerifyBlock(IndexedBlock),
+	VerifyBlock(PartiallyVerifiedBlock),
 	/// Verify single transaction
 	VerifyTransaction(BlockHeight, IndexedTransaction),
 	/// Stop verification thread
@@ -47,8 +66,10 @@ pub enum VerificationTask {
 
 /// Synchronization verifier
 pub trait Verifier : Send + Sync + 'static {
+	/// Verify headers
+	fn verify_headers(&self, peer: PeerIndex, headers: Vec<IndexedBlockHeader>);
 	/// Verify block
-	fn verify_block(&self, block: IndexedBlock);
+	fn verify_block(&self, block: PartiallyVerifiedBlock);
 	/// Verify transaction
 	fn verify_transaction(&self, height: BlockHeight, transaction: IndexedTransaction);
 }
@@ -67,8 +88,34 @@ pub struct ChainVerifierWrapper {
 	pub verifier: Arc<ChainVerifier>,
 	/// Verification parameters.
 	verification_params: VerificationParameters,
-	/// Is verification edge passed.
+	/// True if we have passed verification edge && full verification is required.
 	pub enforce_full_verification: AtomicBool,
+}
+
+impl PartiallyVerifiedBlock {
+	/// Returns hash of the block.
+	pub fn hash(&self) -> &H256 {
+		match *self {
+			PartiallyVerifiedBlock::NotVerified(ref block)
+				| PartiallyVerifiedBlock::HeaderPreVerified(ref block) => block.hash(),
+		}
+	}
+}
+
+impl From<PartiallyVerifiedBlock> for IndexedBlock {
+	fn from(block: PartiallyVerifiedBlock) -> Self {
+		match block {
+			PartiallyVerifiedBlock::NotVerified(block) => block,
+			PartiallyVerifiedBlock::HeaderPreVerified(block) => block,
+		}
+	}
+}
+
+#[cfg(test)]
+impl From<IndexedBlock> for PartiallyVerifiedBlock {
+	fn from(block: IndexedBlock) -> Self {
+		PartiallyVerifiedBlock::NotVerified(block)
+	}
 }
 
 impl ChainVerifierWrapper {
@@ -82,18 +129,34 @@ impl ChainVerifierWrapper {
 		}
 	}
 
+	/// Verify header.
+	pub fn verify_block_header(&self, header: &IndexedBlockHeader) -> Result<(), VerificationError> {
+		self.verifier.verify_block_header(header)
+	}
+
 	/// Verify block.
-	pub fn verify_block(&self, block: &IndexedBlock) -> Result<(), VerificationError> {
+	pub fn verify_block(&self, block: &PartiallyVerifiedBlock) -> Result<(), VerificationError> {
 		let enforce_full_verification = if block.hash() == &self.verification_params.verification_edge {
 			self.enforce_full_verification.store(true, Ordering::Relaxed);
 			true
 		} else {
 			self.enforce_full_verification.load(Ordering::Relaxed)
 		};
-		let verification_level = if enforce_full_verification {
-			VerificationLevel::Full
+
+		// select base verification level
+		let mut verification_level = if enforce_full_verification {
+			VerificationLevel::FULL
 		} else {
 			self.verification_params.verification_level
+		};
+
+		// update verification level with hints, if necessary
+		let block = match *block {
+			PartiallyVerifiedBlock::NotVerified(ref block) => block,
+			PartiallyVerifiedBlock::HeaderPreVerified(ref block) => {
+				verification_level.insert(VerificationLevel::HINT_HEADER_PRE_VERIFIED);
+				block
+			},
 		};
 
 		self.verifier.verify(verification_level, block)
@@ -112,12 +175,19 @@ impl VerificationTask {
 
 impl AsyncVerifier {
 	/// Create new async verifier
-	pub fn new<T: VerificationSink>(verifier: Arc<ChainVerifier>, storage: StorageRef, memory_pool: MemoryPoolRef, sink: Arc<T>, verification_params: VerificationParameters) -> Self {
+	pub fn new<T: VerificationSink>(
+		thread_name: String,
+		verifier: Arc<ChainVerifier>,
+		storage: StorageRef,
+		memory_pool: MemoryPoolRef,
+		sink: Arc<T>,
+		verification_params: VerificationParameters,
+	) -> Self {
 		let (verification_work_sender, verification_work_receiver) = channel();
 		AsyncVerifier {
 			verification_work_sender: Mutex::new(verification_work_sender),
 			verification_worker_thread: Some(thread::Builder::new()
-				.name("Sync verification thread".to_string())
+				.name(thread_name)
 				.spawn(move || {
 					let verifier = ChainVerifierWrapper::new(verifier, &storage, verification_params);
 					AsyncVerifier::verification_worker_proc(sink, storage, memory_pool, verifier, verification_work_receiver)
@@ -127,8 +197,14 @@ impl AsyncVerifier {
 	}
 
 	/// Thread procedure for handling verification tasks
-	fn verification_worker_proc<T: VerificationSink>(sink: Arc<T>, storage: StorageRef, memory_pool: MemoryPoolRef, verifier: ChainVerifierWrapper, work_receiver: Receiver<VerificationTask>) {
-		while let Ok(task) = work_receiver.recv() {
+	fn verification_worker_proc<T: VerificationSink>(
+		sink: Arc<T>,
+		storage: StorageRef,
+		memory_pool: MemoryPoolRef,
+		verifier: ChainVerifierWrapper,
+		work_receiver: Receiver<VerificationTask>,
+	) {
+		while let Some(task) = work_receiver.recv().ok() {
 			if !AsyncVerifier::execute_single_task(&sink, &storage, &memory_pool, &verifier, task) {
 				break;
 			}
@@ -138,7 +214,13 @@ impl AsyncVerifier {
 	}
 
 	/// Execute single verification task
-	pub fn execute_single_task<T: VerificationSink>(sink: &Arc<T>, storage: &StorageRef, memory_pool: &MemoryPoolRef, verifier: &ChainVerifierWrapper, task: VerificationTask) -> bool {
+	pub fn execute_single_task<T: VerificationSink>(
+		sink: &Arc<T>,
+		storage: &StorageRef,
+		memory_pool: &MemoryPoolRef,
+		verifier: &ChainVerifierWrapper,
+		task: VerificationTask,
+	) -> bool {
 		// block verification && insertion can lead to reorganization
 		// => transactions from decanonized blocks should be put back to the MemoryPool
 		// => they must be verified again
@@ -148,11 +230,20 @@ impl AsyncVerifier {
 
 		while let Some(task) = tasks_queue.pop_front() {
 			match task {
+				VerificationTask::VerifyHeaders(peer, headers) => {
+					let result = headers.iter()
+						.try_for_each(|header| verifier.verify_block_header(header)
+							.map_err(|error| (error, header.hash)));
+					match result {
+						Ok(_) => sink.on_headers_verification_success(headers),
+						Err((error, hash)) => sink.on_headers_verification_error(peer, format!("{:?}", error), hash, headers),
+					}
+				},
 				VerificationTask::VerifyBlock(block) => {
 					// verify block
 					match verifier.verify_block(&block) {
 						Ok(_) => {
-							if let Some(tasks) = sink.on_block_verification_success(block) {
+							if let Some(tasks) = sink.on_block_verification_success(block.into()) {
 								tasks_queue.extend(tasks);
 							}
 						},
@@ -185,7 +276,6 @@ impl AsyncVerifier {
 	}
 }
 
-
 impl Drop for AsyncVerifier {
 	fn drop(&mut self) {
 		if let Some(join_handle) = self.verification_worker_thread.take() {
@@ -200,14 +290,18 @@ impl Drop for AsyncVerifier {
 }
 
 impl Verifier for AsyncVerifier {
-	/// Verify block
-	fn verify_block(&self, block: IndexedBlock) {
+	fn verify_headers(&self, peer: PeerIndex, headers: Vec<IndexedBlockHeader>) {
+		self.verification_work_sender.lock()
+			.send(VerificationTask::VerifyHeaders(peer, headers))
+			.expect("Verification thread have the same lifetime as `AsyncVerifier`");
+	}
+
+	fn verify_block(&self, block: PartiallyVerifiedBlock) {
 		self.verification_work_sender.lock()
 			.send(VerificationTask::VerifyBlock(block))
 			.expect("Verification thread have the same lifetime as `AsyncVerifier`");
 	}
 
-	/// Verify transaction
 	fn verify_transaction(&self, height: BlockHeight, transaction: IndexedTransaction) {
 		self.verification_work_sender.lock()
 			.send(VerificationTask::VerifyTransaction(height, transaction))
@@ -236,14 +330,19 @@ impl<T> SyncVerifier<T> where T: VerificationSink {
 }
 
 impl<T> Verifier for SyncVerifier<T> where T: VerificationSink {
+	/// Verify headers
+	fn verify_headers(&self, _peer: PeerIndex, _headers: Vec<IndexedBlockHeader>) {
+		unreachable!("SyncVerifier is used only for blocks verification")
+	}
+
 	/// Verify block
-	fn verify_block(&self, block: IndexedBlock) {
+	fn verify_block(&self, block: PartiallyVerifiedBlock) {
 		match self.verifier.verify_block(&block) {
 			Ok(_) => {
 				// SyncVerifier is used for bulk blocks import only
 				// => there is no memory pool
 				// => we could ignore decanonized transactions
-				self.sink.on_block_verification_success(block);
+				self.sink.on_block_verification_success(block.into());
 			},
 			Err(e) => self.sink.on_block_verification_error(&format!("{:?}", e), block.hash()),
 		}
@@ -251,7 +350,7 @@ impl<T> Verifier for SyncVerifier<T> where T: VerificationSink {
 
 	/// Verify transaction
 	fn verify_transaction(&self, _height: BlockHeight, _transaction: IndexedTransaction) {
-		unimplemented!() // sync verifier is currently only used for blocks verification
+		unreachable!("SyncVerifier is used only for blocks verification")
 	}
 }
 
@@ -269,9 +368,10 @@ pub mod tests {
 	use synchronization_client_core::CoreVerificationSink;
 	use synchronization_executor::tests::DummyTaskExecutor;
 	use primitives::hash::H256;
-	use chain::{IndexedBlock, IndexedTransaction};
-	use super::{Verifier, BlockVerificationSink, TransactionVerificationSink, AsyncVerifier, VerificationTask, ChainVerifierWrapper};
-	use types::{BlockHeight, StorageRef, MemoryPoolRef};
+	use chain::{IndexedBlockHeader, IndexedBlock, IndexedTransaction};
+	use super::{Verifier, HeadersVerificationSink, BlockVerificationSink, TransactionVerificationSink,
+		AsyncVerifier, VerificationTask, ChainVerifierWrapper, PartiallyVerifiedBlock};
+	use types::{PeerIndex, BlockHeight, StorageRef, MemoryPoolRef};
 	use VerificationParameters;
 
 	#[derive(Default)]
@@ -299,7 +399,7 @@ pub mod tests {
 
 		pub fn set_verifier(&mut self, verifier: Arc<ChainVerifier>) {
 			self.verifier = Some(ChainVerifierWrapper::new(verifier, self.storage.as_ref().unwrap(), VerificationParameters {
-				verification_level: VerificationLevel::Full,
+				verification_level: VerificationLevel::FULL,
 				verification_edge: 0u8.into(),
 			}));
 		}
@@ -314,7 +414,14 @@ pub mod tests {
 	}
 
 	impl Verifier for DummyVerifier {
-		fn verify_block(&self, block: IndexedBlock) {
+		fn verify_headers(&self, _peer: PeerIndex, headers: Vec<IndexedBlockHeader>) {
+			match self.sink {
+				Some(ref sink) => sink.on_headers_verification_success(headers),
+				_ => (),
+			}
+		}
+
+		fn verify_block(&self, block: PartiallyVerifiedBlock) {
 			match self.sink {
 				Some(ref sink) => match self.errors.get(&block.hash()) {
 					Some(err) => sink.on_block_verification_error(&err, &block.hash()),
@@ -322,7 +429,7 @@ pub mod tests {
 						if self.actual_checks.contains(block.hash()) {
 							AsyncVerifier::execute_single_task(sink, self.storage.as_ref().unwrap(), self.memory_pool.as_ref().unwrap(), self.verifier.as_ref().unwrap(), VerificationTask::VerifyBlock(block));
 						} else {
-							sink.on_block_verification_success(block);
+							sink.on_block_verification_success(block.into());
 						}
 					},
 				},
@@ -355,18 +462,18 @@ pub mod tests {
 
 		// switching to full verification when block is already in db
 		assert_eq!(ChainVerifierWrapper::new(verifier.clone(), &storage, VerificationParameters {
-			verification_level: VerificationLevel::NoVerification,
+			verification_level: VerificationLevel::NO_VERIFICATION,
 			verification_edge: test_data::genesis().hash(),
 		}).enforce_full_verification.load(Ordering::Relaxed), true);
 
 		// switching to full verification when block with given hash is coming
 		let wrapper = ChainVerifierWrapper::new(verifier, &storage, VerificationParameters {
-			verification_level: VerificationLevel::NoVerification,
+			verification_level: VerificationLevel::NO_VERIFICATION,
 			verification_edge: test_data::block_h1().hash(),
 		});
 		assert_eq!(wrapper.enforce_full_verification.load(Ordering::Relaxed), false);
 		let block: IndexedBlock = test_data::block_h1().into();
-		let _ = wrapper.verify_block(&block);
+		let _ = wrapper.verify_block(&block.into());
 		assert_eq!(wrapper.enforce_full_verification.load(Ordering::Relaxed), true);
 	}
 
@@ -416,17 +523,17 @@ pub mod tests {
 
 		// Ok(()) when tx script is not checked
 		let wrapper = ChainVerifierWrapper::new(verifier.clone(), &storage, VerificationParameters {
-			verification_level: VerificationLevel::Header,
+			verification_level: VerificationLevel::HEADER,
 			verification_edge: 1.into(),
 		});
-		assert_eq!(wrapper.verify_block(&bad_transaction_block), Ok(()));
+		assert_eq!(wrapper.verify_block(&bad_transaction_block.clone().into()), Ok(()));
 
 		// Error when tx script is checked
 		let wrapper = ChainVerifierWrapper::new(verifier, &storage, VerificationParameters {
-			verification_level: VerificationLevel::Full,
+			verification_level: VerificationLevel::FULL,
 			verification_edge: 1.into(),
 		});
-		assert_eq!(wrapper.verify_block(&bad_transaction_block), Err(VerificationError::Transaction(1, TransactionError::Signature(0, ScriptError::InvalidStackOperation))));
+		assert_eq!(wrapper.verify_block(&bad_transaction_block.into()), Err(VerificationError::Transaction(1, TransactionError::Signature(0, ScriptError::InvalidStackOperation))));
 	}
 
 	#[test]
@@ -437,16 +544,16 @@ pub mod tests {
 
 		// Ok(()) when nothing is verified
 		let wrapper = ChainVerifierWrapper::new(verifier.clone(), &storage, VerificationParameters {
-			verification_level: VerificationLevel::NoVerification,
+			verification_level: VerificationLevel::NO_VERIFICATION,
 			verification_edge: 1.into(),
 		});
-		assert_eq!(wrapper.verify_block(&bad_block), Ok(()));
+		assert_eq!(wrapper.verify_block(&bad_block.clone().into()), Ok(()));
 
 		// Error when everything is verified
 		let wrapper = ChainVerifierWrapper::new(verifier, &storage, VerificationParameters {
-			verification_level: VerificationLevel::Full,
+			verification_level: VerificationLevel::FULL,
 			verification_edge: 1.into(),
 		});
-		assert_eq!(wrapper.verify_block(&bad_block), Err(VerificationError::Empty));
+		assert_eq!(wrapper.verify_block(&bad_block.into()), Err(VerificationError::Empty));
 	}
 }

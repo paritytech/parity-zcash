@@ -126,15 +126,15 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	let services = Services::default().with_network(true);
 
 	let verification_level = match matches.value_of("verification-level") {
-		Some(s) if s == "full" => VerificationLevel::Full,
-		Some(s) if s == "header" => VerificationLevel::Header,
-		Some(s) if s == "none" => VerificationLevel::NoVerification,
+		Some(s) if s == "full" => VerificationLevel::FULL,
+		Some(s) if s == "header" => VerificationLevel::HEADER,
+		Some(s) if s == "none" => VerificationLevel::NO_VERIFICATION,
 		Some(s) => return Err(format!("Invalid verification level: {}", s)),
-		None => VerificationLevel::Full,
+		None => VerificationLevel::FULL,
 	};
 
 	let verification_edge = match matches.value_of("verification-edge") {
-		Some(s) if verification_level != VerificationLevel::Full => {
+		Some(s) if verification_level != VerificationLevel::FULL => {
 			let edge: H256 = s.parse().map_err(|_| "Invalid verification edge".to_owned())?;
 			edge.reversed()
 		},

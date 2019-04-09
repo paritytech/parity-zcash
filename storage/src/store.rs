@@ -1,9 +1,8 @@
 use std::sync::Arc;
-use chain::BlockHeader;
+use chain::IndexedBlockHeader;
 use {
 	BestBlock, BlockProvider, BlockHeaderProvider, TransactionProvider, TransactionMetaProvider,
-	TransactionOutputProvider, BlockChain, IndexedBlockProvider, Forkable, NullifierTracker,
-	TreeStateProvider,
+	TransactionOutputProvider, BlockChain, Forkable, NullifierTracker, TreeStateProvider,
 };
 
 pub trait CanonStore: Store + Forkable {
@@ -16,13 +15,13 @@ pub trait Store: AsSubstore {
 	fn best_block(&self) -> BestBlock;
 
 	/// get best header
-	fn best_header(&self) -> BlockHeader;
+	fn best_header(&self) -> IndexedBlockHeader;
 }
 
 /// Allows casting Arc<Store> to reference to any substore type
 pub trait AsSubstore:
 	BlockChain +
-	IndexedBlockProvider +
+	BlockProvider +
 	TransactionProvider +
 	TransactionMetaProvider +
 	TransactionOutputProvider +
@@ -45,7 +44,7 @@ pub trait AsSubstore:
 
 impl<T> AsSubstore for T
 	where T: BlockChain +
-		IndexedBlockProvider +
+		BlockProvider +
 		TransactionProvider +
 		TransactionMetaProvider +
 		TransactionOutputProvider +

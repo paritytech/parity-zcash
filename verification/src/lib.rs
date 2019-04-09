@@ -60,6 +60,8 @@ extern crate byteorder;
 #[cfg(test)]
 extern crate rand;
 extern crate rustc_hex as hex;
+#[macro_use]
+extern crate bitflags;
 
 extern crate storage;
 extern crate chain;
@@ -127,15 +129,19 @@ pub use work::{work_required, is_valid_proof_of_work, is_valid_proof_of_work_has
 pub use deployments::Deployments;
 pub use tree_cache::TreeCache;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
 /// Blocks verification level.
-pub enum VerificationLevel {
-	/// Full verification.
-	Full,
-	/// Transaction scripts are not checked.
-	Header,
-	/// No verification at all.
-	NoVerification,
+bitflags! {
+	pub struct VerificationLevel: u32 {
+		/// Base level: perform full block verification.
+		const FULL = 0x00000001;
+		/// Base level: transaction scripts are not checked.
+		const HEADER = 0x00000002;
+		/// Base level: no blocks verification at all.
+		const NO_VERIFICATION = 0x00000004;
+
+		/// This bit is set if header pre-verification (non-context) has already been performed for the block.
+		const HINT_HEADER_PRE_VERIFIED = 0x10000000;
+	}
 }
 
 /// Interface for block verification

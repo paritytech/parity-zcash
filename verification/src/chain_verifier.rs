@@ -1,9 +1,8 @@
 //! Bitcoin chain verifier
 
-use hash::H256;
-use chain::{IndexedBlock, IndexedBlockHeader, BlockHeader, IndexedTransaction};
+use chain::{IndexedBlock, IndexedBlockHeader, IndexedTransaction};
 use storage::{SharedStore, TransactionOutputProvider, BlockHeaderProvider, BlockOrigin,
-	DuplexTransactionOutputProvider, NoopStore};
+	DuplexTransactionOutputProvider, NoopStore, CachedTransactionOutputProvider};
 use network::ConsensusParams;
 use error::{Error, TransactionError};
 use canon::{CanonBlock, CanonTransaction};
@@ -31,53 +30,102 @@ impl BackwardsCompatibleChainVerifier {
 	}
 
 	fn verify_block(&self, verification_level: VerificationLevel, block: &IndexedBlock) -> Result<(), Error> {
-		if verification_level == VerificationLevel::NoVerification {
+		if verification_level.intersects(VerificationLevel::NO_VERIFICATION) {
 			return Ok(());
 		}
 
 		let current_time = ::time::get_time().sec as u32;
 		// first run pre-verification
-		let chain_verifier = ChainVerifier::new(block, &self.consensus, current_time);
+		let chain_verifier = ChainVerifier::new(block, &self.consensus, current_time, verification_level);
 		chain_verifier.check()?;
 
 		assert_eq!(Some(self.store.best_block().hash), self.store.block_hash(self.store.best_block().number));
 		let block_origin = self.store.block_origin(&block.header)?;
-		trace!(target: "verification", "verify_block: {:?} best_block: {:?} block_origin: {:?}", block.hash().reversed(), self.store.best_block(), block_origin);
+		trace!(
+			target: "verification",
+			"verify_block: {:?} best_block: {:?} block_origin: {:?}",
+			block.hash().reversed(),
+			self.store.best_block(),
+			block_origin,
+		);
 
+		let canon_block = CanonBlock::new(block);
 		match block_origin {
 			BlockOrigin::KnownBlock => {
 				// there should be no known blocks at this point
 				unreachable!();
 			},
 			BlockOrigin::CanonChain { block_number } => {
+				let tx_out_provider = CachedTransactionOutputProvider::new(self.store.as_store().as_transaction_output_provider());
+				let tx_meta_provider = self.store.as_store().as_transaction_meta_provider();
 				let header_provider = self.store.as_store().as_block_header_provider();
+				let tree_state_provider = self.store.as_store().as_tree_state_provider();
+				let nullifier_tracker = self.store.as_store().as_nullifier_tracker();
 				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
-				let canon_block = CanonBlock::new(block);
-				let chain_acceptor = ChainAcceptor::new(self.store.as_store(), &self.consensus, verification_level,
-					canon_block, block_number, block.header.raw.time, &deployments);
+				let chain_acceptor = ChainAcceptor::new(
+					&tx_out_provider,
+					tx_meta_provider,
+					header_provider,
+					tree_state_provider,
+					nullifier_tracker,
+					&self.consensus,
+					verification_level,
+					canon_block,
+					block_number,
+					block.header.raw.time,
+					&deployments,
+				);
 				chain_acceptor.check()?;
 			},
 			BlockOrigin::SideChain(origin) => {
 				let block_number = origin.block_number;
-				let header_provider = self.store.as_store().as_block_header_provider();
-				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
 				let fork = self.store.fork(origin)?;
-				let canon_block = CanonBlock::new(block);
-				let chain_acceptor = ChainAcceptor::new(fork.store(), &self.consensus, verification_level, canon_block,
-					block_number, block.header.raw.time, &deployments);
+				let tx_out_provider = CachedTransactionOutputProvider::new(fork.store().as_transaction_output_provider());
+				let tx_meta_provider = fork.store().as_transaction_meta_provider();
+				let header_provider = fork.store().as_block_header_provider();
+				let tree_state_provider = fork.store().as_tree_state_provider();
+				let nullifier_tracker = fork.store().as_nullifier_tracker();
+				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
+				let chain_acceptor = ChainAcceptor::new(
+					&tx_out_provider,
+					tx_meta_provider,
+					header_provider,
+					tree_state_provider,
+					nullifier_tracker,
+					&self.consensus,
+					verification_level,
+					canon_block,
+					block_number,
+					block.header.raw.time,
+					&deployments,
+				);
 				chain_acceptor.check()?;
 			},
 			BlockOrigin::SideChainBecomingCanonChain(origin) => {
 				let block_number = origin.block_number;
-				let header_provider = self.store.as_store().as_block_header_provider();
-				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
 				let fork = self.store.fork(origin)?;
-				let canon_block = CanonBlock::new(block);
-				let chain_acceptor = ChainAcceptor::new(fork.store(), &self.consensus, verification_level, canon_block,
-					block_number, block.header.raw.time, &deployments);
+				let tx_out_provider = CachedTransactionOutputProvider::new(fork.store().as_transaction_output_provider());
+				let tx_meta_provider = fork.store().as_transaction_meta_provider();
+				let header_provider = fork.store().as_block_header_provider();
+				let tree_state_provider = fork.store().as_tree_state_provider();
+				let nullifier_tracker = fork.store().as_nullifier_tracker();
+				let deployments = BlockDeployments::new(&self.deployments, block_number, header_provider, &self.consensus);
+				let chain_acceptor = ChainAcceptor::new(
+					&tx_out_provider,
+					tx_meta_provider,
+					header_provider,
+					tree_state_provider,
+					nullifier_tracker,
+					&self.consensus,
+					verification_level,
+					canon_block,
+					block_number,
+					block.header.raw.time,
+					&deployments,
+				);
 				chain_acceptor.check()?;
 			},
-		}
+		};
 
 		assert_eq!(Some(self.store.best_block().hash), self.store.block_hash(self.store.best_block().number));
 		Ok(())
@@ -85,15 +133,10 @@ impl BackwardsCompatibleChainVerifier {
 
 	pub fn verify_block_header(
 		&self,
-		_block_header_provider: &BlockHeaderProvider,
-		hash: &H256,
-		header: &BlockHeader
+		header: &IndexedBlockHeader,
 	) -> Result<(), Error> {
-		// let's do only preverifcation
-		// TODO: full verification
 		let current_time = ::time::get_time().sec as u32;
-		let header = IndexedBlockHeader::new(hash.clone(), header.clone());
-		let header_verifier = HeaderVerifier::new(&header, &self.consensus, current_time);
+		let header_verifier = HeaderVerifier::new(header, &self.consensus, current_time);
 		header_verifier.check()
 	}
 
@@ -161,7 +204,7 @@ mod tests {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let b2 = test_data::block_h2().into();
 		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Unitest));
-		assert_eq!(Err(Error::Database(DBError::UnknownParent)), verifier.verify(VerificationLevel::Full, &b2));
+		assert_eq!(Err(Error::Database(DBError::UnknownParent)), verifier.verify(VerificationLevel::FULL, &b2));
 	}
 
 	#[test]
@@ -169,7 +212,7 @@ mod tests {
 		let storage = Arc::new(BlockChainDatabase::init_test_chain(vec![test_data::genesis().into()]));
 		let b1 = test_data::block_h1();
 		let verifier = ChainVerifier::new(storage, ConsensusParams::new(Network::Mainnet));
-		assert_eq!(verifier.verify(VerificationLevel::Full, &b1.into()), Ok(()));
+		assert_eq!(verifier.verify(VerificationLevel::FULL, &b1.into()), Ok(()));
 	}
 
 	#[test]
@@ -181,7 +224,7 @@ mod tests {
 			]);
 		let b1 = test_data::block_h2();
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Mainnet));
-		assert_eq!(verifier.verify(VerificationLevel::Full, &b1.into()), Ok(()));
+		assert_eq!(verifier.verify(VerificationLevel::FULL, &b1.into()), Ok(()));
 	}
 
 	#[test]
@@ -218,7 +261,7 @@ mod tests {
 			TransactionError::Maturity,
 		));
 
-		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
+		assert_eq!(expected, verifier.verify(VerificationLevel::FULL, &block.into()));
 	}
 
 	#[test]
@@ -253,7 +296,7 @@ mod tests {
 			.build();
 
 		let verifier = ChainVerifier::new(Arc::new(storage), consensus);
-		assert_eq!(verifier.verify(VerificationLevel::Full, &block.into()), Ok(()));
+		assert_eq!(verifier.verify(VerificationLevel::FULL, &block.into()), Ok(()));
 	}
 
 	#[test]
@@ -292,7 +335,7 @@ mod tests {
 			.build();
 
 		let verifier = ChainVerifier::new(Arc::new(storage), consensus);
-		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
+		assert!(verifier.verify(VerificationLevel::FULL, &block.into()).is_ok());
 	}
 
 	#[test]
@@ -333,7 +376,7 @@ mod tests {
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 
 		let expected = Err(Error::Transaction(2, TransactionError::Overspend));
-		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
+		assert_eq!(expected, verifier.verify(VerificationLevel::FULL, &block.into()));
 	}
 
 	#[test]
@@ -373,7 +416,7 @@ mod tests {
 			.build();
 
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
-		assert!(verifier.verify(VerificationLevel::Full, &block.into()).is_ok());
+		assert!(verifier.verify(VerificationLevel::FULL, &block.into()).is_ok());
 	}
 
 	#[test]
@@ -421,7 +464,7 @@ mod tests {
 
 		let verifier = ChainVerifier::new(Arc::new(storage), ConsensusParams::new(Network::Unitest));
 		let expected = Err(Error::MaximumSigops);
-		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
+		assert_eq!(expected, verifier.verify(VerificationLevel::FULL, &block.into()));
 	}
 
 	#[test]
@@ -448,6 +491,6 @@ mod tests {
 			actual: 1250000001,
 		});
 
-		assert_eq!(expected, verifier.verify(VerificationLevel::Full, &block.into()));
+		assert_eq!(expected, verifier.verify(VerificationLevel::FULL, &block.into()));
 	}
 }

@@ -1,7 +1,5 @@
-#![allow(dead_code)]
-
 use chain::{JoinSplit, JoinSplitProof, JoinSplitDescription};
-use crypto::{BnU256, Pghr13Proof, pghr13_verify};
+use crypto::{Pghr13Proof, pghr13_verify};
 
 /// Join split verification error kind
 #[derive(Debug)]
@@ -10,25 +8,6 @@ pub enum ErrorKind {
 	InvalidProof,
 	/// Invalid raw bytes econding of proof
 	InvalidEncoding,
-}
-
-/// Join split verification error
-#[derive(Debug)]
-pub struct Error {
-	index: usize,
-	kind: ErrorKind,
-}
-
-impl Error {
-	pub fn proof(idx: usize) -> Self {
-		Error { kind: ErrorKind::InvalidProof, index: idx }
-	}
-
-	pub fn encoding(idx: usize) -> Self {
-		Error { kind: ErrorKind::InvalidEncoding, index: idx }
-	}
-
-	pub fn index(&self) -> usize { self.index }
 }
 
 // blake2 hash of (random_seed, nullifier[0], nullifier[1], pub_key_hash) with 'ZcashComputehSig' personal token
@@ -96,12 +75,6 @@ pub struct Input {
 impl Input {
 	fn new(size: usize) -> Self {
 		Input { bits: bitvec::BitVec::with_capacity(size) }
-	}
-
-	fn push_u256(&mut self, val: BnU256) {
-		for i in 0..256 {
-			self.bits.push(val.get_bit(255-i).expect("for 0..256 index range will always return some; qeed"))
-		}
 	}
 
 	fn push_hash(&mut self, val: &[u8; 32]) {

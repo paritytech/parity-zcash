@@ -74,13 +74,14 @@ impl BestHeadersChain {
 	}
 
 	/// Insert new block header
-	pub fn insert(&mut self, header: IndexedBlockHeader) {
+	pub fn insert(&mut self, header: IndexedBlockHeader) -> bool {
 		// append to the best chain
 		if self.best_block_hash() == header.raw.previous_header_hash {
 			let header_hash = header.hash.clone();
-			self.headers.insert(header_hash.clone(), header);
 			self.best.push_back(header_hash);
-			return;
+			self.headers.insert(header_hash.clone(), header).is_some()
+		} else {
+			self.headers.contains_key(&header.hash)
 		}
 	}
 
@@ -227,5 +228,14 @@ mod tests {
 
 		assert_eq!(chain.information().best, 1);
 		assert_eq!(chain.information().total, 1);
+	}
+
+	#[test]
+	fn insert_to_best_chain_returns_true_if_header_is_in_chain() {
+		let b0 = test_data::block_builder().header().build().build();
+		let b1 = test_data::block_builder().header().parent(b0.hash()).build().build().block_header;
+		let mut chain = BestHeadersChain::new(b0.hash());
+		assert!(!chain.insert(b1.clone().into()));
+		assert!(chain.insert(b1.clone().into()));
 	}
 }
