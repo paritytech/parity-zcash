@@ -342,7 +342,7 @@ mod tests {
 	}
 
 	#[test]
-	fn appended_1_32_root() {
+	fn appended_1_29_root() {
 		let mut tree = SproutTreeState::new();
 		tree.append(H256::from("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
 			.expect("failed to append to the tree");
