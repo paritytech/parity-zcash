@@ -52,6 +52,6 @@ impl<'a> Into<&'a [u8; 192]> for &'a Proof {
 impl Proof {
 	pub fn to_bls_proof(&self) -> Result<BellmanProof<Bls12>, Error> {
 		BellmanProof::<Bls12>::read(&self.0[..])
-			.map_err(|_| /* only invalid data possible, length is always ok */ Error::InvalidData)
+			.map_err(|_| /* only invalid point data possible, length is always ok */ Error::InvalidData)
 	}
 }

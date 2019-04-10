@@ -1,5 +1,5 @@
 use chain::{JoinSplit, JoinSplitProof, JoinSplitDescription};
-use crypto::{Pghr13Proof, pghr13_verify};
+use crypto::{Pghr13Proof, pghr13_verify, curve::bn, curve::bls};
 
 /// Join split verification error kind
 #[derive(Debug)]
@@ -32,36 +32,47 @@ pub fn compute_hsig(random_seed: &[u8; 32], nullifiers: &[[u8; 32]; 2], pub_key_
 pub fn verify(
 	desc: &JoinSplitDescription,
 	join_split: &JoinSplit,
-	verifying_key: &crypto::Pghr13VerifyingKey,
+	sprout_verifying_key: &crypto::Pghr13VerifyingKey,
+	sapling_verifying_key: &crypto::Groth16VerifyingKey,
 ) -> Result<(), ErrorKind>
 {
+
+	let hsig = compute_hsig(&desc.random_seed, &desc.nullifiers, &join_split.pubkey.into());
+
+	let mut input = Input::new(2176);
+	input.push_hash(&desc.anchor);
+	input.push_hash(&hsig);
+
+	input.push_hash(&desc.nullifiers[0]);
+	input.push_hash(&desc.macs[0]);
+
+	input.push_hash(&desc.nullifiers[1]);
+	input.push_hash(&desc.macs[1]);
+
+	input.push_hash(&desc.commitments[0]);
+	input.push_hash(&desc.commitments[1]);
+
+	input.push_u64(desc.value_pub_old);
+	input.push_u64(desc.value_pub_new);
+
 	match desc.zkproof {
 		JoinSplitProof::PHGR(ref proof_raw) => {
-			let hsig = compute_hsig(&desc.random_seed, &desc.nullifiers, &join_split.pubkey.into());
-
-			let mut input = Input::new(2176);
-			input.push_hash(&desc.anchor);
-			input.push_hash(&hsig);
-
-			input.push_hash(&desc.nullifiers[0]);
-			input.push_hash(&desc.macs[0]);
-
-			input.push_hash(&desc.nullifiers[1]);
-			input.push_hash(&desc.macs[1]);
-
-			input.push_hash(&desc.commitments[0]);
-			input.push_hash(&desc.commitments[1]);
-
-			input.push_u64(desc.value_pub_old);
-			input.push_u64(desc.value_pub_new);
 
 			let proof = Pghr13Proof::from_raw(proof_raw).map_err(|_| ErrorKind::InvalidEncoding)?;
 
-			if !pghr13_verify(verifying_key, &input.into_frs(), &proof) {
+			if !pghr13_verify(sprout_verifying_key, &input.into_bn_frs(), &proof) {
 				return Err(ErrorKind::InvalidProof);
 			}
 		},
-		JoinSplitProof::Groth(_) => {},
+		JoinSplitProof::Groth(ref proof) => {
+			if !crypto::bellman::groth16::verify_proof(
+				&sapling_verifying_key.0,
+				&proof.to_bls_proof().map_err(|_| ErrorKind::InvalidEncoding)?,
+				&input.into_bls_frs(),
+			).map_err(|_| ErrorKind::InvalidProof)? {
+				return Err(ErrorKind::InvalidProof);
+			}
+		},
 	}
 
 	Ok(())
@@ -98,15 +109,13 @@ impl Input {
 		&self.bits
 	}
 
-	pub fn into_frs(self) -> Vec<crypto::Fr> {
-		use crypto::Fr;
-
+	pub fn into_bn_frs(self) -> Vec<bn::Fr> {
 		let mut frs = Vec::new();
 
 		for bits in self.bits.chunks(253)
 		{
-			let mut num = Fr::zero();
-			let mut coeff = Fr::one();
+			let mut num = bn::Fr::zero();
+			let mut coeff = bn::Fr::one();
 			for bit in bits {
 				num = if bit { num + coeff } else { num };
 				coeff = coeff + coeff;
@@ -114,6 +123,26 @@ impl Input {
 
 			frs.push(num);
 		}
+
+		frs
+	}
+
+	pub fn into_bls_frs(self) -> Vec<bls::Fr> {
+		use crypto::pairing::{Field, PrimeField};
+
+		let mut frs = Vec::new();
+
+		for bits in self.bits.chunks(bls::Fr::CAPACITY as usize)
+			{
+				let mut num = bls::Fr::zero();
+				let mut coeff = bls::Fr::one();
+				for bit in bits {
+					if bit { num.add_assign(&coeff) }
+					coeff.double();
+				}
+
+				frs.push(num);
+			}
 
 		frs
 	}
@@ -143,6 +172,21 @@ mod tests {
 		let mut result = [0u8; 32];
 		result.copy_from_slice(&bytes[..]);
 		result
+	}
+
+	fn dummy_groth16_key() -> crypto::Groth16VerifyingKey {
+		use crypto::pairing::{CurveAffine, bls12_381::{G1Affine, G2Affine}};
+		use crypto::bellman::groth16::{VerifyingKey, prepare_verifying_key};
+
+		crypto::Groth16VerifyingKey(prepare_verifying_key(&VerifyingKey {
+			alpha_g1: G1Affine::zero(),
+			beta_g1: G1Affine::zero(),
+			beta_g2: G2Affine::zero(),
+			gamma_g2: G2Affine::zero(),
+			delta_g1: G1Affine::zero(),
+			delta_g2: G2Affine::zero(),
+			ic: vec![],
+		}))
 	}
 
 	#[test]
@@ -233,7 +277,7 @@ mod tests {
 		input.push_u64(14250000);
 		input.push_u64(0);
 		assert_eq!(
-			input.into_frs()[0].into_u256(),
+			input.into_bn_frs()[0].into_u256(),
 			10161672.into()
 		);
 	}
@@ -288,6 +332,6 @@ mod tests {
 			sig: [0u8; 64].into(), // not used
 		};
 
-		verify(&js.descriptions[0], &js, &vkey()).unwrap();
+		verify(&js.descriptions[0], &js, &vkey(), &dummy_groth16_key()).unwrap();
 	}
 }

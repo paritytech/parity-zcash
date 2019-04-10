@@ -38,15 +38,22 @@ pub use json::groth16::{
 	load_sapling_spend_verifying_key, load_sapling_output_verifying_key,
 };
 
-pub use pghr13::{
-	VerifyingKey as Pghr13VerifyingKey, Proof as Pghr13Proof, verify as pghr13_verify,
-	G1, G2, Fr, Group, U256 as BnU256,
-};
+pub use pghr13::{VerifyingKey as Pghr13VerifyingKey, Proof as Pghr13Proof, verify as pghr13_verify};
 
 pub use groth16::{
 	Proof as Groth16Proof,
 	Error as Groth16Error,
 };
+
+pub mod curve {
+	pub mod bn {
+		pub use pghr13::{G1, G2, Fr, Group, U256};
+	}
+
+	pub mod bls {
+		pub use pairing::bls12_381::Fr;
+	}
+}
 
 pub struct Groth16VerifyingKey(pub bellman::groth16::PreparedVerifyingKey<pairing::bls12_381::Bls12>);
 

@@ -84,7 +84,7 @@ fn mainnet_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
 }
 
 fn testnet_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
-	use crypto::{G1, G2, Group};
+	use crypto::curve::bn::{G1, G2, Group};
 
 	// TODO: Actually use group elements for testnet
 	crypto::Pghr13VerifyingKey {
@@ -100,7 +100,7 @@ fn testnet_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
 }
 
 fn regtest_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
-	use crypto::{G1, G2, Group};
+	use crypto::curve::bn::{G1, G2, Group};
 
 	// TODO: Actually use group elements for regtests
 	crypto::Pghr13VerifyingKey {
@@ -116,7 +116,7 @@ fn regtest_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
 }
 
 fn unitest_pghr_verification_key() -> crypto::Pghr13VerifyingKey {
-	use crypto::{G1, G2, Group};
+	use crypto::curve::bn::{G1, G2, Group};
 
 	// TODO: Actually use group elements for unit tests
 	crypto::Pghr13VerifyingKey {
