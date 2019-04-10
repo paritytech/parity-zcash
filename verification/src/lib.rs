@@ -71,6 +71,8 @@ extern crate primitives;
 extern crate serialization as ser;
 extern crate script;
 extern crate bitcrypto as crypto;
+extern crate bitvec;
+
 #[cfg(test)]
 extern crate db;
 
@@ -104,6 +106,8 @@ mod accept_transaction;
 // backwards compatibility
 mod chain_verifier;
 
+mod tree_cache;
+
 pub use primitives::{bigint, hash, compact};
 
 pub use canon::{CanonBlock, CanonHeader, CanonTransaction};
@@ -123,6 +127,7 @@ pub use sigops::transaction_sigops;
 pub use timestamp::{median_timestamp, median_timestamp_inclusive};
 pub use work::{work_required, is_valid_proof_of_work, is_valid_proof_of_work_hash};
 pub use deployments::Deployments;
+pub use tree_cache::TreeCache;
 
 /// Blocks verification level.
 bitflags! {

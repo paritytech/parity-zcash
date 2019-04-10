@@ -158,6 +158,13 @@ impl Dim for H32 {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct H29;
+
+impl Dim for H29 {
+	const HEIGHT: usize = 29;
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct SproutTreeHash;
 
 impl TreeHash for SproutTreeHash {
@@ -261,7 +268,7 @@ impl<D: Dim, H: TreeHash> TreeState<D, H> {
 	}
 }
 
-pub type SproutTreeState = TreeState<H32, SproutTreeHash>;
+pub type SproutTreeState = TreeState<H29, SproutTreeHash>;
 pub type SaplingTreeState = TreeState<H32, SaplingTreeHash>;
 
 impl<D: Dim, H: TreeHash> serialization::Serializable for TreeState<D, H> {
@@ -327,21 +334,21 @@ mod tests {
 	}
 
 	#[test]
-	fn empty_32_root() {
+	fn empty_29_root() {
 		assert_eq!(
 			SproutTreeState::new().root(),
-			H256::from("ac58cd1388fec290d398f1944b564449a63c815880566bd1d189f7839e3b0c8c"),
+			H256::from("d7c612c817793191a1e68652121876d6b3bde40f4fa52bc314145ce6e5cdd259"),
 		)
 	}
 
 	#[test]
-	fn appended_1_32_root() {
+	fn appended_1_29_root() {
 		let mut tree = SproutTreeState::new();
 		tree.append(H256::from("bab6e8992959caf0ca94847c36b4e648a7f88a9b9c6a62ea387cf1fb9badfd62"))
 			.expect("failed to append to the tree");
 		assert_eq!(
 			tree.root(),
-			H256::from("af3a29c548af2d8314544875fe0a59555bfda3c81ea78da54bd02f89cce68acb")
+			H256::from("128ebe145c5d6fd81cc7734c90db0e284dd888870d4488314ef4ad70a34232aa")
 		);
 	}
 

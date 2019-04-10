@@ -60,6 +60,7 @@ impl<'a> ChainAcceptor<'a> {
 						block.header.raw.time,
 						tx_index,
 						deployments,
+						tree_state_provider,
 				))
 				.collect(),
 		}

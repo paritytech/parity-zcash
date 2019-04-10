@@ -166,6 +166,7 @@ impl BackwardsCompatibleChainVerifier {
 			height,
 			time,
 			&deployments,
+			self.store.as_tree_state_provider(),
 		);
 		tx_acceptor.check()
 	}

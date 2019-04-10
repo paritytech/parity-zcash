@@ -30,7 +30,7 @@ pub use transaction::{OVERWINTER_TX_VERSION_GROUP_ID, SAPLING_TX_VERSION_GROUP_I
 pub use block::Block;
 pub use block_header::BlockHeader;
 pub use solution::EquihashSolution;
-pub use join_split::{JoinSplit, JoinSplitDescription};
+pub use join_split::{JoinSplit, JoinSplitDescription, JoinSplitProof};
 pub use merkle_root::{merkle_root, merkle_node_hash};
 pub use sapling::{Sapling, SaplingSpendDescription, SaplingOutputDescription};
 pub use transaction::{Transaction, TransactionInput, TransactionOutput, OutPoint};

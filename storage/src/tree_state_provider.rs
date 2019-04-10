@@ -1,7 +1,7 @@
 use hash::H256;
 use {SproutTreeState, SaplingTreeState};
 
-pub trait TreeStateProvider {
+pub trait TreeStateProvider : Send + Sync {
 	fn sprout_tree_at(&self, root: &H256) -> Option<SproutTreeState>;
 
 	fn sapling_tree_at(&self, root: &H256) -> Option<SaplingTreeState>;
