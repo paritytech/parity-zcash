@@ -82,11 +82,7 @@ impl Input {
 	}
 
 	fn push_u64(&mut self, val: u64) {
-		let mut le = [0u8; 8];
-		for i in 0..8 {
-			le[i] = (val >> i*8) as u8;
-		}
-		self.push_bytes(&le[..]);
+		self.push_bytes(&val.to_le_bytes()[..]);
 	}
 
 	fn push_bytes(&mut self, vals: &[u8]) {
