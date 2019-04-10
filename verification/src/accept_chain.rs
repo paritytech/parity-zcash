@@ -35,7 +35,6 @@ impl<'a> ChainAcceptor<'a> {
 	) -> Self {
 		trace!(target: "verification", "Block verification {}", block.hash().to_reversed_str());
 		let output_store = DuplexTransactionOutputProvider::new(tx_out_provider, block.raw());
-		let tree_cache = TreeCache::new(tree_state_provider);
 
 		ChainAcceptor {
 			block: BlockAcceptor::new(
@@ -62,7 +61,7 @@ impl<'a> ChainAcceptor<'a> {
 						block.header.raw.time,
 						tx_index,
 						deployments,
-						tree_cache.clone(),
+						tree_state_provider,
 				))
 				.collect(),
 		}

@@ -1,7 +1,7 @@
 use ser::Serializable;
 use crypto::Groth16VerifyingKey;
 use storage::{EpochRef, NullifierTracker, EpochTag, TransactionMetaProvider, TransactionOutputProvider,
-	DuplexTransactionOutputProvider};
+	DuplexTransactionOutputProvider, TreeStateProvider};
 use network::{ConsensusParams};
 use script::{Script, verify_script, VerificationFlags, TransactionSignatureChecker, TransactionInputSigner, SighashBase};
 use deployments::BlockDeployments;
@@ -44,7 +44,7 @@ impl<'a> TransactionAcceptor<'a> {
 		time: u32,
 		transaction_index: usize,
 		deployments: &'a BlockDeployments<'a>,
-		tree_cache: TreeCache<'a>,
+		tree_state_provider: &'a TreeStateProvider,
 	) -> Self {
 		trace!(target: "verification", "Tx verification {}", transaction.hash.to_reversed_str());
 		TransactionAcceptor {
@@ -57,7 +57,7 @@ impl<'a> TransactionAcceptor<'a> {
 			overspent: TransactionOverspent::new(transaction, output_store),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, deployments),
-			join_split: JoinSplitVerification::new(consensus, transaction, nullifier_tracker, tree_cache),
+			join_split: JoinSplitVerification::new(consensus, transaction, nullifier_tracker, tree_state_provider),
 			sapling: SaplingVerification::new(
 				nullifier_tracker,
 				consensus.sapling_spend_verifying_key,
@@ -113,7 +113,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 		height: u32,
 		time: u32,
 		deployments: &'a BlockDeployments<'a>,
-		tree_cache: TreeCache<'a>,
+		tree_state_provider: &'a TreeStateProvider,
 	) -> Self {
 		trace!(target: "verification", "Mempool-Tx verification {}", transaction.hash.to_reversed_str());
 		let transaction_index = 0;
@@ -128,7 +128,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 			sigops: TransactionSigops::new(transaction, output_store, consensus, max_block_sigops, time),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, VerificationLevel::FULL, height, time, deployments),
-			join_split: JoinSplitVerification::new(consensus, transaction, nullifier_tracker, tree_cache),
+			join_split: JoinSplitVerification::new(consensus, transaction, nullifier_tracker, tree_state_provider),
 			sapling: SaplingVerification::new(
 				nullifier_tracker,
 				consensus.sapling_spend_verifying_key,
@@ -579,15 +579,15 @@ impl<'a> TransactionVersion<'a> {
 pub struct JoinSplitProof<'a> {
 	transaction: CanonTransaction<'a>,
 	consensus_params: &'a ConsensusParams,
-	tree_cache: TreeCache<'a>,
+	tree_state_provider: &'a TreeStateProvider,
 }
 
 impl<'a> JoinSplitProof<'a> {
-	fn new(transaction: CanonTransaction<'a>, consensus_params: &'a ConsensusParams, tree_cache: TreeCache<'a>) -> Self {
+	fn new(transaction: CanonTransaction<'a>, consensus_params: &'a ConsensusParams, tree_state_provider: &'a TreeStateProvider) -> Self {
 		JoinSplitProof {
-			transaction: transaction,
-			consensus_params: consensus_params,
-			tree_cache: tree_cache,
+			transaction,
+			consensus_params,
+			tree_state_provider,
 		}
 	}
 
@@ -596,11 +596,12 @@ impl<'a> JoinSplitProof<'a> {
 
 		if let Some(ref join_split) = self.transaction.raw.join_split {
 			let mut index = 0;
+			let mut tree_cache = TreeCache::new(self.tree_state_provider);
 			for desc in join_split.descriptions.iter() {
 				sprout::verify(&desc, &join_split, &self.consensus_params.joinsplit_verification_key)
 					.map_err(|_e| TransactionError::InvalidJoinSplit(index))?;
 
-				self.tree_cache.continue_root(&desc.anchor.into(), &desc.commitments)?;
+				tree_cache.continue_root(&desc.anchor.into(), &desc.commitments)?;
 
 				index += 1;
 			}
@@ -649,11 +650,11 @@ impl<'a> JoinSplitVerification<'a> {
 		consensus_params: &'a ConsensusParams,
 		transaction: CanonTransaction<'a>,
 		tracker: &'a NullifierTracker,
-		tree_cache: TreeCache<'a>)
+		tree_state_provider: &'a TreeStateProvider)
 		-> Self
 	{
 		JoinSplitVerification {
-			proof: JoinSplitProof::new(transaction, consensus_params, tree_cache),
+			proof: JoinSplitProof::new(transaction, consensus_params, tree_state_provider),
 			nullifiers: JoinSplitNullifiers::new(tracker, transaction),
 		}
 	}

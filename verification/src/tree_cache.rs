@@ -10,7 +10,7 @@ use error::TransactionError;
 #[derive(Clone)]
 pub struct TreeCache<'a> {
 	persistent: &'a TreeStateProvider ,
-	interstitial: Arc<RwLock<HashMap<H256, SproutTreeState>>>,
+	interstitial: HashMap<H256, SproutTreeState>,
 }
 
 struct NoPersistentStorage;
@@ -42,8 +42,8 @@ impl<'a> TreeCache<'a> {
 		}
 	}
 
-	pub fn continue_root(&self, root: &H256, commitments: &[[u8; 32]; 2]) -> Result<(), TransactionError> {
-		let mut tree = match self.interstitial.read().get(root) {
+	pub fn continue_root(&mut self, root: &H256, commitments: &[[u8; 32]; 2]) -> Result<(), TransactionError> {
+		let mut tree = match self.interstitial.get(root) {
 			Some(tree) => tree.clone(),
 			None => {
 				self.persistent.sprout_tree_at(root).ok_or(TransactionError::UnknownAnchor(*root))?
@@ -53,7 +53,7 @@ impl<'a> TreeCache<'a> {
 		tree.append(commitments[0].into()).expect("Unrecoverable error: merkle tree full");
 		tree.append(commitments[1].into()).expect("Unrecoverable error: merkle tree full");
 
-		self.interstitial.write().insert(tree.root(), tree);
+		self.interstitial.insert(tree.root(), tree);
 
 		Ok(())
 	}
