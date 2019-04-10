@@ -2,11 +2,12 @@ use std::{fmt, io};
 use hash::{H256, H512};
 use hex::ToHex;
 use ser::{Error, Stream, Reader, CompactInteger, Serializable};
+use crypto::Groth16Proof;
 
 #[derive(Clone)]
 pub enum JoinSplitProof {
 	PHGR([u8; 296]),
-	Groth([u8; 192]),
+	Groth(Groth16Proof),
 }
 
 #[derive(Debug, PartialEq, Default, Clone)]
@@ -59,7 +60,7 @@ impl Serializable for JoinSplitDescription {
 			.append(&self.macs);
 		match self.zkproof {
 			JoinSplitProof::PHGR(ref proof) => stream.append(proof),
-			JoinSplitProof::Groth(ref proof) => stream.append(proof),
+			JoinSplitProof::Groth(ref proof) => stream.append::<[u8; 192]>(proof.into()),
 		};
 		stream.append(&self.ciphertexts);
 	}
@@ -104,7 +105,7 @@ impl PartialEq<JoinSplitDescription> for JoinSplitDescription {
 
 impl Default for JoinSplitProof {
 	fn default() -> Self {
-		JoinSplitProof::Groth([0; 192])
+		JoinSplitProof::Groth(Groth16Proof::default())
 	}
 }
 
@@ -112,7 +113,7 @@ impl fmt::Debug for JoinSplitProof {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
 			JoinSplitProof::PHGR(ref proof) => f.write_fmt(format_args!("PHGR({:?})", &proof.to_hex::<String>())),
-			JoinSplitProof::Groth(ref proof) => f.write_fmt(format_args!("Groth({:?})", &proof.to_hex::<String>())),
+			JoinSplitProof::Groth(ref proof) => f.write_fmt(format_args!("Groth({:?})", &proof)),
 		}
 	}
 }
@@ -120,7 +121,7 @@ impl fmt::Debug for JoinSplitProof {
 impl PartialEq<JoinSplitProof> for JoinSplitProof {
 	fn eq(&self, other: &JoinSplitProof) -> bool {
 		match (self, other) {
-			(&JoinSplitProof::Groth(v1), &JoinSplitProof::Groth(v2)) => v1.as_ref() == v2.as_ref(),
+			(&JoinSplitProof::Groth(ref v1), &JoinSplitProof::Groth(ref v2)) => v1 == v2,
 			(&JoinSplitProof::PHGR(v1), &JoinSplitProof::PHGR(v2)) => v1.as_ref() == v2.as_ref(),
 			_ => false,
 		}
@@ -176,7 +177,7 @@ pub fn deserialize_join_split_description<T>(reader: &mut Reader<T>, use_groth: 
 		random_seed: reader.read()?,
 		macs: reader.read()?,
 		zkproof: if use_groth {
-			JoinSplitProof::Groth(reader.read()?)
+			JoinSplitProof::Groth(reader.read::<[u8; 192]>()?.into())
 		} else {
 			JoinSplitProof::PHGR(reader.read()?)
 		},
