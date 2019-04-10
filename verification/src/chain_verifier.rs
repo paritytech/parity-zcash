@@ -12,7 +12,7 @@ use verify_transaction::MemoryPoolTransactionVerifier;
 use accept_chain::ChainAcceptor;
 use accept_transaction::MemoryPoolTransactionAcceptor;
 use deployments::{Deployments, BlockDeployments};
-use {Verify, VerificationLevel, TreeCache};
+use {Verify, VerificationLevel};
 
 pub struct BackwardsCompatibleChainVerifier {
 	store: SharedStore,

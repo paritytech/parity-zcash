@@ -11,7 +11,6 @@ use accept_header::HeaderAcceptor;
 use accept_transaction::TransactionAcceptor;
 use deployments::BlockDeployments;
 use VerificationLevel;
-use tree_cache::TreeCache;
 
 pub struct ChainAcceptor<'a> {
 	pub block: BlockAcceptor<'a>,

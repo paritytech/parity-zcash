@@ -1,6 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
-
-use parking_lot::RwLock;
+use std::collections::HashMap;
 
 use chain::hash::H256;
 use storage::{TreeStateProvider, SproutTreeState, SaplingTreeState};
