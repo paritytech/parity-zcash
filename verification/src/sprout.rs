@@ -133,16 +133,16 @@ impl Input {
 		let mut frs = Vec::new();
 
 		for bits in self.bits.chunks(bls::Fr::CAPACITY as usize)
-			{
-				let mut num = bls::Fr::zero();
-				let mut coeff = bls::Fr::one();
-				for bit in bits {
-					if bit { num.add_assign(&coeff) }
-					coeff.double();
-				}
-
-				frs.push(num);
+		{
+			let mut num = bls::Fr::zero();
+			let mut coeff = bls::Fr::one();
+			for bit in bits {
+				if bit { num.add_assign(&coeff) }
+				coeff.double();
 			}
+
+			frs.push(num);
+		}
 
 		frs
 	}
