@@ -336,10 +336,19 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 		let mut best_block = self.best_block.write();
 		let block = match self.block(hash.clone().into()) {
 			Some(block) => block,
-			None => return Err(Error::CannotCanonize),
+			None => {
+				error!(target: "db", "Block is not found during canonization: {}", hash.reversed());
+				return Err(Error::CannotCanonize);
+			},
 		};
 
 		if best_block.hash != block.header.raw.previous_header_hash {
+			error!(
+				target: "db",
+				"Wrong best block during canonization. Best {}, parent: {}",
+				best_block.hash.reversed(),
+				block.header.raw.previous_header_hash.reversed(),
+			);
 			return Err(Error::CannotCanonize);
 		}
 
@@ -378,7 +387,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 							H256::from(&nullifier[..])
 						);
 						if self.contains_nullifier(nullifier_key) {
-							trace!(target: "db", "Duplicate nullifer during canonization: {:?}", nullifier_key);
+							error!(target: "db", "Duplicate sprout nullifer during canonization: {:?}", nullifier_key);
 							return Err(Error::CannotCanonize);
 						}
 						update.insert(KeyValue::Nullifier(nullifier_key));
@@ -393,7 +402,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 						H256::from(&spend.nullifier[..])
 					);
 					if self.contains_nullifier(nullifier_key) {
-						trace!(target: "db", "Duplicate nullifer during canonization: {:?}", nullifier_key);
+						error!(target: "db", "Duplicate sapling nullifer during canonization: {:?}", nullifier_key);
 						return Err(Error::CannotCanonize);
 					}
 					update.insert(KeyValue::Nullifier(nullifier_key));
@@ -410,7 +419,16 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 					},
 					Entry::Vacant(entry) => {
 						let mut meta = self.transaction_meta(&input.previous_output.hash)
-							.ok_or(Error::CannotCanonize)?;
+							.ok_or_else(|| {
+								error!(
+									target: "db",
+									"Cannot find tx meta during canonization of tx {}: {}/{}",
+									tx.hash.reversed(),
+									input.previous_output.hash.reversed(),
+									input.previous_output.index,
+								);
+								Error::CannotCanonize
+							})?;
 						meta.denote_used(input.previous_output.index as usize);
 						entry.insert(meta);
 					}
@@ -431,7 +449,10 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 		let mut best_block = self.best_block.write();
 		let block = match self.block(best_block.hash.clone().into()) {
 			Some(block) => block,
-			None => return Err(Error::CannotCanonize),
+			None => {
+				error!(target: "db", "Block is not found during decanonization: {}", best_block.hash.reversed());
+				return Err(Error::CannotDecanonize)
+			},
 		};
 		let block_number = best_block.number;
 		let block_hash = best_block.hash.clone();
@@ -464,7 +485,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 							H256::from(&nullifier[..])
 						);
 						if !self.contains_nullifier(nullifier_key) {
-							warn!(target: "db", "cannot decanonize, no nullifier: {:?}", nullifier_key);
+							error!(target: "db", "cannot decanonize, no sprout nullifier: {:?}", nullifier_key);
 							return Err(Error::CannotDecanonize);
 						}
 						update.delete(Key::Nullifier(nullifier_key));
@@ -479,7 +500,7 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 						H256::from(&spend.nullifier[..])
 					);
 					if !self.contains_nullifier(nullifier_key) {
-						warn!(target: "db", "cannot decanonize, no nullifier: {:?}", nullifier_key);
+						error!(target: "db", "cannot decanonize, no sapling nullifier: {:?}", nullifier_key);
 						return Err(Error::CannotDecanonize);
 					}
 					update.delete(Key::Nullifier(nullifier_key));
@@ -496,7 +517,16 @@ impl<T> BlockChainDatabase<T> where T: KeyValueDatabase {
 					},
 					Entry::Vacant(entry) => {
 						let mut meta = self.transaction_meta(&input.previous_output.hash)
-							.ok_or(Error::CannotCanonize)?;
+							.ok_or_else(|| {
+								error!(
+									target: "db",
+									"Cannot find tx meta during canonization of tx {}: {}/{}",
+									tx.hash.reversed(),
+									input.previous_output.hash.reversed(),
+									input.previous_output.index,
+								);
+								Error::CannotDecanonize
+							})?;
 						meta.denote_unused(input.previous_output.index as usize);
 						entry.insert(meta);
 					}
