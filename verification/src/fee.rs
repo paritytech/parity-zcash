@@ -1,22 +1,22 @@
 use chain::Transaction;
 use storage::TransactionOutputProvider;
-use FeeError;
+use TransactionError;
 
 /// Compute miner fee for given transaction.
 ///
 /// Returns None if overflow/underflow happens during computation. Missed prevout
 /// is treated as 0-value.
-pub fn checked_transaction_fee(store: &TransactionOutputProvider, tx_idx: usize, tx: &Transaction) -> Result<u64, FeeError> {
+pub fn checked_transaction_fee(store: &TransactionOutputProvider, tx_idx: usize, tx: &Transaction) -> Result<u64, TransactionError> {
 	// (1) Total sum of all transparent + shielded inputs
 	let mut incoming: u64 = 0;
 	for (input_idx, input) in tx.inputs.iter().enumerate() {
 		let prevout = match store.transaction_output(&input.previous_output, tx_idx) {
 			Some(prevout) => prevout,
-			None => return Err(FeeError::MissingInput(input_idx)),
+			None => return Err(TransactionError::Input(input_idx)),
 		};
 		incoming = match incoming.checked_add(prevout.value) {
 			Some(incoming) => incoming,
-			None => return Err(FeeError::InputsOverflow),
+			None => return Err(TransactionError::InputValueOverflow),
 		};
 	}
 
@@ -24,7 +24,7 @@ pub fn checked_transaction_fee(store: &TransactionOutputProvider, tx_idx: usize,
 		for js_desc in &join_split.descriptions {
 			incoming = match incoming.checked_add(js_desc.value_pub_new) {
 				Some(incoming) => incoming,
-				None => return Err(FeeError::InputsOverflow),
+				None => return Err(TransactionError::InputValueOverflow),
 			};
 		}
 	}
@@ -35,7 +35,7 @@ pub fn checked_transaction_fee(store: &TransactionOutputProvider, tx_idx: usize,
 
 			incoming = match incoming.checked_add(balancing_value) {
 				Some(incoming) => incoming,
-				None => return Err(FeeError::InputsOverflow),
+				None => return Err(TransactionError::InputValueOverflow),
 			};
 		}
 	}
@@ -47,7 +47,7 @@ pub fn checked_transaction_fee(store: &TransactionOutputProvider, tx_idx: usize,
 		for js_desc in &join_split.descriptions {
 			spends = match spends.checked_add(js_desc.value_pub_old) {
 				Some(spends) => spends,
-				None => return Err(FeeError::OutputsOverflow),
+				None => return Err(TransactionError::OutputValueOverflow),
 			};
 		}
 	}
@@ -56,12 +56,12 @@ pub fn checked_transaction_fee(store: &TransactionOutputProvider, tx_idx: usize,
 		if sapling.balancing_value < 0 {
 			let balancing_value = match sapling.balancing_value.checked_neg() {
 				Some(balancing_value) => balancing_value as u64,
-				None => return Err(FeeError::OutputsOverflow),
+				None => return Err(TransactionError::OutputValueOverflow),
 			};
 			
 			spends = match spends.checked_add(balancing_value) {
 				Some(spends) => spends,
-				None => return Err(FeeError::OutputsOverflow),
+				None => return Err(TransactionError::OutputValueOverflow),
 			};
 		}
 	}
@@ -69,7 +69,7 @@ pub fn checked_transaction_fee(store: &TransactionOutputProvider, tx_idx: usize,
 	// (3) Fee is the difference between (1) and (2)
 	match incoming.checked_sub(spends) {
 		Some(fee) => Ok(fee),
-		None => Err(FeeError::NegativeFee),
+		None => Err(TransactionError::Overspend),
 	}
 }
 
@@ -104,7 +104,7 @@ mod tests {
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![b0.into(), b1.into()]));
 		let store = db.as_transaction_output_provider();
 
-		assert_eq!(checked_transaction_fee(store, ::std::usize::MAX, &tx0), Err(FeeError::NegativeFee));
+		assert_eq!(checked_transaction_fee(store, ::std::usize::MAX, &tx0), Err(TransactionError::Overspend));
 		assert_eq!(checked_transaction_fee(store, ::std::usize::MAX, &tx2), Ok(500_000));
 	}
 }

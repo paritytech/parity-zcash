@@ -123,7 +123,7 @@ pub use verify_header::HeaderVerifier;
 pub use verify_transaction::{TransactionVerifier, MemoryPoolTransactionVerifier};
 
 pub use chain_verifier::BackwardsCompatibleChainVerifier;
-pub use error::{Error, TransactionError, FeeError};
+pub use error::{Error, TransactionError};
 pub use fee::checked_transaction_fee;
 pub use sigops::transaction_sigops;
 pub use timestamp::{median_timestamp, median_timestamp_inclusive};

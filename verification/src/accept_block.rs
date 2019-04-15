@@ -176,7 +176,7 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 
 		for (tx_idx, tx) in self.block.transactions.iter().enumerate().skip(1) {
 			let tx_fee = checked_transaction_fee(&store, tx_idx, &tx.raw)
-				.map_err(|fee_err| Error::Transaction(tx_idx, fee_err.into()))?;
+				.map_err(|tx_err| Error::Transaction(tx_idx, tx_err))?;
 
 			// Adding to total fees (with possible overflow)
 			let (sum, overflow) = fees.overflowing_add(tx_fee);

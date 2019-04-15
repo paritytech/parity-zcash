@@ -272,7 +272,6 @@ impl<'a> TransactionOverspent<'a> {
 		}
 
 		checked_transaction_fee(&self.store, ::std::usize::MAX, &self.transaction.raw)
-			.map_err(Into::into)
 			.map(|_| ())
 	}
 }

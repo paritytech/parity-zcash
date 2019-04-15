@@ -153,27 +153,3 @@ pub enum TransactionError {
 	/// Unknown anchor used in join split
 	UnknownAnchor(H256),
 }
-
-#[derive(Debug, PartialEq)]
-/// Fee calculation error.
-pub enum FeeError {
-	/// Transaction misses input.
-	MissingInput(usize),
-	/// Inputs sum overflow.
-	InputsOverflow,
-	/// Outputs sum overflow.
-	OutputsOverflow,
-	/// Negative fee.
-	NegativeFee,
-}
-
-impl From<FeeError> for TransactionError {
-	fn from(error: FeeError) -> TransactionError {
-		match error {
-			FeeError::MissingInput(idx) => TransactionError::Input(idx),
-			FeeError::InputsOverflow => TransactionError::InputValueOverflow,
-			FeeError::OutputsOverflow => TransactionError::OutputValueOverflow,
-			FeeError::NegativeFee => TransactionError::Overspend,
-		}
-	}
-}
