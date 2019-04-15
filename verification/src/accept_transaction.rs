@@ -12,7 +12,7 @@ use chain::{OVERWINTER_TX_VERSION, SAPLING_TX_VERSION, OVERWINTER_TX_VERSION_GRO
 use constants::COINBASE_MATURITY;
 use error::TransactionError;
 use primitives::hash::H256;
-use VerificationLevel;
+use {checked_transaction_fee, VerificationLevel};
 use tree_cache::TreeCache;
 
 pub struct TransactionAcceptor<'a> {
@@ -22,7 +22,6 @@ pub struct TransactionAcceptor<'a> {
 	pub bip30: TransactionBip30<'a>,
 	pub missing_inputs: TransactionMissingInputs<'a>,
 	pub maturity: TransactionMaturity<'a>,
-	pub overspent: TransactionOverspent<'a>,
 	pub double_spent: TransactionDoubleSpend<'a>,
 	pub eval: TransactionEval<'a>,
 	pub join_split: JoinSplitVerification<'a>,
@@ -54,7 +53,6 @@ impl<'a> TransactionAcceptor<'a> {
 			bip30: TransactionBip30::new_for_sync(transaction, meta_store),
 			missing_inputs: TransactionMissingInputs::new(transaction, output_store, transaction_index),
 			maturity: TransactionMaturity::new(transaction, meta_store, height),
-			overspent: TransactionOverspent::new(transaction, output_store),
 			double_spent: TransactionDoubleSpend::new(transaction, output_store),
 			eval: TransactionEval::new(transaction, output_store, consensus, verification_level, height, time, deployments),
 			join_split: JoinSplitVerification::new(consensus, transaction, nullifier_tracker, tree_state_provider),
@@ -74,7 +72,6 @@ impl<'a> TransactionAcceptor<'a> {
 		self.bip30.check()?;
 		self.missing_inputs.check()?;
 		self.maturity.check()?;
-		self.overspent.check()?;
 		self.double_spent.check()?;
 
 		// to make sure we're using the sighash-cache, let's make all sighash-related
@@ -274,24 +271,9 @@ impl<'a> TransactionOverspent<'a> {
 			return Ok(());
 		}
 
-		let available_public = self.transaction.raw.inputs.iter()
-			.map(|input| self.store.transaction_output(&input.previous_output, usize::max_value()).map(|o| o.value).unwrap_or(0))
-			.sum::<u64>();
-
-		let available_join_split = self.transaction.raw.join_split.iter()
-			.flat_map(|js| &js.descriptions)
-			.map(|d| d.value_pub_new)
-			.sum::<u64>();
-
-		let total_available = available_public + available_join_split;
-
-		let spends = self.transaction.raw.total_spends();
-
-		if spends > total_available {
-			Err(TransactionError::Overspend)
-		} else {
-			Ok(())
-		}
+		checked_transaction_fee(&self.store, ::std::usize::MAX, &self.transaction.raw)
+			.map_err(Into::into)
+			.map(|_| ())
 	}
 }
 

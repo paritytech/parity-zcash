@@ -6,8 +6,9 @@ use script::{self, Builder};
 use sigops::transaction_sigops;
 use deployments::BlockDeployments;
 use canon::CanonBlock;
-use error::{Error, TransactionError};
+use error::Error;
 use timestamp::median_timestamp;
+use fee::checked_transaction_fee;
 
 /// Flexible verification of ordered block
 pub struct BlockAcceptor<'a> {
@@ -174,73 +175,11 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 		let mut fees: u64 = 0;
 
 		for (tx_idx, tx) in self.block.transactions.iter().enumerate().skip(1) {
-			// (1) Total sum of all referenced outputs
-			let mut incoming: u64 = 0;
-			for input in tx.raw.inputs.iter() {
-				let prevout = store.transaction_output(&input.previous_output, tx_idx);
-				let (sum, overflow) = incoming.overflowing_add(prevout.map(|o| o.value).unwrap_or(0));
-				if overflow {
-					return Err(Error::Transaction(tx_idx, TransactionError::InputValueOverflow));
-				}
-				incoming = sum;
-			}
-
-			let join_split_public_new = tx.raw.join_split.iter()
-				.flat_map(|js| &js.descriptions)
-				.map(|d| d.value_pub_new)
-				.sum::<u64>();
-
-			incoming = match incoming.overflowing_add(join_split_public_new) {
-				(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::InputValueOverflow)),
-				(incoming, _) => incoming,
-			};
-
-			if let Some(ref sapling) = tx.raw.sapling {
-				if sapling.balancing_value > 0 {
-					let balancing_value = sapling.balancing_value as u64;
-
-					incoming = match incoming.overflowing_add(balancing_value) {
-						(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::InputValueOverflow)),
-						(incoming, _) => incoming,
-					};
-				}
-			}
-
-			// (2) Total sum of all outputs
-			let mut spends = tx.raw.total_spends();
-
-			let join_split_public_old = tx.raw.join_split.iter()
-				.flat_map(|js| &js.descriptions)
-				.map(|d| d.value_pub_old)
-				.sum::<u64>();
-
-			spends = match spends.overflowing_add(join_split_public_old) {
-				(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::OutputValueOverflow)),
-				(spends, _) => spends,
-			};
-
-			if let Some(ref sapling) = tx.raw.sapling {
-				if sapling.balancing_value < 0 {
-					let balancing_value = match sapling.balancing_value.checked_neg() {
-						Some(balancing_value) => balancing_value as u64,
-						None => return Err(Error::Transaction(tx_idx, TransactionError::OutputValueOverflow)),
-					};
-					
-					spends = match spends.overflowing_add(balancing_value) {
-						(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::OutputValueOverflow)),
-						(spends, _) => spends,
-					};
-				}
-			}
-
-			// Difference between (1) and (2)
-			let (difference, overflow) = incoming.overflowing_sub(spends);
-			if overflow {
-				return Err(Error::Transaction(tx_idx, TransactionError::Overspend));
-			}
+			let tx_fee = checked_transaction_fee(&store, tx_idx, &tx.raw)
+				.map_err(|fee_err| Error::Transaction(tx_idx, fee_err.into()))?;
 
 			// Adding to total fees (with possible overflow)
-			let (sum, overflow) = fees.overflowing_add(difference);
+			let (sum, overflow) = fees.overflowing_add(tx_fee);
 			if overflow {
 				return Err(Error::TransactionFeesOverflow)
 			}
