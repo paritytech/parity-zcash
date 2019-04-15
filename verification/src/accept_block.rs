@@ -180,7 +180,7 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 				let prevout = store.transaction_output(&input.previous_output, tx_idx);
 				let (sum, overflow) = incoming.overflowing_add(prevout.map(|o| o.value).unwrap_or(0));
 				if overflow {
-					return Err(Error::ReferencedInputsSumOverflow)
+					return Err(Error::Transaction(tx_idx, TransactionError::Overspend));
 				}
 				incoming = sum;
 			}
@@ -191,17 +191,52 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 				.sum::<u64>();
 
 			incoming = match incoming.overflowing_add(join_split_public_new) {
-				(_, true) => return Err(Error::ReferencedInputsSumOverflow),
+				(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
 				(incoming, _) => incoming,
 			};
 
+			if let Some(ref sapling) = tx.raw.sapling {
+				if sapling.balancing_value > 0 {
+					let balancing_value = sapling.balancing_value as u64;
+
+					incoming = match incoming.overflowing_add(balancing_value) {
+						(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+						(incoming, _) => incoming,
+					};
+				}
+			}
+
 			// (2) Total sum of all outputs
-			let spends = tx.raw.total_spends();
+			let mut spends = tx.raw.total_spends();
+
+			let join_split_public_old = tx.raw.join_split.iter()
+				.flat_map(|js| &js.descriptions)
+				.map(|d| d.value_pub_old)
+				.sum::<u64>();
+
+			spends = match spends.overflowing_add(join_split_public_old) {
+				(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+				(spends, _) => spends,
+			};
+
+			if let Some(ref sapling) = tx.raw.sapling {
+				if sapling.balancing_value < 0 {
+					let balancing_value = match sapling.balancing_value.checked_neg() {
+						Some(balancing_value) => balancing_value as u64,
+						None => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+					};
+					
+					spends = match spends.overflowing_add(balancing_value) {
+						(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+						(spends, _) => spends,
+					};
+				}
+			}
 
 			// Difference between (1) and (2)
 			let (difference, overflow) = incoming.overflowing_sub(spends);
 			if overflow {
-				return Err(Error::Transaction(tx_idx, TransactionError::Overspend))
+				return Err(Error::Transaction(tx_idx, TransactionError::Overspend));
 			}
 
 			// Adding to total fees (with possible overflow)
@@ -355,10 +390,13 @@ impl<'a> BlockSaplingRoot<'a> {
 mod tests {
 	extern crate test_data;
 
+	use std::collections::HashMap;
+	use chain::{OutPoint, TransactionOutput};
 	use db::BlockChainDatabase;
-	use storage::SaplingTreeState;
+	use network::{ConsensusParams, Network};
+	use storage::{SaplingTreeState, TransactionOutputProvider};
 	use {Error, CanonBlock};
-	use super::{BlockCoinbaseScript, BlockSaplingRoot};
+	use super::{BlockCoinbaseScript, BlockSaplingRoot, BlockCoinbaseMinerReward};
 
 	#[test]
 	fn test_block_coinbase_script() {
@@ -422,5 +460,31 @@ mod tests {
 			expected: "fbc2f4300c01f0b7820d00e3347c8da4ee614674376cbc45359daa54f9b5493e".into(),
 			actual: "0000000000000000000000000000000000000000000000000000000000000000".into(),
 		}));
+	}
+
+	#[test]
+	fn test_coinbase_overspend_b419221() {
+		struct Store(HashMap<OutPoint, TransactionOutput>);
+
+		impl TransactionOutputProvider for Store {
+			fn transaction_output(&self, outpoint: &OutPoint, _transaction_index: usize) -> Option<TransactionOutput> {
+				self.0.get(outpoint).cloned()
+			}
+
+			fn is_spent(&self, _outpoint: &OutPoint) -> bool {
+				false
+			}
+		}
+
+		let (block, donors) = test_data::block_h419221_with_donors();
+		let store = Store(donors.into_iter().flat_map(|donor| {
+			let hash = donor.hash();
+			donor.outputs.into_iter().enumerate().map(move |(index, output)| (OutPoint {
+				hash: hash.clone(),
+				index: index as u32,
+			}, output))
+		}).collect());
+		let consensus = ConsensusParams::new(Network::Mainnet);
+		assert_eq!(BlockCoinbaseMinerReward::new(CanonBlock::new(&block.into()), &store, &consensus, 419221).check(), Ok(()));
 	}
 }
