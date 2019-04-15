@@ -180,7 +180,7 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 				let prevout = store.transaction_output(&input.previous_output, tx_idx);
 				let (sum, overflow) = incoming.overflowing_add(prevout.map(|o| o.value).unwrap_or(0));
 				if overflow {
-					return Err(Error::Transaction(tx_idx, TransactionError::Overspend));
+					return Err(Error::Transaction(tx_idx, TransactionError::InputValueOverflow));
 				}
 				incoming = sum;
 			}
@@ -191,7 +191,7 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 				.sum::<u64>();
 
 			incoming = match incoming.overflowing_add(join_split_public_new) {
-				(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+				(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::InputValueOverflow)),
 				(incoming, _) => incoming,
 			};
 
@@ -200,7 +200,7 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 					let balancing_value = sapling.balancing_value as u64;
 
 					incoming = match incoming.overflowing_add(balancing_value) {
-						(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+						(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::InputValueOverflow)),
 						(incoming, _) => incoming,
 					};
 				}
@@ -215,7 +215,7 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 				.sum::<u64>();
 
 			spends = match spends.overflowing_add(join_split_public_old) {
-				(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+				(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::OutputValueOverflow)),
 				(spends, _) => spends,
 			};
 
@@ -223,11 +223,11 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 				if sapling.balancing_value < 0 {
 					let balancing_value = match sapling.balancing_value.checked_neg() {
 						Some(balancing_value) => balancing_value as u64,
-						None => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+						None => return Err(Error::Transaction(tx_idx, TransactionError::OutputValueOverflow)),
 					};
 					
 					spends = match spends.overflowing_add(balancing_value) {
-						(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::Overspend)),
+						(_, true) => return Err(Error::Transaction(tx_idx, TransactionError::OutputValueOverflow)),
 						(spends, _) => spends,
 					};
 				}
