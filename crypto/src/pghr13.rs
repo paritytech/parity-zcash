@@ -1,4 +1,4 @@
-pub use bn::{Fr, Fq, Fq2, G1, G2, Group, arith::{U256, U512}, AffineG1, AffineG2};
+pub use bn::{Fr, Fq, Fq2, G1, G2, Group, arith::{U256, U512}, AffineG1, AffineG2, CurveError};
 use bn::pairing;
 use std::ops::Neg;
 use json::pghr13 as json;
@@ -46,6 +46,13 @@ pub enum Error {
 	NotFqMember,
 	NotFq2Member,
 	InvalidSignPrefix,
+	Curve(CurveError),
+}
+
+impl From<CurveError> for Error {
+	fn from(e: CurveError) -> Self {
+		Error::Curve(e)
+	}
 }
 
 #[derive(Clone)]
@@ -63,57 +70,40 @@ pub struct Proof {
 impl Proof {
 	pub fn from_raw(data: &[u8; 296]) -> Result<Self, Error> {
 		Ok(Proof {
-			a: g1_from_compressed(&data[0..33])?,
-			a_prime: g1_from_compressed(&data[33..66])?,
+			a: G1::from_compressed(&data[0..33])?,
+			a_prime: G1::from_compressed(&data[33..66])?,
 			b: g2_from_compressed(&data[66..131])?,
-			b_prime: g1_from_compressed(&data[131..164])?,
-			c: g1_from_compressed(&data[164..197])?,
-			c_prime: g1_from_compressed(&data[197..230])?,
-			k: g1_from_compressed(&data[230..263])?,
-			h: g1_from_compressed(&data[263..296])?,
+			b_prime: G1::from_compressed(&data[131..164])?,
+			c: G1::from_compressed(&data[164..197])?,
+			c_prime: G1::from_compressed(&data[197..230])?,
+			k: G1::from_compressed(&data[230..263])?,
+			h: G1::from_compressed(&data[263..296])?,
 		})
 	}
 }
 
 lazy_static! {
 	// integer modulus for Fq field
-	pub static ref FQ: U256 = U256::from([
+	static ref FQ: U256 = U256::from([
         0x3c208c16d87cfd47,
         0x97816a916871ca8d,
         0xb85045b68181585d,
         0x30644e72e131a029
     ]);
 
-	pub static ref G1_B: Fq = Fq::from_u256(3.into()).expect("3 is a valid field element and static; qed");
+	static ref G1_B: Fq = Fq::from_u256(3.into()).expect("3 is a valid field element and static; qed");
 
-	pub static ref FQ_MINUS3_DIV4: Fq =
-		Fq::from_u256(3.into()).expect("3 is a valid field element and static; qed").neg() *
-		Fq::from_u256(4.into()).expect("4 is a valid field element and static; qed").inverse()
-			.expect("4 has inverse in Fq and is static; qed");
-
-	pub static ref FQ_MINUS1_DIV2: Fq =
+	static ref FQ_MINUS1_DIV2: Fq =
 		Fq::from_u256(1.into()).expect("1 is a valid field element and static; qed").neg() *
 		Fq::from_u256(2.into()).expect("2 is a valid field element and static; qed").inverse()
 			.expect("2 has inverse in Fq and is static; qed");
 
+	static ref FQ_MINUS3_DIV4: Fq =
+		Fq::from_u256(3.into()).expect("3 is a valid field element and static; qed").neg() *
+		Fq::from_u256(4.into()).expect("4 is a valid field element and static; qed").inverse()
+			.expect("4 has inverse in Fq and is static; qed");
 }
 
-// Shanks’s algorithm for q ≡ 3 (mod 4)
-// (FQ mod 4 = 3)
-fn fq_sqrt(a: Fq) -> Option<Fq> {
-	let a1 = a.pow(*FQ_MINUS3_DIV4);
-	let a1a = a1 * a;
-	let a0 = a1 * (a1a);
-
-	let mut am1 = *FQ;
-	am1.sub(&1.into(), &*FQ);
-
-	if a0 == Fq::from_u256(am1).unwrap() {
-		None
-	} else {
-		Some(a1a)
-	}
-}
 
 fn fq2_to_u512(e: Fq2) -> U512 {
     let c0 = e.real().into_u256();
@@ -142,24 +132,6 @@ fn fq2_sqrt(a: Fq2) -> Option<Fq2> {
 	}
 }
 
-fn g1_from_compressed(data: &[u8]) -> Result<G1, Error> {
-	if data.len() != 33 { return Err(Error::InvalidRawInput); }
-
-	let sign = data[0];
-	let fq = deserialize_fq(&data[1..])?;
-	let x = fq;
-	let y_squared = (fq * fq * fq) + *G1_B;
-
-	let mut y = fq_sqrt(y_squared).ok_or(Error::InvalidFieldElement)?;
-
-	if sign == 2 && y.into_u256().get_bit(0).expect("bit 0 always exist; qed") { y = y.neg(); }
-	else if sign == 3 && !y.into_u256().get_bit(0).expect("bit 0 always exist; qed") { y = y.neg(); }
-	else if sign != 3 && sign != 2 {
-		return Err(Error::InvalidSignPrefix);
-	}
-	AffineG1::new(x, y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
-}
-
 fn g2_from_compressed(data: &[u8]) -> Result<G2, Error> {
 	if data.len() != 65 { return Err(Error::InvalidRawInput); }
 
@@ -179,11 +151,6 @@ fn g2_from_compressed(data: &[u8]) -> Result<G2, Error> {
 		};
 
 	AffineG2::new(x, e_y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
-}
-
-fn deserialize_fq(data: &[u8]) -> Result<Fq, Error> {
-	let u256 = U256::from_slice(data).map_err(|_| Error::InvalidU256Encoding)?;
-	Ok(Fq::from_u256(u256).map_err(|_| Error::NotFqMember)?)
 }
 
 fn deserialize_fq2(data: &[u8]) -> Result<Fq2, Error> {
@@ -229,15 +196,6 @@ mod tests {
 	}
 
 	#[test]
-	fn sqrt_fq() {
-		// from zcash test_proof.cpp
-		let fq1 = Fq::from_str("5204065062716160319596273903996315000119019512886596366359652578430118331601").unwrap();
-		let fq2 = Fq::from_str("348579348568").unwrap();
-
-		assert_eq!(fq1, fq_sqrt(fq2).expect("348579348568 is quadratic residue"));
-	}
-
-	#[test]
 	fn sqrt_fq2() {
 		// from zcash test_proof.cpp
 		let x1 = Fq2::new(
@@ -262,14 +220,6 @@ mod tests {
 		assert!(
 			fq2_sqrt(Fq2::new(Fq::from_str("1").unwrap(), Fq::from_str("2").unwrap())).is_none()
 		);
-	}
-
-	#[test]
-	fn g1_deserialize() {
-		let g1 = g1_from_compressed(&hex("0230644e72e131a029b85045b68181585d97816a916871ca8d3c208c16d87cfd46")).expect("Invalid g1 decompress result");
-		assert_eq!(g1.x(), Fq::from_str("21888242871839275222246405745257275088696311157297823662689037894645226208582").unwrap());
-		assert_eq!(g1.y(), Fq::from_str("3969792565221544645472939191694882283483352126195956956354061729942568608776").unwrap());
-		assert_eq!(g1.z(), Fq::one());
 	}
 
 	fn vkey() -> VerifyingKey {
