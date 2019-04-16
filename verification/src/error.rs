@@ -153,4 +153,3 @@ pub enum TransactionError {
 	/// Unknown anchor used in join split
 	UnknownAnchor(H256),
 }
-
