@@ -306,7 +306,7 @@ mod tests {
 
 	fn compute_sighash(tx: Transaction) -> [u8; 32] {
 		let signer: TransactionInputSigner = tx.into();
-		signer.signature_hash(&mut None, None, 0, &From::from(vec![]), SighashBase::All.into(), 0x76b809bb).into()
+		signer.signature_hash(&mut Default::default(), None, 0, &From::from(vec![]), SighashBase::All.into(), 0x76b809bb).into()
 	}
 
 	fn run_accept_sapling(tx: Transaction) -> Result<(), Error> {

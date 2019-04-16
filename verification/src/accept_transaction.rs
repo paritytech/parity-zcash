@@ -387,7 +387,7 @@ impl<'a> TransactionEval<'a> {
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: self.consensus_branch_id,
-			cache: None,
+			cache: Default::default(),
 		};
 
 		// generate sighash that is not associated with a transparent input
@@ -781,7 +781,7 @@ mod tests {
 			input_index: 0,
 			input_amount: 0,
 			consensus_branch_id: 0,
-			cache: None,
+			cache: Default::default(),
 		};
 
 		let flags = VerificationFlags::default()

@@ -26,12 +26,12 @@ impl From<SighashBase> for u32 {
 /// Signature portions cache.
 #[derive(Debug, Default, PartialEq)]
 pub struct SighashCache {
-	pub hash_prevouts: H256,
-	pub hash_sequence: H256,
-	pub hash_outputs: H256,
-	pub hash_join_split: H256,
-	pub hash_sapling_spends: H256,
-	pub hash_sapling_outputs: H256,
+	pub hash_prevouts: Option<H256>,
+	pub hash_sequence: Option<H256>,
+	pub hash_outputs: Option<H256>,
+	pub hash_join_split: Option<H256>,
+	pub hash_sapling_spends: Option<H256>,
+	pub hash_sapling_outputs: Option<H256>,
 }
 
 #[cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
@@ -151,7 +151,7 @@ impl TransactionInputSigner {
 	/// Pass None as input_index to compute transparent input signature
 	pub fn signature_hash(
 		&self,
-		cache: &mut Option<SighashCache>,
+		cache: &mut SighashCache,
 		input_index: Option<usize>,
 		input_amount: u64,
 		script_pubkey: &Script,
@@ -248,7 +248,7 @@ impl TransactionInputSigner {
 	/// Overwinter/sapling version of the signature.
 	fn signature_hash_post_overwinter(
 		&self,
-		cache: &mut Option<SighashCache>,
+		cache: &mut SighashCache,
 		input_index: Option<usize>,
 		input_amount: u64,
 		script_pubkey: &Script,
@@ -258,35 +258,35 @@ impl TransactionInputSigner {
 		sapling: bool,
 	) -> H256 {
 		// compute signature portions that can be reused for other inputs
-		let hash_prevouts = cache.as_ref().map(|c| c.hash_prevouts)
-			.unwrap_or_else(|| compute_hash_prevouts(sighash, &self.inputs));
-		let hash_sequence = cache.as_ref().map(|c| c.hash_sequence)
-			.unwrap_or_else(|| compute_hash_sequence(sighash, &self.inputs));
-		let hash_outputs = compute_hash_outputs(cache, sighash, input_index, &self.outputs);
-		let hash_join_split = cache.as_ref().map(|c| c.hash_join_split)
-			.unwrap_or_else(|| compute_hash_join_split(self.join_split.as_ref()));
-		let hash_sapling_spends = if sapling {
-			cache.as_ref().map(|c| c.hash_sapling_spends)
-				.unwrap_or_else(|| compute_hash_sapling_spends(self.sapling.as_ref()))
-		} else {
-			0u8.into()
-		};
-		let hash_sapling_outputs = if sapling {
-			cache.as_ref().map(|c| c.hash_sapling_outputs)
-				.unwrap_or_else(|| compute_hash_sapling_outputs(self.sapling.as_ref()))
-		} else {
-			0u8.into()
-		};
+		//
+		// compute_* decides if it wants to use cached value
+		// compute_* decides if it wants to cache computed value
+		let (hash_prevouts, cache_hash_prevouts) = compute_hash_prevouts(cache, sighash, &self.inputs);
+		let (hash_sequence, cache_hash_sequence) = compute_hash_sequence(cache, sighash, &self.inputs);
+		let (hash_outputs, cache_hash_outputs) = compute_hash_outputs(cache, sighash, input_index, &self.outputs);
+		let (hash_join_split, cache_hash_join_split) = compute_hash_join_split(cache, self.join_split.as_ref());
+		let (hash_sapling_spends, cache_hash_sapling_spends) = compute_hash_sapling_spends(cache, sapling, self.sapling.as_ref());
+		let (hash_sapling_outputs, cache_hash_sapling_outputs) = compute_hash_sapling_outputs(cache, sapling, self.sapling.as_ref());
 
 		// update cache
-		*cache = Some(SighashCache {
-			hash_prevouts,
-			hash_sequence,
-			hash_outputs,
-			hash_join_split,
-			hash_sapling_spends,
-			hash_sapling_outputs,
-		});
+		if cache_hash_prevouts {
+			cache.hash_prevouts = Some(hash_prevouts);
+		}
+		if cache_hash_sequence {
+			cache.hash_sequence = Some(hash_sequence);
+		}
+		if cache_hash_outputs {
+			cache.hash_outputs = Some(hash_outputs);
+		}
+		if cache_hash_join_split {
+			cache.hash_join_split = Some(hash_join_split);
+		}
+		if cache_hash_sapling_spends {
+			cache.hash_sapling_spends = Some(hash_sapling_spends);
+		}
+		if cache_hash_sapling_outputs {
+			cache.hash_sapling_outputs = Some(hash_sapling_outputs);
+		}
 
 		let mut personalization = [0u8; 16];
 		personalization[..12].copy_from_slice(b"ZcashSigHash");
@@ -341,85 +341,101 @@ impl TransactionInputSigner {
 	}
 }
 
-fn compute_hash_prevouts(sighash: Sighash, inputs: &[UnsignedTransactionInput]) -> H256 {
+fn compute_hash_prevouts(
+	cache: &SighashCache,
+	sighash: Sighash,
+	inputs: &[UnsignedTransactionInput],
+) -> (H256, bool) {
 	const PERSONALIZATION: &'static [u8; 16] = b"ZcashPrevoutHash";
 
 	match sighash.anyone_can_pay {
-		false => {
+		false => (cache.hash_prevouts.unwrap_or_else(|| {
 			let mut stream = Stream::default();
 			for input in inputs {
 				stream.append(&input.previous_output);
 			}
 			blake2b_personal(PERSONALIZATION, &stream.out())
-		},
-		true => 0u8.into(),
+		}), true),
+		true => (0u8.into(), false),
 	}
 }
 
-fn compute_hash_sequence(sighash: Sighash, inputs: &[UnsignedTransactionInput]) -> H256 {
+fn compute_hash_sequence(
+	cache: &SighashCache,
+	sighash: Sighash,
+	inputs: &[UnsignedTransactionInput],
+) -> (H256, bool) {
 	const PERSONALIZATION: &'static [u8; 16] = b"ZcashSequencHash";
 
 	match sighash.base {
-		SighashBase::All if !sighash.anyone_can_pay => {
+		SighashBase::All if !sighash.anyone_can_pay => (cache.hash_sequence.unwrap_or_else(|| {
 			let mut stream = Stream::default();
 			for input in inputs {
 				stream.append(&input.sequence);
 			}
 			blake2b_personal(PERSONALIZATION, &stream.out())
-		},
-		_ => 0u8.into(),
+		}), true),
+		_ => (0u8.into(), false),
 	}
 }
 
 fn compute_hash_outputs(
-	cache: &mut Option<SighashCache>,
+	cache: &SighashCache,
 	sighash: Sighash,
 	input_index: Option<usize>,
 	outputs: &[TransactionOutput]
-) -> H256 {
+) -> (H256, bool) {
 	const PERSONALIZATION: &'static [u8; 16] = b"ZcashOutputsHash";
 
 	match (sighash.base, input_index) {
-		(SighashBase::All, _) => {
-			cache.as_ref().map(|c| c.hash_outputs)
-				.unwrap_or_else(|| {
-					let mut stream = Stream::default();
-					for output in outputs {
-						stream.append(output);
-					}
-					blake2b_personal(PERSONALIZATION, &stream.out())
-				})
-		},
+		(SighashBase::All, _) => (cache.hash_outputs.unwrap_or_else(|| {
+			let mut stream = Stream::default();
+			for output in outputs {
+				stream.append(output);
+			}
+			blake2b_personal(PERSONALIZATION, &stream.out())
+		}), true),
 		(SighashBase::Single, Some(input_index)) if input_index < outputs.len() => {
 			let mut stream = Stream::default();
 			stream.append(&outputs[input_index]);
-			blake2b_personal(PERSONALIZATION, &stream.out())
+			(blake2b_personal(PERSONALIZATION, &stream.out()), false)
 		},
-		_ => 0u8.into(),
+		_ => (0u8.into(), false),
 	}
 }
 
-fn compute_hash_join_split(join_split: Option<&JoinSplit>) -> H256 {
+fn compute_hash_join_split(
+	cache: &SighashCache,
+	join_split: Option<&JoinSplit>,
+) -> (H256, bool) {
 	const PERSONALIZATION: &'static [u8; 16] = b"ZcashJSplitsHash";
 
 	match join_split {
-		Some(join_split) if !join_split.descriptions.is_empty() => {
+		Some(join_split) if !join_split.descriptions.is_empty() => (cache.hash_join_split.unwrap_or_else(|| {
 			let mut stream = Stream::default();
 			for description in &join_split.descriptions {
 				stream.append(description);
 			}
 			stream.append(&join_split.pubkey);
 			blake2b_personal(PERSONALIZATION, &stream.out())
-		},
-		_ => 0u8.into(),
+		}), true),
+		_ => (0u8.into(), false),
 	}
 }
 
-fn compute_hash_sapling_spends(sapling: Option<&Sapling>) -> H256 {
+fn compute_hash_sapling_spends(
+	cache: &SighashCache,
+	is_sapling: bool,
+	sapling: Option<&Sapling>,
+) -> (H256, bool) {
 	const PERSONALIZATION: &'static [u8; 16] = b"ZcashSSpendsHash";
 
+	if !is_sapling {
+		return (0u8.into(), false);
+	}
+
 	match sapling {
-		Some(sapling) if !sapling.spends.is_empty() => {
+		Some(sapling) if !sapling.spends.is_empty() => (cache.hash_sapling_spends.unwrap_or_else(|| {
 			let mut stream = Stream::default();
 			for spend in &sapling.spends {
 				stream.append(&spend.value_commitment);
@@ -429,23 +445,31 @@ fn compute_hash_sapling_spends(sapling: Option<&Sapling>) -> H256 {
 				stream.append(&spend.zkproof);
 			}
 			blake2b_personal(PERSONALIZATION, &stream.out())
-		},
-		_ => 0u8.into(),
+		}), true),
+		_ => (0u8.into(), false),
 	}
 }
 
-fn compute_hash_sapling_outputs(sapling: Option<&Sapling>) -> H256 {
+fn compute_hash_sapling_outputs(
+	cache: &SighashCache,
+	is_sapling: bool,
+	sapling: Option<&Sapling>,
+) -> (H256, bool) {
 	const PERSONALIZATION: &'static [u8; 16] = b"ZcashSOutputHash";
 
+	if !is_sapling {
+		return (0u8.into(), false);
+	}
+
 	match sapling {
-		Some(sapling) if !sapling.outputs.is_empty() => {
+		Some(sapling) if !sapling.outputs.is_empty() => (cache.hash_sapling_outputs.unwrap_or_else(|| {
 			let mut stream = Stream::default();
 			for output in &sapling.outputs {
 				stream.append(output);
 			}
 			blake2b_personal(PERSONALIZATION, &stream.out())
-		},
-		_ => 0u8.into(),
+		}), true),
+		_ => (0u8.into(), false),
 	}
 }
 
@@ -504,7 +528,7 @@ mod tests {
 			sapling: None,
 		};
 
-		let mut cache = None;
+		let mut cache = Default::default();
 		let hash = input_signer.signature_hash(&mut cache, Some(0), 0, &previous_output, SighashBase::All.into(), 0);
 		assert_eq!(hash, expected_signature_hash);
 	}
@@ -534,7 +558,7 @@ mod tests {
 		let expected: H256 = result.parse().unwrap();
 		let expected = expected.reversed();
 
-		let mut cache = None;
+		let mut cache = Default::default();
 		let input_index = if input_index as u64 == ::std::u64::MAX { None } else { Some(input_index) };
 		let hash = signer.signature_hash(&mut cache, input_index, 0, &script, hash_type as u32, consensus_branch_id);
 		if expected != hash {
@@ -566,50 +590,64 @@ mod tests {
 		}
 	}
 
-	// tx#1 from block#419201
 	#[test]
 	fn test_sighash_cache_works_correctly() {
-		// tx#1 from block#419201
-		// https://zcash.blockexplorer.com/api/rawblock/00000000014d117faa2ea701b24261d364a6c6a62e5bc4bc27335eb9b3c1e2a8
-		let spend_tx: Transaction = "0400008085202f8901ddd8ddd4a8713d9443e11f1a79adb737e974bece08608b6b04017d9b436b9399010000006a473044022004cd1a5a48b015213fa0810028d98271d219aa4a7293928dea01946f9e3db53102206837946d92757a460c8d7a2d64872890abbfa3f572cd1e8fabf5a7ca8997de26012102fa947bb7cfa50aa6e83f6296d95334d7f55cd43e9c873404f2550f6ba006d5aaffffffff00000000009465060021f65ff9ffffffff0001b40f6b0d76653bc236b045c7dd16e0e8e1a8fa6fa9f7d5120c1e7289aee78d67f9d8ae3d9707dcb30064b8f7afcc2fc1aca8918f263c58da6c7806cfad133d11fedf35174cf837149b3f2559a70055398c6ab3eba99a3335f4d360488d88266fb533abea66784d930ff8f1574eca66374d4fa559f462d65c0d8af6e7b2770dfb804f9d29388b651b2af0d9d21ad3cd6aebeeb8ecdc98b208aa027e6dcc8f27a13d643d650934faa98a809fa0c61ea3f796f96565cbee80a176a9258621ec3574ce5e7f6ceb70db4bd36f2feb983648f8405ebda405645f005f455f3dd96ea7d5081ba13a6a90cae0aebc7ec7a4589058bf67dc35c511de423d0c29d95febeaf08a32f4e123f39d4bb964d836eeaf2eb825c68c0f7ce62ab8f048f61a28998c1f0340d9660c849b86d8f639955d5d2e15458875dd547c86fd96a74c48b3eb6fc3d31ffdfa24d78afdbb0dbfa8200e87562668293bbab1ca9fc67af4f7369f0e12b6e6e07388189381b38059737ddc3322cbbfd6d1bce912d2bacdfa66f3f22835fc0f3f213e6abef8eacfaffd4c204296900e1651d1c9cbf981364629250b4bafaa5e4d1cbba21a03f6270ddbcaed684caceea5b2870a856a11835923277e5648db0d92ad60f280c7dbb1c2820000fa3117f3e1e0a08cec9f3dfeaf2b6d8d714e072b674d5dbb53420dc9cf67c8f0010665119a8200dd774f0107b17a7398706cf10eecd219f252b2d6813f4d8a672a1dca61f68c75cefb9f2ba7653bdae0b2faa6e76afe9ff62d2ecdfc72d497210517a66f2bf39f402991e5608e754c551e75bd26e7f33474b68d690d5285bd949182731fc49b43d4673aaca20d665c0d0b6ad7cced361c91b06e114e46495400738ef9d528744267fd47d3239e4548a6a3ff6e43b6ca821f32fc261f2c649674a4dc2bac93d177e0c44f4c78694f50ce374978599de6aefbd37e892de81d8d6012675f31daa75fb35bbb339754355e67ea4cf0b8c67d573af3f4f3382b3f408682a50d58767a796ca1ed3dca4227f9d107dc08c0e53134d4fa6e06792182873aa895f3373c388b0c9c7d4a2c065b6f1cd807ef3f4d7b2737eeb90ebb557c859ff17b898d350d8cffc7ca1e08dcb9baba5a336f17e6eba7a2425da8c43caefbd7fa58390e78ad083c36720336fe824983d1fa17402e89d3c224e994248c88ec2f547aeb48227705fd8a4ac3f9f30b139b4e30bb0b82af9bae87800c875c19d6fbd45a26763d056bef6899e031442185ae50a5ed24b006a852f8ce3d55b2d2d9f4179797f93bbffd8905cc9ce69cebc8a17e1e8b8eb5e1e675620c70b22de348969b993246520c00bfa467125a2528a829120b3f64d2c1f58f45cb31a1d15ba368d7df55aa65e65ad4a8f5bc63e06396d40964b3aff6084a83f567b186b1c70072dfebc873638409".into();
-		assert_eq!(spend_tx.hash().reversed(), "66e2e3dfb9c51eb961004e0eb8bfd3820239c4f11614b65a1fffb60e01858580".into());
-		assert_eq!(spend_tx.inputs[0].previous_output.hash.reversed(), "99936b439b7d01046b8b6008cebe74e937b7ad791a1fe143943d71a8d4ddd8dd".into());
-		assert_eq!(spend_tx.inputs[0].previous_output.index, 1);
+		let test_cases: Vec<(Transaction, Transaction, usize)> = vec![
+			(
+				// tx#1 from block#419201
+				// https://zcash.blockexplorer.com/api/rawblock/00000000014d117faa2ea701b24261d364a6c6a62e5bc4bc27335eb9b3c1e2a8
+				"0400008085202f8901ddd8ddd4a8713d9443e11f1a79adb737e974bece08608b6b04017d9b436b9399010000006a473044022004cd1a5a48b015213fa0810028d98271d219aa4a7293928dea01946f9e3db53102206837946d92757a460c8d7a2d64872890abbfa3f572cd1e8fabf5a7ca8997de26012102fa947bb7cfa50aa6e83f6296d95334d7f55cd43e9c873404f2550f6ba006d5aaffffffff00000000009465060021f65ff9ffffffff0001b40f6b0d76653bc236b045c7dd16e0e8e1a8fa6fa9f7d5120c1e7289aee78d67f9d8ae3d9707dcb30064b8f7afcc2fc1aca8918f263c58da6c7806cfad133d11fedf35174cf837149b3f2559a70055398c6ab3eba99a3335f4d360488d88266fb533abea66784d930ff8f1574eca66374d4fa559f462d65c0d8af6e7b2770dfb804f9d29388b651b2af0d9d21ad3cd6aebeeb8ecdc98b208aa027e6dcc8f27a13d643d650934faa98a809fa0c61ea3f796f96565cbee80a176a9258621ec3574ce5e7f6ceb70db4bd36f2feb983648f8405ebda405645f005f455f3dd96ea7d5081ba13a6a90cae0aebc7ec7a4589058bf67dc35c511de423d0c29d95febeaf08a32f4e123f39d4bb964d836eeaf2eb825c68c0f7ce62ab8f048f61a28998c1f0340d9660c849b86d8f639955d5d2e15458875dd547c86fd96a74c48b3eb6fc3d31ffdfa24d78afdbb0dbfa8200e87562668293bbab1ca9fc67af4f7369f0e12b6e6e07388189381b38059737ddc3322cbbfd6d1bce912d2bacdfa66f3f22835fc0f3f213e6abef8eacfaffd4c204296900e1651d1c9cbf981364629250b4bafaa5e4d1cbba21a03f6270ddbcaed684caceea5b2870a856a11835923277e5648db0d92ad60f280c7dbb1c2820000fa3117f3e1e0a08cec9f3dfeaf2b6d8d714e072b674d5dbb53420dc9cf67c8f0010665119a8200dd774f0107b17a7398706cf10eecd219f252b2d6813f4d8a672a1dca61f68c75cefb9f2ba7653bdae0b2faa6e76afe9ff62d2ecdfc72d497210517a66f2bf39f402991e5608e754c551e75bd26e7f33474b68d690d5285bd949182731fc49b43d4673aaca20d665c0d0b6ad7cced361c91b06e114e46495400738ef9d528744267fd47d3239e4548a6a3ff6e43b6ca821f32fc261f2c649674a4dc2bac93d177e0c44f4c78694f50ce374978599de6aefbd37e892de81d8d6012675f31daa75fb35bbb339754355e67ea4cf0b8c67d573af3f4f3382b3f408682a50d58767a796ca1ed3dca4227f9d107dc08c0e53134d4fa6e06792182873aa895f3373c388b0c9c7d4a2c065b6f1cd807ef3f4d7b2737eeb90ebb557c859ff17b898d350d8cffc7ca1e08dcb9baba5a336f17e6eba7a2425da8c43caefbd7fa58390e78ad083c36720336fe824983d1fa17402e89d3c224e994248c88ec2f547aeb48227705fd8a4ac3f9f30b139b4e30bb0b82af9bae87800c875c19d6fbd45a26763d056bef6899e031442185ae50a5ed24b006a852f8ce3d55b2d2d9f4179797f93bbffd8905cc9ce69cebc8a17e1e8b8eb5e1e675620c70b22de348969b993246520c00bfa467125a2528a829120b3f64d2c1f58f45cb31a1d15ba368d7df55aa65e65ad4a8f5bc63e06396d40964b3aff6084a83f567b186b1c70072dfebc873638409".into(),
+				// donor tx for input #0:
+				// tx#3 from block#409840
+				// https://zcash.blockexplorer.com/api/rawblock/0000000002d83a0d7d5011a19d2bd89125dc22d63b6484f2792fd1d636c4d940
+				"030000807082c4030b10d6644275fdb7553601349f524ce0a4fb6acc1d17551249b7cb87cb97e07f1f100000006b483045022100977b46b263f691777cb13b9b9c623ce15ccef2d5d5f1efcb7fd1f16aeac98fe20220090ecb6f82cccb37f295ec3c898c1c9b5bb3f46f7b524bc641137a9ce6277bbb012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7feffffff8308f2430ed380564b53e7e4fdb16fbb30d1c482dc5fae68613e69d368608c44190000006a47304402201b5673ce6c541a42eac79742e7d1a1c9f51456d5012226985067eec93922f96f0220064c88fa17711860e5a06ebf8849cd4dcbb8f944c39ff227a99a91d8c82a4621012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7feffffff5c89bda835f37289182b3123c49c7906629631e4c3c883de97fb637f92802c16580000006a47304402203533eca9827a92959ee7b8c0ea8154b62e9935bc8ca4c61020ff268bb336c59402200e14f6ea6f2e9e0bce19db50b2b10ed3d1e40db957aae3b491797540932dd8ea012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7feffffff9b057ba8d3e81fa9c10a98c4ee258df57a9eb1a80f1fb22b08b1685d1ada17fc1f0000006b483045022100e845ab5355bd877641e8238d9f16ac1345af346e81fbeeedda128f23dec5f71002207367e2e38d32e6843aa8c52eedd6b1fbda08d8436e26e0e80e035cb2314710d7012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7feffffff9e01f46736183d109a9739638cfff185f62aebf2e9a010f795d80a0b82daad50200000006b483045022100fdf3156db7f2cad51acfd4fcda6ec9f3608ba68f49d5d947e7504a00522f6a4102202f4c74cc34843efbecd53612fd8ea065d8f79b3419190e1792fe3fa03b8d5447012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7fefffffffafa19844c386065fd650694ec15094a24e4a6499eb585a0c0544fbf5be9e002010000006a47304402205e2a73750d0ee3672184da65e356fbb95023586ef77c8f01d87eecab09aba5e7022015f8b13eece11b9c7a57bd869b5f44af3a4dfc07ebaf324f899b6541f7ffba050121025792386461f81e038989e4ac62a4142e1e987ae740906ab3032a04e4ac74967bfeffffff1ae4ec68f85c5d67797eccba7653c1a2bc5df34423366af7793bf1232c2bacb9000000006a47304402207501656ce6d97dbd5573953c117cb8fbdc61e09be58798cdab162304291311860220088945ac2142cf3689d7686b146720e4ac1c7f5292c13406fc2628a8e63ff221012103fbdca468248d731579fb6e756566d48903a84a16cd0f415cddfb5c41458bb262feffffff2d805a191e7699a2dcadf2444f682afe2be378b20e3b4b4431f57f32c7d554dd000000006b483045022100b39190d59a549f04f1e22d637f997b1b1ab7abda98d34a67fb616d380d247ea5022039feb0bf51e496dcfad037b0c675038d0c36793a26a66e58a9039524bd6e3e6c012103bb4932a7677891b8945557cb23530b6e9a688f0fa6deac31c9e323f0edf40439feffffff71934ffa32133dc62c7e4b2a8b10f51a8aa0a96099b4fc1e648ea9c676884c6f000000006b48304502210094af623575cec584e3d4406ed30a2f6364a0c6ba493cb77ea0f0d6e8d372cc5f02206ee94b089bfc4e347cf5de9de27785102e3bb146276868a4d9220d405d4e28e2012102cb666a57bb47dc4d447795e439f9d03d7b935f94fd92f80ecabc6a41061a50e8feffffff1bddd5649e33d1595c956b574d3dbb3883d25d1b9be93ef3ce7fad492534d8e4000000006b483045022100800c193e55b1234ed405248ebd69250fb0373bcfe6dda2da593c8f4213d10e5e02202c7b7387449b74125ee8d1f8c381d30f9474f0d5718e33ddd0a9179f5c6ca5ff0121020b2c90de955d7b4bf93415147b8bb43af3186b46e743316ee662ec9136899bf9fefffffffec3b71b6d478340583518ac04357d7a01e39ef311a9b7a9eed4bd3afe8a2a39010000006b483045022100b0e445d7bb23bf2400428d17d8b076d1ea6f415981ef9b806c714697538eaad402203b29f0108126b3345f48dfe22a8b743f3fd91b3c809272d8f81d566530540aa20121029506cd31b962743382a7c5b372d4a6ce66584f7aafefd358ad1b720902c3c907feffffff023d4a0f00000000001976a914e212f89515c07fc61c01fd9ccee566544956822088acef30a006000000001976a91414c42abe82c257103f4589e738f4f05b0f0c600e88ace54006000441060000".into(),
+				// we're testing input#0
+				0,
+			),
+			(
+				// tx#3 from block#420083
+				// https://zcash.blockexplorer.com/api/rawtx/56d3fd4241520573c4f90e8b89a634cb3b3c4f2cfca34e7b3208de4678bf67b2
+				"0400008085202f890666a4b9fe9308b92f1785f9e18a18f473d5a8c44ac3abf5cf52d43773a5bab580000000006b4830450221008336e1a227f894d41a4f9a13bb67ae3a0bc0be6558dd4c17ffa79732f3908f8802200978b7abfa0cd38cf73a161aedfcdf78600a3112ad8a5821d12f709bf9e640b4032102c13a62ce58bf064cd5e3bdb8ad61e07ff5fe854284728edd1117125c7bffbfeeffffffffb9fcb288f427e0556f629d248656d6bab6d2b6343aee8ffd8eddfb754b6f8fe0000000006b483045022100bf6744adf8ad5a3aea4e6170ff5e638702179832f8ab7c20721a5d7db169944a0220147ab55f2316097fe54a67c9fa08950ab3645cf475ba7a61596f39ea03893da40321032bf181cbe48f2ab8ae2b2c3840eff37615a0299bb90b49bfecbc36ebc83c7b6bffffffffb9ee9a5db14130b14cb28a8488ee25a451b31b7793925564c2cf158b5750d148010000006a473044022038f9774cd6654a6efec33150d27a2e2b8177e11c98cd3196b157c18ed2af20fa02203f3ea40ca22fb9fc1c28d06105c5a2289311ab03aa5fb03509230e1a87644cfa0321025371db306496fa8ec28ffc8ed28f1c8fd93c751d7b2448d7959656a6fbfd36faffffffff6f3447fe2d7f1a35ea6024083868067786fc2d2a8e65787dc5a5268efae2290a010000006a47304402207a975173da91e93280f5664f58e07959d18408554a28c428836b90b9e0e73578022070c495faa40b8c1fa784454e29f8a621f1824a182f68c6600cb0daffc7b4e45f0321025778f397884e483eb74ae861d52abc625b114052dfd40936b3d505767f38ed33ffffffff794ff48194c959056ff80ef547262259c9f1583d860301425c04a6824807b820010000006b483045022100bd707bc1a01edb5bfc5e6120490ec07cb330a78aa366d718f291980bdfd15758022035f8e860431c915591b3cde8fced541eca8a26c8966b92368f09a0356f6d92800321030ede2c25e6d034f4a855f9976cd67615e4279656f775fe13be300a4f6b688b8effffffff1fe56983eee881144093b6e4e2953779ea2cee051005bd1e78a06edceda90333010000006b483045022100a5a36678dd45ec9e4de1a275829da911dded2c59bb0e7467110bb9c6fc8cb099022033a2c22315ae87aedff8c1c9631c4c890cca9690544433dec52dc358332334400321023e4a72e165868a1257f53e093eda3c1e95c7e36b5a4a32bf78c4d0d8417addc7ffffffff01eaf82800000000001976a91417379a9efb16569951887cb5365791ad9895389788ac00000000000000000000000000000000000000".into(),
+				// donor tx for input #0:
+				// https://zcash.blockexplorer.com/api/rawtx/80b5baa57337d452cff5abc34ac4a8d573f4188ae1f985172fb90893feb9a466
+				"030000807082c4030363fa1654f87357fa2f9daf554424d97fe9b0275f820e10fa80c713329816b085000000006a47304402200fc27c0e1c63142f6903608967f66432ca88c95b54cc80794b099b82d0a2df780220440a9c21de092f4cc33f83405a27023362961e2423b5957b387442b30b9fea8f01210227855d8d44fa991a92a8608df49a3a76bb2a37a6ec4146df59bedabc6ba97572feffffff956dc5a8869f4ea22e806f2422248b840d2fae0abaaaaec798b97bc8358cdb5d000000006a47304402203c3dcf0206a5b48ef517d2d23f04a3d6a2383536c208daa7d6f5ce9a2cf61e5402206ac954167c7f6ec1e8be22c997c32104dc0368b3f2d97fea670a9d6490a169bc012102fbdf4afcad38290d7268db506165af2e4fbd99632c2f609b2512f951af17b116feffffffb126f38d5cb212b2ec56184dde40acb66583d26ae979dc54893f5321fe329df8000000006a473044022054842385d5596ae51626c507dacb575274df071ed76f064825206e90687503fa02201e7e3f9c34adf182776048b0b87a9ff7cb34819ca97866a92fb1c960257e56d2012103c6d5ce7fcb7483662e702ff6a40141ce6e03cdf10206513a6ee33543194bcea3feffffff020f9f1000000000001976a9146b5f30eb97d6908d7319b57b5c453612045bc98688ac085a0f00000000001976a9140a47e7e4b7767f6cd0eb630a2bc3a69c9f9175f788ac430f0600620f060000".into(),
+				// we're testing input#0
+				0,
+			)
+		];
 
-		// donor tx for input #1:
-		// tx#3 from block#409840
-		// https://zcash.blockexplorer.com/api/rawblock/0000000002d83a0d7d5011a19d2bd89125dc22d63b6484f2792fd1d636c4d940
-		let donor_tx: Transaction = "030000807082c4030b10d6644275fdb7553601349f524ce0a4fb6acc1d17551249b7cb87cb97e07f1f100000006b483045022100977b46b263f691777cb13b9b9c623ce15ccef2d5d5f1efcb7fd1f16aeac98fe20220090ecb6f82cccb37f295ec3c898c1c9b5bb3f46f7b524bc641137a9ce6277bbb012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7feffffff8308f2430ed380564b53e7e4fdb16fbb30d1c482dc5fae68613e69d368608c44190000006a47304402201b5673ce6c541a42eac79742e7d1a1c9f51456d5012226985067eec93922f96f0220064c88fa17711860e5a06ebf8849cd4dcbb8f944c39ff227a99a91d8c82a4621012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7feffffff5c89bda835f37289182b3123c49c7906629631e4c3c883de97fb637f92802c16580000006a47304402203533eca9827a92959ee7b8c0ea8154b62e9935bc8ca4c61020ff268bb336c59402200e14f6ea6f2e9e0bce19db50b2b10ed3d1e40db957aae3b491797540932dd8ea012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7feffffff9b057ba8d3e81fa9c10a98c4ee258df57a9eb1a80f1fb22b08b1685d1ada17fc1f0000006b483045022100e845ab5355bd877641e8238d9f16ac1345af346e81fbeeedda128f23dec5f71002207367e2e38d32e6843aa8c52eedd6b1fbda08d8436e26e0e80e035cb2314710d7012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7feffffff9e01f46736183d109a9739638cfff185f62aebf2e9a010f795d80a0b82daad50200000006b483045022100fdf3156db7f2cad51acfd4fcda6ec9f3608ba68f49d5d947e7504a00522f6a4102202f4c74cc34843efbecd53612fd8ea065d8f79b3419190e1792fe3fa03b8d5447012102be56007d075b0ae8e9de4027b61af2b0c8f458c5d1cc6c0a3e0a7f699cfb96c7fefffffffafa19844c386065fd650694ec15094a24e4a6499eb585a0c0544fbf5be9e002010000006a47304402205e2a73750d0ee3672184da65e356fbb95023586ef77c8f01d87eecab09aba5e7022015f8b13eece11b9c7a57bd869b5f44af3a4dfc07ebaf324f899b6541f7ffba050121025792386461f81e038989e4ac62a4142e1e987ae740906ab3032a04e4ac74967bfeffffff1ae4ec68f85c5d67797eccba7653c1a2bc5df34423366af7793bf1232c2bacb9000000006a47304402207501656ce6d97dbd5573953c117cb8fbdc61e09be58798cdab162304291311860220088945ac2142cf3689d7686b146720e4ac1c7f5292c13406fc2628a8e63ff221012103fbdca468248d731579fb6e756566d48903a84a16cd0f415cddfb5c41458bb262feffffff2d805a191e7699a2dcadf2444f682afe2be378b20e3b4b4431f57f32c7d554dd000000006b483045022100b39190d59a549f04f1e22d637f997b1b1ab7abda98d34a67fb616d380d247ea5022039feb0bf51e496dcfad037b0c675038d0c36793a26a66e58a9039524bd6e3e6c012103bb4932a7677891b8945557cb23530b6e9a688f0fa6deac31c9e323f0edf40439feffffff71934ffa32133dc62c7e4b2a8b10f51a8aa0a96099b4fc1e648ea9c676884c6f000000006b48304502210094af623575cec584e3d4406ed30a2f6364a0c6ba493cb77ea0f0d6e8d372cc5f02206ee94b089bfc4e347cf5de9de27785102e3bb146276868a4d9220d405d4e28e2012102cb666a57bb47dc4d447795e439f9d03d7b935f94fd92f80ecabc6a41061a50e8feffffff1bddd5649e33d1595c956b574d3dbb3883d25d1b9be93ef3ce7fad492534d8e4000000006b483045022100800c193e55b1234ed405248ebd69250fb0373bcfe6dda2da593c8f4213d10e5e02202c7b7387449b74125ee8d1f8c381d30f9474f0d5718e33ddd0a9179f5c6ca5ff0121020b2c90de955d7b4bf93415147b8bb43af3186b46e743316ee662ec9136899bf9fefffffffec3b71b6d478340583518ac04357d7a01e39ef311a9b7a9eed4bd3afe8a2a39010000006b483045022100b0e445d7bb23bf2400428d17d8b076d1ea6f415981ef9b806c714697538eaad402203b29f0108126b3345f48dfe22a8b743f3fd91b3c809272d8f81d566530540aa20121029506cd31b962743382a7c5b372d4a6ce66584f7aafefd358ad1b720902c3c907feffffff023d4a0f00000000001976a914e212f89515c07fc61c01fd9ccee566544956822088acef30a006000000001976a91414c42abe82c257103f4589e738f4f05b0f0c600e88ace54006000441060000".into();
-		assert_eq!(donor_tx.hash().reversed(), "99936b439b7d01046b8b6008cebe74e937b7ad791a1fe143943d71a8d4ddd8dd".into());
+		for (spend_tx, donor_tx, input_index) in test_cases {
+			let output_index = spend_tx.inputs[input_index].previous_output.index as usize;
 
-		// prepare tx signature checker
-		let consensus_branch_id = 0x76b809bb; // sapling starts from block#419200
-		let signer: TransactionInputSigner = spend_tx.clone().into();
-		let mut checker = TransactionSignatureChecker {
-			signer,
-			input_index: 0,
-			input_amount: donor_tx.outputs[1].value,
-			consensus_branch_id,
-			cache: None,
-		};
+			// prepare tx signature checker
+			let consensus_branch_id = 0x76b809bb; // all test cases are for sapling era
+			let signer: TransactionInputSigner = spend_tx.clone().into();
+			let mut checker = TransactionSignatureChecker {
+				signer,
+				input_index,
+				input_amount: donor_tx.outputs[output_index].value,
+				consensus_branch_id,
+				cache: Default::default(),
+			};
 
-		// calculate signature => fill cache
-		checker.signer.signature_hash(
-			&mut checker.cache,
-			None,
-			0,
-			&From::from(vec![]),
-			::sign::SighashBase::All.into(),
-			consensus_branch_id,
-		);
+			// calculate signature => fill cache
+			checker.signer.signature_hash(
+				&mut checker.cache,
+				None,
+				0,
+				&From::from(vec![]),
+				::sign::SighashBase::All.into(),
+				consensus_branch_id,
+			);
 
-		// and finally check input#0 (the cached signature portions are used here)
-		let input: Script = spend_tx.inputs[0].script_sig.clone().into();
-		let output: Script = donor_tx.outputs[1].script_pubkey.clone().into();
-		let flags = VerificationFlags::default()
-			.verify_p2sh(true)
-			.verify_locktime(true)
-			.verify_dersig(true);
-		assert_eq!(verify_script(&input, &output, &flags, &mut checker), Ok(()));
+			// and finally check input (the cached signature portions are used here)
+			let input: Script = spend_tx.inputs[input_index].script_sig.clone().into();
+			let output: Script = donor_tx.outputs[output_index].script_pubkey.clone().into();
+			let flags = VerificationFlags::default()
+				.verify_p2sh(true)
+				.verify_locktime(true)
+				.verify_dersig(true);
+			assert_eq!(verify_script(&input, &output, &flags, &mut checker), Ok(()));
+		}
 	}
 }
