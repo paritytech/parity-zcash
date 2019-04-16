@@ -4,8 +4,10 @@ use crypto::{Pghr13Proof, pghr13_verify, curve::bn, curve::bls};
 /// Join split verification error kind
 #[derive(Debug)]
 pub enum ErrorKind {
-	/// Invalid join split zkp statement
-	InvalidProof,
+	/// Invalid join split zkp statement of pghr type
+	InvalidPGHRProof,
+	/// Invalid join split zkp statement of groyh type
+	InvalidGrothProof,
 	/// Invalid raw bytes econding of proof
 	InvalidEncoding,
 }
@@ -61,16 +63,22 @@ pub fn verify(
 			let proof = Pghr13Proof::from_raw(proof_raw).map_err(|_| ErrorKind::InvalidEncoding)?;
 
 			if !pghr13_verify(sprout_verifying_key, &input.into_bn_frs(), &proof) {
-				return Err(ErrorKind::InvalidProof);
+				return Err(ErrorKind::InvalidPGHRProof);
 			}
 		},
 		JoinSplitProof::Groth(ref proof) => {
+
+			let input = input.into_bls_frs();
+			assert_eq!(input.len(), 9);
+			assert_eq!(sapling_verifying_key.0.ic.len(), 10);
+
 			if !crypto::bellman::groth16::verify_proof(
 				&sapling_verifying_key.0,
 				&proof.to_bls_proof().map_err(|_| ErrorKind::InvalidEncoding)?,
-				&input.into_bls_frs(),
-			).map_err(|_| ErrorKind::InvalidProof)? {
-				return Err(ErrorKind::InvalidProof);
+				&input,
+//			).map_err(|_| ErrorKind::InvalidGrothProof)? {
+			).unwrap() {
+				return Err(ErrorKind::InvalidGrothProof);
 			}
 		},
 	}
@@ -154,6 +162,7 @@ mod tests {
 	use super::{compute_hsig, verify};
 	use crypto;
 	use chain::{JoinSplit, JoinSplitProof, JoinSplitDescription};
+	use crypto::{load_sapling_spend_verifying_key, load_sapling_output_verifying_key};
 
 	fn hash(s: &'static str) -> [u8; 32] {
 		use hex::FromHex;
@@ -298,12 +307,24 @@ mod tests {
 		JoinSplitProof::PHGR(arr)
 	}
 
+	fn groth16_proof(hex: &'static str) -> JoinSplitProof {
+		use hex::FromHex;
+
+		assert_eq!(hex.len(), 192*2);
+
+		let bytes: Vec<u8> = hex.from_hex().expect("is static and should be good");
+		let mut arr = [0u8; 192];
+		arr[..].copy_from_slice(&bytes[..]);
+
+		JoinSplitProof::Groth(arr.into())
+	}
+
 	fn sample_pghr_proof() -> JoinSplitProof {
 		pgh13_proof("022cbbb59465c880f50d42d0d49d6422197b5f823c2b3ffdb341869b98ed2eb2fd031b271702bda61ff885788363a7cf980a134c09a24c9911dc94cbe970bd613b700b0891fe8b8b05d9d2e7e51df9d6959bdf0a3f2310164afb197a229486a0e8e3808d76c75662b568839ebac7fbf740db9d576523282e6cdd1adf8b0f9c183ae95b0301fa1146d35af869cc47c51cfd827b7efceeca3c55884f54a68e38ee7682b5d102131b9b1198ed371e7e3da9f5a8b9ad394ab5a29f67a1d9b6ca1b8449862c69a5022e5d671e6989d33c182e0a6bbbe4a9da491dbd93ca3c01490c8f74a780479c7c031fb473670cacde779713dcd8cbdad802b8d418e007335919837becf46a3b1d0e02120af9d926bed2b28ed8a2b8307b3da2a171b3ee1bc1e6196773b570407df6b4")
 	}
 
 	#[test]
-	fn smoky() {
+	fn smoky_pghr() {
 		let js = JoinSplit {
 			descriptions: vec![
 				JoinSplitDescription {
@@ -334,4 +355,47 @@ mod tests {
 
 		verify(&js.descriptions[0], &js, &vkey(), &dummy_groth16_key()).unwrap();
 	}
+
+	fn sample_groth_proof() -> JoinSplitProof {
+		groth16_proof("989f643de6f823b5b7e7426ceec93f6477ce53a271b081a8f71736dd0e8cfb6906886f4de425ebdfa2b881a8a6678d38b5b26ade9f90a37fcf0d1fbb32605d0beaa2c286692ad588084234c85da43ed4968b2a4c651d384f4e37ecad5d0bac9d12bcf179ad359a675868cba94727fd85b486fc2eeb014b86d218870ca91a05e203bd29b660131bf101cbb8c207aba49b815b8cc26a17f5be2337b56f66905cb3437983d23641b4dbcc86b938ffff1bde769f060cdb0a0ba18a16e5503d6d1d32")
+	}
+
+	#[test]
+	fn smoky_groth() {
+		let js = JoinSplit {
+			descriptions: vec![
+				JoinSplitDescription {
+					value_pub_new: 133720000,
+					value_pub_old: 0,
+					anchor: hash2("3e55eebe5c60dd6aafb9fef2fdca323e67226e64cefdf9f514ad714cdae9f6d4"),
+					nullifiers: [
+						hash2("5f929761b638f94f536985fff2b25e773b5b11cc798dccfe2edce67fe7b1a21e"),
+						hash2("2c363c5285ea14e8ecdc71cb0505c014f2b82a03a70dc0d323ea2e260fc4b15e"),
+					],
+					commitments: [
+						hash2("9821ad363ca35d33981a617bb7f9bccdc013d0719215ce0df9b235ac43d6734d"),
+						hash2("47163e67274309197ef177cecb8bf31c4851d2f5cdf828558984401e7680646a"),
+					],
+					ephemeral_key: [0u8; 32], // not used
+					random_seed: hash2("eab222220caeff4a484a7b88fa322392dffb795b2738b467db22f4ac50866e4e"),
+					macs: [
+						hash2("6555003c2f7e77bc415a184c1c7bb67a6649546ca7181232d0c12395995feecd"),
+						hash2("660b7b78c77f68049808cac15ea079e3f12b7abe839b0ee8c80be94362c61179"),
+					],
+					zkproof: sample_groth_proof(),
+					ciphertexts: [[0u8; 601]; 2],
+				}
+			],
+			pubkey: hash2("99a01b54019222b7d1b4ec8b321313b0120fceb63b3915eb2a8434d816c1f8f7").into(),
+			sig: [0u8; 64].into(), // not used
+		};
+
+		verify(
+			&js.descriptions[0],
+			&js,
+			&vkey(),
+			&load_sapling_spend_verifying_key().expect("Known to be good"),
+		).unwrap();
+	}
+
 }
