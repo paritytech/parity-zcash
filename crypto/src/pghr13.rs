@@ -1,6 +1,5 @@
 pub use bn::{Fr, Fq, Fq2, G1, G2, Group, arith::{U256, U512}, AffineG1, AffineG2, CurveError};
 use bn::pairing;
-use std::ops::Neg;
 use json::pghr13 as json;
 
 #[derive(Clone)]
@@ -72,7 +71,7 @@ impl Proof {
 		Ok(Proof {
 			a: G1::from_compressed(&data[0..33])?,
 			a_prime: G1::from_compressed(&data[33..66])?,
-			b: g2_from_compressed(&data[66..131])?,
+			b: G2::from_compressed(&data[66..131])?,
 			b_prime: G1::from_compressed(&data[131..164])?,
 			c: G1::from_compressed(&data[164..197])?,
 			c_prime: G1::from_compressed(&data[197..230])?,
@@ -80,86 +79,6 @@ impl Proof {
 			h: G1::from_compressed(&data[263..296])?,
 		})
 	}
-}
-
-lazy_static! {
-	// integer modulus for Fq field
-	static ref FQ: U256 = U256::from([
-        0x3c208c16d87cfd47,
-        0x97816a916871ca8d,
-        0xb85045b68181585d,
-        0x30644e72e131a029
-    ]);
-
-	static ref G1_B: Fq = Fq::from_u256(3.into()).expect("3 is a valid field element and static; qed");
-
-	static ref FQ_MINUS1_DIV2: Fq =
-		Fq::from_u256(1.into()).expect("1 is a valid field element and static; qed").neg() *
-		Fq::from_u256(2.into()).expect("2 is a valid field element and static; qed").inverse()
-			.expect("2 has inverse in Fq and is static; qed");
-
-	static ref FQ_MINUS3_DIV4: Fq =
-		Fq::from_u256(3.into()).expect("3 is a valid field element and static; qed").neg() *
-		Fq::from_u256(4.into()).expect("4 is a valid field element and static; qed").inverse()
-			.expect("4 has inverse in Fq and is static; qed");
-}
-
-
-fn fq2_to_u512(e: Fq2) -> U512 {
-    let c0 = e.real().into_u256();
-    let c1 = e.imaginary().into_u256();
-
-    U512::new(&c1, &c0, &FQ)
-}
-
-// Algorithm 9 Square root computation over Fq2, with q ≡ 3 (mod 4)
-// from https://eprint.iacr.org/2012/685.pdf (Square root computation over even extension fields)
-fn fq2_sqrt(a: Fq2) -> Option<Fq2> {
-	let a1 = a.pow(FQ_MINUS3_DIV4.into_u256());
-	let a1a = a1 * a;
-	let alpha = a1 * a1a;
-	let a0 = alpha.pow(*FQ) * alpha;
-
-	if a0 == Fq2::one().neg() {
-		return None;
-	}
-
-	if alpha == Fq2::one().neg() {
-		Some(Fq2::i() * a1a)
-	} else {
-		let b = (alpha + Fq2::one()).pow(FQ_MINUS1_DIV2.into_u256());
-		Some(b * a1a)
-	}
-}
-
-fn g2_from_compressed(data: &[u8]) -> Result<G2, Error> {
-	if data.len() != 65 { return Err(Error::InvalidRawInput); }
-
-	let sign = data[0];
-	let x = deserialize_fq2(&data[1..])?;
-
-	let y_squared = (x * x * x) + G2::b();
-	let y = fq2_sqrt(y_squared).ok_or(Error::InvalidFieldElement)?;
-	let y_neg = -y;
-
-	let y_gt = fq2_to_u512(y) > fq2_to_u512(y_neg);
-
-	let e_y = if sign == 10 { if y_gt { y_neg } else { y } }
-		else if sign == 11 { if y_gt { y } else { y_neg } }
-		else {
-			return Err(Error::InvalidSignPrefix);
-		};
-
-	AffineG2::new(x, e_y).map_err(|_| Error::InvalidCurvePoint).map(Into::into)
-}
-
-fn deserialize_fq2(data: &[u8]) -> Result<Fq2, Error> {
-	let u512 = U512::from_slice(data).map_err(|_| Error::InvalidU512Encoding)?;
-	let (res, c0) = u512.divrem(&Fq::modulus());
-	Ok(Fq2::new(
-		Fq::from_u256(c0).map_err(|_| Error::NotFqMember)?,
-		Fq::from_u256(res.ok_or(Error::NotFq2Member)?).map_err(|_| Error::NotFqMember)?,
-	))
 }
 
 pub fn verify(vk: &VerifyingKey, primary_input: &[Fr], proof: &Proof) -> bool {
@@ -189,38 +108,6 @@ mod tests {
 
 	use super::*;
 	use json;
-
-	fn hex(s: &'static str) -> Vec<u8> {
-		use hex::FromHex;
-		s.from_hex().unwrap()
-	}
-
-	#[test]
-	fn sqrt_fq2() {
-		// from zcash test_proof.cpp
-		let x1 = Fq2::new(
-			Fq::from_str("12844195307879678418043983815760255909500142247603239203345049921980497041944").unwrap(),
-			Fq::from_str("7476417578426924565731404322659619974551724117137577781074613937423560117731").unwrap(),
-		);
-
-		let x2 = Fq2::new(
-			Fq::from_str("3345897230485723946872934576923485762803457692345760237495682347502347589474").unwrap(),
-			Fq::from_str("1234912378405347958234756902345768290345762348957605678245967234857634857676").unwrap(),
-		);
-
-		assert_eq!(fq2_sqrt(x2).unwrap(), x1);
-
-		// i is sqrt(-1)
-		assert_eq!(
-			fq2_sqrt(Fq2::one().neg()).unwrap(),
-			Fq2::i(),
-		);
-
-		// no sqrt for (1 + 2i)
-		assert!(
-			fq2_sqrt(Fq2::new(Fq::from_str("1").unwrap(), Fq::from_str("2").unwrap())).is_none()
-		);
-	}
 
 	fn vkey() -> VerifyingKey {
 		json::pghr13::decode(include_bytes!("../../res/sprout-verifying-key.json")).expect("known to be good").into()
@@ -430,52 +317,5 @@ mod tests {
 		];
 
 		assert!(verify(&vk, &primary_input[..], &proof));
-	}
-
-	#[test]
-	fn g2_deserialize() {
-		let g2 = g2_from_compressed(
-			&hex("0a023aed31b5a9e486366ea9988b05dba469c6206e58361d9c065bbea7d928204a761efc6e4fa08ed227650134b52c7f7dd0463963e8a4bf21f4899fe5da7f984a")
-		).expect("Valid g2 point hex encoding");
-
-		assert_eq!(g2.x(),
-			Fq2::new(
-				Fq::from_str("5923585509243758863255447226263146374209884951848029582715967108651637186684").unwrap(),
-				Fq::from_str("5336385337059958111259504403491065820971993066694750945459110579338490853570").unwrap(),
-			)
-		);
-
-		assert_eq!(g2.y(),
-			Fq2::new(
-				Fq::from_str("10374495865873200088116930399159835104695426846400310764827677226300185211748").unwrap(),
-				Fq::from_str("5256529835065685814318509161957442385362539991735248614869838648137856366932").unwrap(),
-			)
-		);
-
-		// 0b prefix is point reflection on the curve
-		let g2 = -g2_from_compressed(
-			&hex("0b023aed31b5a9e486366ea9988b05dba469c6206e58361d9c065bbea7d928204a761efc6e4fa08ed227650134b52c7f7dd0463963e8a4bf21f4899fe5da7f984a")
-		).expect("Valid g2 point hex encoding");
-
-		assert_eq!(g2.x(),
-			Fq2::new(
-				Fq::from_str("5923585509243758863255447226263146374209884951848029582715967108651637186684").unwrap(),
-				Fq::from_str("5336385337059958111259504403491065820971993066694750945459110579338490853570").unwrap(),
-			)
-		);
-
-		assert_eq!(g2.y(),
-			Fq2::new(
-				Fq::from_str("10374495865873200088116930399159835104695426846400310764827677226300185211748").unwrap(),
-				Fq::from_str("5256529835065685814318509161957442385362539991735248614869838648137856366932").unwrap(),
-			)
-		);
-
-		// valid point but invalid sign prefix
-		assert!(
-			g2_from_compressed(
-				&hex("0c023aed31b5a9e486366ea9988b05dba469c6206e58361d9c065bbea7d928204a761efc6e4fa08ed227650134b52c7f7dd0463963e8a4bf21f4899fe5da7f984a")
-			).is_err()
-		);
 	}
 }
