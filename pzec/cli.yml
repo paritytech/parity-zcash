@@ -102,11 +102,11 @@ args:
         value_name: ADDRESS
 subcommands:
     - import:
-        about: Import blocks from a Bitcoin Core database.
+        about: Import blocks from a zcashd database.
         args:
             - PATH:
                 required: true
-                help: Path of the Bitcoin Core database.
+                help: Path of the zcashd database.
     - rollback:
         about: Rollback the database to given canonical-chain block.
         args:
