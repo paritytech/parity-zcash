@@ -366,7 +366,7 @@ impl Chain {
 		match block_origin {
 			storage::BlockOrigin::KnownBlock => {
 				// there should be no known blocks at this point
-				unreachable!();
+				unreachable!("Trying to re-insert known block: {}", block.hash().to_reversed_str());
 			},
 			// case 1: block has been added to the main branch
 			storage::BlockOrigin::CanonChain { .. } => {

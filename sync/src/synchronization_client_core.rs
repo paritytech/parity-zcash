@@ -255,7 +255,7 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 
 	/// Try to queue synchronization of unknown blocks when blocks headers are received.
 	fn on_headers(&mut self, peer_index: PeerIndex, headers: Vec<IndexedBlockHeader>) -> Option<Vec<IndexedBlockHeader>> {
-		assert!(!	headers.is_empty(), "This must be checked in incoming connection");
+		assert!(!headers.is_empty(), "This is checked in incoming connection");
 
 		// update peers to select next tasks
 		self.peers_tasks.on_headers_received(peer_index);
@@ -421,6 +421,13 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 							self.chain.forget_block_leave_header(&block.header.hash);
 							// remember this block as unknown
 							if !self.orphaned_blocks_pool.contains_unknown_block(&block.header.hash) {
+								trace!(
+									target: "sync",
+									"Inserting unknown orphan block: {}. Block state: {:?}, parent state: {:?}",
+									block.header.hash.to_reversed_str(),
+									block_state,
+									parent_block_state,
+								);
 								self.orphaned_blocks_pool.insert_unknown_block(block);
 							}
 						}
@@ -455,9 +462,27 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 								entry.insert((blocks_to_verify_hashes.into_iter().collect(), Vec::new()));
 							}
 						}
+
+						trace!(
+							target: "sync",
+							"Scheduling verification of blocks: {}..{} First block state: {:?}, parent state: {:?}",
+							blocks_to_verify[0].hash().to_reversed_str(),
+							blocks_to_verify[blocks_to_verify.len() - 1].hash().to_reversed_str(),
+							block_state,
+							parent_block_state,
+						);
+
 						result = Some(blocks_to_verify);
 					},
 					BlockState::Requested | BlockState::Scheduled => {
+						trace!(
+							target: "sync",
+							"Inserting known orphan block: {}. Block state: {:?}, parent state: {:?}",
+							block.header.hash.to_reversed_str(),
+							block_state,
+							parent_block_state,
+						);
+
 						// remember peer as useful
 						self.peers_tasks.useful_peer(peer_index);
 						// remember as orphan block
@@ -1059,8 +1084,15 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 
 	fn on_headers_verification_success(&mut self, headers: Vec<IndexedBlockHeader>) {
 		let headers = self.chain.headers_verified(headers);
-
-		self.chain.schedule_blocks_headers(headers);
+		if !headers.is_empty() {
+			trace!(
+				target: "sync",
+				"Scheduling retrieval of headers: {}..{}",
+				headers[0].hash.to_reversed_str(),
+				headers[headers.len() - 1].hash.to_reversed_str(),
+			);
+			self.chain.schedule_blocks_headers(headers);
+		}
 
 		// switch to synchronization state
 		if !self.state.is_synchronizing() {
