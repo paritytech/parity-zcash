@@ -621,7 +621,7 @@ pub fn eval_script(
 				if v1 == v2 {
 					stack.push(vec![1].into());
 				} else {
-					stack.push(vec![0].into());
+					stack.push(Bytes::new());
 				}
 			},
 			Opcode::OP_EQUALVERIFY => {
@@ -738,7 +738,7 @@ pub fn eval_script(
 				if v2 <= v3 && v3 < v1 {
 					stack.push(vec![1].into());
 				} else {
-					stack.push(vec![0].into());
+					stack.push(Bytes::new());
 				}
 			},
 			Opcode::OP_RIPEMD160 => {
@@ -774,7 +774,7 @@ pub fn eval_script(
 						if success {
 							stack.push(vec![1].into());
 						} else {
-							stack.push(vec![0].into());
+							stack.push(Bytes::new());
 						}
 					},
 					Opcode::OP_CHECKSIGVERIFY if !success => {
@@ -829,7 +829,7 @@ pub fn eval_script(
 						if success {
 							stack.push(vec![1].into());
 						} else {
-							stack.push(vec![0].into());
+							stack.push(Bytes::new());
 						}
 					},
 					Opcode::OP_CHECKMULTISIGVERIFY if !success => {
@@ -951,7 +951,7 @@ mod tests {
 			.push_opcode(Opcode::OP_EQUAL)
 			.into_script();
 		let result = Ok(false);
-		let stack = vec![vec![0].into()].into();
+		let stack = vec![Bytes::new()].into();
 		basic_test(&script, result, stack);
 	}
 
@@ -1783,7 +1783,7 @@ mod tests {
 			.push_opcode(Opcode::OP_WITHIN)
 			.into_script();
 		let result = Ok(false);
-		let stack = vec![vec![0].into()].into();
+		let stack = vec![Bytes::new()].into();
 		basic_test(&script, result, stack);
 	}
 
