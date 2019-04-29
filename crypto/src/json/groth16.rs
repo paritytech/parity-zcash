@@ -21,6 +21,12 @@ pub fn load_sapling_output_verifying_key() -> Result<Groth16VerifyingKey, String
 	Ok(Groth16VerifyingKey(prepare_verifying_key(&output_vk.into())))
 }
 
+pub fn load_joinsplit_groth16_verifying_key() -> Result<Groth16VerifyingKey, String> {
+	let output_vk_json = include_bytes!("../../../res/sprout-groth16-key.json");
+	let output_vk = serde_json::from_slice::<VerifyingKey>(&output_vk_json[..]).unwrap();
+	Ok(Groth16VerifyingKey(prepare_verifying_key(&output_vk.into())))
+}
+
 type G1 = Point<G1Uncompressed>;
 type G2 = Point<G2Uncompressed>;
 

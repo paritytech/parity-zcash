@@ -17,6 +17,7 @@ pub extern crate blake2b_simd as blake2;
 
 pub mod json;
 mod pghr13;
+mod groth16;
 
 pub use rcrypto::digest::Digest;
 pub use blake2_rfc::blake2b::Blake2b;
@@ -34,13 +35,25 @@ use siphasher::sip::SipHasher24;
 use primitives::hash::{H32, H160, H256};
 
 pub use json::groth16::{
-	load_sapling_spend_verifying_key, load_sapling_output_verifying_key,
+	load_sapling_spend_verifying_key, load_sapling_output_verifying_key, load_joinsplit_groth16_verifying_key,
 };
 
-pub use pghr13::{
-	VerifyingKey as Pghr13VerifyingKey, Proof as Pghr13Proof, verify as pghr13_verify,
-	G1, G2, Fr, Group, U256 as BnU256,
+pub use pghr13::{VerifyingKey as Pghr13VerifyingKey, Proof as Pghr13Proof, verify as pghr13_verify};
+
+pub use groth16::{
+	Proof as Groth16Proof,
+	Error as Groth16Error,
 };
+
+pub mod curve {
+	pub mod bn {
+		pub use pghr13::{G1, G2, Fr, Group, U256};
+	}
+
+	pub mod bls {
+		pub use pairing::bls12_381::Fr;
+	}
+}
 
 pub struct Groth16VerifyingKey(pub bellman::groth16::PreparedVerifyingKey<pairing::bls12_381::Bls12>);
 
@@ -222,8 +235,7 @@ pub fn blake2b_personal(personalization: &[u8], input: &[u8]) -> H256 {
 /// "Uncommitted" note value.
 #[inline]
 pub fn pedersen_uncommitted() -> H256 {
-	use pairing::{PrimeField, PrimeFieldRepr};
-	use pairing::bls12_381::{Bls12};
+	use pairing::{PrimeField, PrimeFieldRepr, bls12_381::Bls12};
 
 	let hash_point = sapling_crypto::primitives::Note::<Bls12>::uncommitted().into_repr();
 

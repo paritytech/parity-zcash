@@ -579,8 +579,12 @@ impl<'a> JoinSplitProof<'a> {
 			let mut index = 0;
 			let mut tree_cache = TreeCache::new(self.tree_state_provider);
 			for desc in join_split.descriptions.iter() {
-				sprout::verify(&desc, &join_split, &self.consensus_params.joinsplit_verification_key)
-					.map_err(|_e| TransactionError::InvalidJoinSplit(index))?;
+				sprout::verify(
+					&desc,
+					&join_split,
+					&self.consensus_params.joinsplit_verification_key,
+					&self.consensus_params.joinsplit_groth16_verification_key,
+				).map_err(|_e| TransactionError::InvalidJoinSplit(index))?;
 
 				tree_cache.continue_root(&desc.anchor.into(), &desc.commitments)?;
 
