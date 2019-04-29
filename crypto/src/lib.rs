@@ -35,7 +35,7 @@ use siphasher::sip::SipHasher24;
 use primitives::hash::{H32, H160, H256};
 
 pub use json::groth16::{
-	load_sapling_spend_verifying_key, load_sapling_output_verifying_key,
+	load_sapling_spend_verifying_key, load_sapling_output_verifying_key, load_joinsplit_groth16_verifying_key,
 };
 
 pub use pghr13::{VerifyingKey as Pghr13VerifyingKey, Proof as Pghr13Proof, verify as pghr13_verify};

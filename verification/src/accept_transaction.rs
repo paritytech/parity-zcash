@@ -602,7 +602,7 @@ impl<'a> JoinSplitProof<'a> {
 					&desc,
 					&join_split,
 					&self.consensus_params.joinsplit_verification_key,
-					&self.consensus_params.sapling_spend_verifying_key,
+					&self.consensus_params.joinsplit_groth16_verification_key,
 				).map_err(|_e| TransactionError::InvalidJoinSplit(index))?;
 
 				tree_cache.continue_root(&desc.anchor.into(), &desc.commitments)?;

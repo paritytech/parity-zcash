@@ -69,15 +69,12 @@ pub fn verify(
 		JoinSplitProof::Groth(ref proof) => {
 
 			let input = input.into_bls_frs();
-			assert_eq!(input.len(), 9);
-			assert_eq!(sapling_verifying_key.0.ic.len(), 10);
 
 			if !crypto::bellman::groth16::verify_proof(
 				&sapling_verifying_key.0,
 				&proof.to_bls_proof().map_err(|_| ErrorKind::InvalidEncoding)?,
 				&input,
-//			).map_err(|_| ErrorKind::InvalidGrothProof)? {
-			).unwrap() {
+			).map_err(|_| ErrorKind::InvalidGrothProof)? {
 				return Err(ErrorKind::InvalidGrothProof);
 			}
 		},
@@ -162,7 +159,7 @@ mod tests {
 	use super::{compute_hsig, verify};
 	use crypto;
 	use chain::{JoinSplit, JoinSplitProof, JoinSplitDescription};
-	use crypto::{load_sapling_spend_verifying_key, load_sapling_output_verifying_key};
+	use crypto::load_joinsplit_groth16_verifying_key;
 
 	fn hash(s: &'static str) -> [u8; 32] {
 		use hex::FromHex;
@@ -394,7 +391,7 @@ mod tests {
 			&js.descriptions[0],
 			&js,
 			&vkey(),
-			&load_sapling_spend_verifying_key().expect("Known to be good"),
+			&load_joinsplit_groth16_verifying_key().unwrap(),
 		).unwrap();
 	}
 
