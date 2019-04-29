@@ -53,7 +53,7 @@ pub struct TransactionSignatureChecker {
 	pub input_index: usize,
 	pub input_amount: u64,
 	pub consensus_branch_id: u32,
-	pub cache: Option<SighashCache>,
+	pub cache: SighashCache,
 }
 
 impl SignatureChecker for TransactionSignatureChecker {

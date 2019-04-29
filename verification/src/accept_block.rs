@@ -6,8 +6,9 @@ use script::{self, Builder};
 use sigops::transaction_sigops;
 use deployments::BlockDeployments;
 use canon::CanonBlock;
-use error::{Error, TransactionError};
+use error::Error;
 use timestamp::median_timestamp;
+use fee::checked_transaction_fee;
 
 /// Flexible verification of ordered block
 pub struct BlockAcceptor<'a> {
@@ -174,38 +175,11 @@ impl<'a> BlockCoinbaseMinerReward<'a> {
 		let mut fees: u64 = 0;
 
 		for (tx_idx, tx) in self.block.transactions.iter().enumerate().skip(1) {
-			// (1) Total sum of all referenced outputs
-			let mut incoming: u64 = 0;
-			for input in tx.raw.inputs.iter() {
-				let prevout = store.transaction_output(&input.previous_output, tx_idx);
-				let (sum, overflow) = incoming.overflowing_add(prevout.map(|o| o.value).unwrap_or(0));
-				if overflow {
-					return Err(Error::ReferencedInputsSumOverflow)
-				}
-				incoming = sum;
-			}
-
-			let join_split_public_new = tx.raw.join_split.iter()
-				.flat_map(|js| &js.descriptions)
-				.map(|d| d.value_pub_new)
-				.sum::<u64>();
-
-			incoming = match incoming.overflowing_add(join_split_public_new) {
-				(_, true) => return Err(Error::ReferencedInputsSumOverflow),
-				(incoming, _) => incoming,
-			};
-
-			// (2) Total sum of all outputs
-			let spends = tx.raw.total_spends();
-
-			// Difference between (1) and (2)
-			let (difference, overflow) = incoming.overflowing_sub(spends);
-			if overflow {
-				return Err(Error::Transaction(tx_idx, TransactionError::Overspend))
-			}
+			let tx_fee = checked_transaction_fee(&store, tx_idx, &tx.raw)
+				.map_err(|tx_err| Error::Transaction(tx_idx, tx_err))?;
 
 			// Adding to total fees (with possible overflow)
-			let (sum, overflow) = fees.overflowing_add(difference);
+			let (sum, overflow) = fees.overflowing_add(tx_fee);
 			if overflow {
 				return Err(Error::TransactionFeesOverflow)
 			}
@@ -355,10 +329,13 @@ impl<'a> BlockSaplingRoot<'a> {
 mod tests {
 	extern crate test_data;
 
+	use std::collections::HashMap;
+	use chain::{OutPoint, TransactionOutput};
 	use db::BlockChainDatabase;
-	use storage::SaplingTreeState;
+	use network::{ConsensusParams, Network};
+	use storage::{SaplingTreeState, TransactionOutputProvider};
 	use {Error, CanonBlock};
-	use super::{BlockCoinbaseScript, BlockSaplingRoot};
+	use super::{BlockCoinbaseScript, BlockSaplingRoot, BlockCoinbaseMinerReward};
 
 	#[test]
 	fn test_block_coinbase_script() {
@@ -422,5 +399,31 @@ mod tests {
 			expected: "fbc2f4300c01f0b7820d00e3347c8da4ee614674376cbc45359daa54f9b5493e".into(),
 			actual: "0000000000000000000000000000000000000000000000000000000000000000".into(),
 		}));
+	}
+
+	#[test]
+	fn test_coinbase_overspend_b419221() {
+		struct Store(HashMap<OutPoint, TransactionOutput>);
+
+		impl TransactionOutputProvider for Store {
+			fn transaction_output(&self, outpoint: &OutPoint, _transaction_index: usize) -> Option<TransactionOutput> {
+				self.0.get(outpoint).cloned()
+			}
+
+			fn is_spent(&self, _outpoint: &OutPoint) -> bool {
+				false
+			}
+		}
+
+		let (block, donors) = test_data::block_h419221_with_donors();
+		let store = Store(donors.into_iter().flat_map(|donor| {
+			let hash = donor.hash();
+			donor.outputs.into_iter().enumerate().map(move |(index, output)| (OutPoint {
+				hash: hash.clone(),
+				index: index as u32,
+			}, output))
+		}).collect());
+		let consensus = ConsensusParams::new(Network::Mainnet);
+		assert_eq!(BlockCoinbaseMinerReward::new(CanonBlock::new(&block.into()), &store, &consensus, 419221).check(), Ok(()));
 	}
 }

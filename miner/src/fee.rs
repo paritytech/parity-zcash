@@ -1,6 +1,7 @@
 use chain::Transaction;
 use ser::Serializable;
 use storage::{TransactionOutputProvider, DuplexTransactionOutputProvider};
+use verification::checked_transaction_fee;
 use MemoryPool;
 
 /// Transaction fee calculator for memory pool
@@ -32,43 +33,12 @@ impl MemoryPoolFeeCalculator for NonZeroFeeCalculator {
 	}
 }
 
-/// Compute miner fee for given transaction.
+/// Compute miner fee for given (memory pool) transaction.
 ///
-/// It could return a wrong value (that should have overflow/underflow) if either outputs sum,
-/// inputs sum or their difference overflows/underflows. But since it is used for prioritizing
-/// verified transactions && verification checks that values are correct, the call is safe.
-pub fn transaction_fee(store: &TransactionOutputProvider, transaction: &Transaction) -> u64 {
-	let mut inputs_sum = transaction.inputs.iter().map(|input|
-		store.transaction_output(&input.previous_output, ::std::usize::MAX)
-			.expect("transaction must be verified by caller")
-			.value)
-		.fold(0u64, |acc, value| acc.saturating_add(value));
-	if let Some(ref join_split) = transaction.join_split {
-		let js_value_pub_new = join_split.descriptions.iter()
-			.fold(0u64, |acc, jsd| acc.saturating_add(jsd.value_pub_new));
-		inputs_sum = inputs_sum.saturating_add(js_value_pub_new);
-	}
-	if let Some(ref sapling) = transaction.sapling {
-		if sapling.balancing_value > 0 {
-			inputs_sum = inputs_sum.saturating_add(sapling.balancing_value as u64);
-		}
-	}
-
-	let mut outputs_sum = transaction.outputs.iter().map(|output| output.value)
-		.fold(0u64, |acc, value| acc.saturating_add(value));
-	if let Some(ref join_split) = transaction.join_split {
-		let js_value_pub_old = join_split.descriptions.iter()
-			.fold(0u64, |acc, jsd| acc.saturating_add(jsd.value_pub_old));
-		outputs_sum = outputs_sum.saturating_add(js_value_pub_old);
-	}
-	if let Some(ref sapling) = transaction.sapling {
-		if sapling.balancing_value < 0 {
-			inputs_sum = inputs_sum.saturating_add(sapling.balancing_value
-				.checked_neg().unwrap_or(::std::i64::MAX) as u64);
-		}
-	}
-
-	inputs_sum.saturating_sub(outputs_sum)
+/// If any error occurs during computation, zero fee is returned. Normally, zero fee
+/// transactions are not accepted to the memory pool.
+pub fn transaction_fee(store: &TransactionOutputProvider, tx: &Transaction) -> u64 {
+	checked_transaction_fee(store, ::std::usize::MAX, tx).unwrap_or(0)
 }
 
 pub fn transaction_fee_rate(store: &TransactionOutputProvider, tx: &Transaction) -> u64 {
@@ -77,15 +47,13 @@ pub fn transaction_fee_rate(store: &TransactionOutputProvider, tx: &Transaction)
 
 #[cfg(test)]
 mod tests {
-	extern crate test_data;
-
 	use std::sync::Arc;
-	use storage::{AsSubstore};
+	use storage::AsSubstore;
 	use db::BlockChainDatabase;
-	use super::*;
+	use super::transaction_fee_rate;
 
 	#[test]
-	fn test_transaction_fee() {
+	fn transaction_fee_rate_works() {
 		let b0 = test_data::block_builder().header().nonce(1.into()).build()
 			.transaction()
 				.output().value(1_000_000).build()
@@ -104,11 +72,9 @@ mod tests {
 		let tx2 = b1.transactions[0].clone();
 
 		let db = Arc::new(BlockChainDatabase::init_test_chain(vec![b0.into(), b1.into()]));
+		let store = db.as_transaction_output_provider();
 
-		assert_eq!(transaction_fee(db.as_transaction_output_provider(), &tx0), 0);
-		assert_eq!(transaction_fee(db.as_transaction_output_provider(), &tx2), 500_000);
-
-		assert_eq!(transaction_fee_rate(db.as_transaction_output_provider(), &tx0), 0);
-		assert_eq!(transaction_fee_rate(db.as_transaction_output_provider(), &tx2), 4_901);
+		assert_eq!(transaction_fee_rate(store, &tx0), 0);
+		assert_eq!(transaction_fee_rate(store, &tx2), 4_901);
 	}
 }

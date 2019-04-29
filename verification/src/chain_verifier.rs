@@ -53,7 +53,7 @@ impl BackwardsCompatibleChainVerifier {
 		match block_origin {
 			BlockOrigin::KnownBlock => {
 				// there should be no known blocks at this point
-				unreachable!();
+				unreachable!("Trying to re-verify known block: {}", block.hash().reversed());
 			},
 			BlockOrigin::CanonChain { block_number } => {
 				let tx_out_provider = CachedTransactionOutputProvider::new(self.store.as_store().as_transaction_output_provider());

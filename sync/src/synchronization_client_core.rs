@@ -255,7 +255,7 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 
 	/// Try to queue synchronization of unknown blocks when blocks headers are received.
 	fn on_headers(&mut self, peer_index: PeerIndex, headers: Vec<IndexedBlockHeader>) -> Option<Vec<IndexedBlockHeader>> {
-		assert!(!	headers.is_empty(), "This must be checked in incoming connection");
+		assert!(!headers.is_empty(), "This is checked in incoming connection");
 
 		// update peers to select next tasks
 		self.peers_tasks.on_headers_received(peer_index);
@@ -421,6 +421,13 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 							self.chain.forget_block_leave_header(&block.header.hash);
 							// remember this block as unknown
 							if !self.orphaned_blocks_pool.contains_unknown_block(&block.header.hash) {
+								trace!(
+									target: "sync",
+									"Inserting unknown orphan block: {}. Block state: {:?}, parent state: {:?}",
+									block.header.hash.to_reversed_str(),
+									block_state,
+									parent_block_state,
+								);
 								self.orphaned_blocks_pool.insert_unknown_block(block);
 							}
 						}
@@ -455,9 +462,27 @@ impl<T> ClientCore for SynchronizationClientCore<T> where T: TaskExecutor {
 								entry.insert((blocks_to_verify_hashes.into_iter().collect(), Vec::new()));
 							}
 						}
+
+						trace!(
+							target: "sync",
+							"Scheduling verification of blocks: {}..{} First block state: {:?}, parent state: {:?}",
+							blocks_to_verify[0].hash().to_reversed_str(),
+							blocks_to_verify[blocks_to_verify.len() - 1].hash().to_reversed_str(),
+							block_state,
+							parent_block_state,
+						);
+
 						result = Some(blocks_to_verify);
 					},
 					BlockState::Requested | BlockState::Scheduled => {
+						trace!(
+							target: "sync",
+							"Inserting known orphan block: {}. Block state: {:?}, parent state: {:?}",
+							block.header.hash.to_reversed_str(),
+							block_state,
+							parent_block_state,
+						);
+
 						// remember peer as useful
 						self.peers_tasks.useful_peer(peer_index);
 						// remember as orphan block
@@ -1058,9 +1083,16 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 	}
 
 	fn on_headers_verification_success(&mut self, headers: Vec<IndexedBlockHeader>) {
-		self.chain.headers_verified(&headers);
-
-		self.chain.schedule_blocks_headers(headers);
+		let headers = self.chain.headers_verified(headers);
+		if !headers.is_empty() {
+			trace!(
+				target: "sync",
+				"Scheduling retrieval of headers: {}..{}",
+				headers[0].hash.to_reversed_str(),
+				headers[headers.len() - 1].hash.to_reversed_str(),
+			);
+			self.chain.schedule_blocks_headers(headers);
+		}
 
 		// switch to synchronization state
 		if !self.state.is_synchronizing() {
@@ -1076,7 +1108,7 @@ impl<T> SynchronizationClientCore<T> where T: TaskExecutor {
 	}
 
 	fn on_headers_verification_error(&mut self, peer: PeerIndex, error: String, hash: H256, headers: Vec<IndexedBlockHeader>) {
-		self.chain.headers_verified(&headers);
+		self.chain.headers_verified(headers);
 
 		if self.config.close_connection_on_bad_block {
 			self.peers.misbehaving(
@@ -1305,7 +1337,7 @@ pub mod tests {
 
 	use std::sync::Arc;
 	use parking_lot::{Mutex, RwLock};
-	use chain::{Block, Transaction};
+	use chain::{Block, Transaction, IndexedBlock};
 	use db::BlockChainDatabase;
 	use message::common::InventoryVector;
 	use message::{Services, types};
@@ -1314,7 +1346,7 @@ pub mod tests {
 	use primitives::hash::H256;
 	use verification::BackwardsCompatibleChainVerifier as ChainVerifier;
 	use inbound_connection::tests::DummyOutboundSyncConnection;
-	use synchronization_chain::Chain;
+	use synchronization_chain::{Chain, BlockState};
 	use synchronization_client::{SynchronizationClient, Client};
 	use synchronization_peers::PeersImpl;
 	use synchronization_executor::Task;
@@ -2458,5 +2490,60 @@ pub mod tests {
 		sync.on_block(0, test_data::block_h2().into());
 		assert_eq!(data.lock().is_synchronizing, false);
 		assert_eq!(data.lock().best_blocks.len(), 3);
+	}
+
+	#[test]
+	fn known_blocks_are_ignored_in_headers_verification_success() {
+		let (_, sync, _) = create_sync(None, None);
+		let mut sync = sync.lock();
+
+		let block1: IndexedBlock = test_data::block_h1().into();
+		let block2: IndexedBlock = test_data::block_h2().into();
+		let header1 = block1.header.clone();
+		let header2 = block2.header.clone();
+		let hash1 = *block1.hash();
+		let hash2 = *block2.hash();
+
+		// WHEN
+		// we have orphaned [block2]
+		sync.orphaned_blocks_pool.insert_unknown_block(block2.clone());
+
+		// THEN:
+
+		// [header1] received => [header1] verification starts
+		sync.on_headers(0, vec![header1.clone()]);
+		assert_eq!(sync.chain().block_state(&hash1), BlockState::VerifyingHeader);
+		assert_eq!(sync.chain().block_state(&hash2), BlockState::Unknown);
+
+		// [header1] verification ends => [block1] is requested
+		sync.on_headers_verification_success(vec![header1.clone()]);
+		assert_eq!(sync.chain().block_state(&hash1), BlockState::Requested);
+		assert_eq!(sync.chain().block_state(&hash2), BlockState::Unknown);
+
+		// [header2] received => [header2] verification starts
+		sync.on_headers(0, vec![header2.clone()]);
+		assert_eq!(sync.chain().block_state(&hash1), BlockState::Requested);
+		assert_eq!(sync.chain().block_state(&hash2), BlockState::VerifyingHeader);
+
+		// [block1] received => [block1, block2] verification starts
+		sync.on_block(0, block1.clone());
+		assert_eq!(sync.chain().block_state(&hash1), BlockState::Verifying);
+		assert_eq!(sync.chain().block_state(&hash2), BlockState::Verifying); // pre-fix: VerifyingHeader
+
+		// [block1, block2] verification ends => [block1, block2] are inserted into DB
+		sync.on_block_verification_success(block1.clone());
+		sync.on_block_verification_success(block2.clone());
+		assert_eq!(sync.chain().block_state(&hash1), BlockState::Stored);
+		assert_eq!(sync.chain().block_state(&hash2), BlockState::Stored); // pre-fix: VerifyingHeader
+
+		// [header2] verification ends => [block2] is requested
+		sync.on_headers_verification_success(vec![header2.clone()]);
+		assert_eq!(sync.chain().block_state(&hash1), BlockState::Stored);
+		assert_eq!(sync.chain().block_state(&hash2), BlockState::Stored); // pre-fix: Requested
+
+		// [block2] received => [block2] verification starts
+		sync.on_block(0, block2.clone());
+		assert_eq!(sync.chain().block_state(&hash1), BlockState::Stored);
+		assert_eq!(sync.chain().block_state(&hash2), BlockState::Stored); // pre-fix: Verifying
 	}
 }

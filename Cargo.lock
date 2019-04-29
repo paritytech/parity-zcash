@@ -174,11 +174,13 @@ dependencies = [
 [[package]]
 name = "bn"
 version = "0.4.4"
-source = "git+https://github.com/paritytech/bn#7f6a93623fe1867a5de6e2b9f4196581a3594f84"
+source = "git+https://github.com/paritytech/bn#162149011cb30ad4ad417be2cf1c3a4d15575274"
 dependencies = [
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "crunchy 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

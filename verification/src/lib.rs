@@ -85,6 +85,7 @@ mod canon;
 mod deployments;
 mod equihash;
 mod error;
+mod fee;
 mod sapling;
 mod sigops;
 mod sprout;
@@ -123,6 +124,7 @@ pub use verify_transaction::{TransactionVerifier, MemoryPoolTransactionVerifier}
 
 pub use chain_verifier::BackwardsCompatibleChainVerifier;
 pub use error::{Error, TransactionError};
+pub use fee::checked_transaction_fee;
 pub use sigops::transaction_sigops;
 pub use timestamp::{median_timestamp, median_timestamp_inclusive};
 pub use work::{work_required, is_valid_proof_of_work, is_valid_proof_of_work_hash};

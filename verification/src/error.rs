@@ -49,8 +49,6 @@ pub enum Error {
 	TransactionFeeAndRewardOverflow,
 	/// Sum of the transaction fees in block exceeds u64::max
 	TransactionFeesOverflow,
-	/// Sum of all referenced outputs in block transactions resulted in the overflow
-	ReferencedInputsSumOverflow,
 	/// Non-canonical tranasctions ordering within block
 	NonCanonicalTransactionOrdering,
 	/// Database error
@@ -155,4 +153,3 @@ pub enum TransactionError {
 	/// Unknown anchor used in join split
 	UnknownAnchor(H256),
 }
-

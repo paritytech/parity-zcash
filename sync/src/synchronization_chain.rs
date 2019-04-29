@@ -310,11 +310,12 @@ impl Chain {
 		self.verifying_headers.extend(headers.iter().map(|h| h.hash))
 	}
 
-	/// Remove headers from verifying queue
-	pub fn headers_verified(&mut self, headers: &[IndexedBlockHeader]) {
-		for header in headers {
-			self.verifying_headers.remove(&header.hash);
-		}
+	/// Remove headers from verifying queue.
+	///
+	/// Returns all headers that still have VerifyingHeader state (i.e. they are not Verifying || Stored).
+	pub fn headers_verified(&mut self, mut headers: Vec<IndexedBlockHeader>) -> Vec<IndexedBlockHeader> {
+		headers.retain(|header| self.verifying_headers.remove(&header.hash));
+		headers
 	}
 
 	/// Schedule blocks hashes for requesting
@@ -336,6 +337,9 @@ impl Chain {
 	/// chain, guarantees the header has already been pre-verified. The opposite isn't true -
 	/// if the header isn't in the chain, it could have been (in rare cases) pre-verified.
 	pub fn verify_block(&mut self, header: IndexedBlockHeader) -> bool {
+		// when we start verifying block, forget that we (possibly) verifying header of the block
+		self.verifying_headers.remove(&header.hash);
+
 		// insert header to the in-memory chain in case when it is not already there (non-headers-first sync)
 		self.hash_chain.push_back_at(VERIFYING_QUEUE, header.hash.clone());
 		self.headers_chain.insert(header)
@@ -362,7 +366,7 @@ impl Chain {
 		match block_origin {
 			storage::BlockOrigin::KnownBlock => {
 				// there should be no known blocks at this point
-				unreachable!();
+				unreachable!("Trying to re-insert known block: {}", block.hash().to_reversed_str());
 			},
 			// case 1: block has been added to the main branch
 			storage::BlockOrigin::CanonChain { .. } => {
