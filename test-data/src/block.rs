@@ -364,6 +364,7 @@ impl<F> TransactionBuilder<F> where F: Invoke<chain::Transaction> {
 
 	pub fn with_sapling(mut self, sapling : chain::Sapling) -> Self {
 		self.sapling = Some(sapling);
+		// Here, we add a Sapling transaction, like some Sapling to the block.
 		self
 	}
 	
@@ -631,4 +632,15 @@ fn transaction_with_size() {
 	assert_eq!(block.transactions[1].serialized_size(), 100);
 	assert_eq!(block.transactions[2].serialized_size(), 2000);
 	assert_eq!(block.transactions[3].serialized_size(), 50000);
+}
+
+#[test]
+fn sapling_transaction() {
+	let block = block_builder().header().build()
+		.transaction().coinbase()
+			.with_sapling()
+			.build()
+		.build();
+
+	assert_eq!(0,0);
 }
