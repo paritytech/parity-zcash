@@ -63,9 +63,8 @@ impl Network {
 
 	pub fn rpc_port(&self) -> u16 {
 		match *self {
-			Network::Mainnet | Network::Other(_) => 8332,
-			Network::Testnet => 18332,
-			Network::Regtest | Network::Unitest => 18443,
+			Network::Mainnet | Network::Other(_) => 8232,
+			Network::Testnet | Network::Regtest | Network::Unitest => 18232,
 		}
 	}
 
