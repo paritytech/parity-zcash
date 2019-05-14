@@ -77,7 +77,7 @@ impl<'a> TransactionAcceptor<'a> {
 		// to make sure we're using the sighash-cache, let's make all sighash-related
 		// calls from single checker && pass sighash to other checkers
 		let sighash = self.eval.check()?;
-		self.join_split.check()?;
+		self.join_split.check(sighash)?;
 		self.sapling.check(sighash)?;
 
 		Ok(())
@@ -150,7 +150,7 @@ impl<'a> MemoryPoolTransactionAcceptor<'a> {
 		// to make sure we're using the sighash-cache, let's make all sighash-related
 		// calls from single checker && pass sighash to other checkers
 		let sighash = self.eval.check()?;
-		self.join_split.check()?;
+		self.join_split.check(sighash)?;
 		self.sapling.check(sighash)?;
 
 		Ok(())
@@ -628,6 +628,7 @@ impl<'a> JoinSplitNullifiers<'a> {
 pub struct JoinSplitVerification<'a> {
 	proof: JoinSplitProof<'a>,
 	nullifiers: JoinSplitNullifiers<'a>,
+	transaction: CanonTransaction<'a>,
 }
 
 impl<'a> JoinSplitVerification<'a> {
@@ -641,10 +642,16 @@ impl<'a> JoinSplitVerification<'a> {
 		JoinSplitVerification {
 			proof: JoinSplitProof::new(transaction, consensus_params, tree_state_provider),
 			nullifiers: JoinSplitNullifiers::new(tracker, transaction),
+			transaction: transaction,
 		}
 	}
 
-	pub fn check(&self) -> Result<(), TransactionError> {
+	pub fn check(&self, sighash: H256) -> Result<(), TransactionError> {
+		if let Some(ref join_split) = self.transaction.raw.join_split {
+			::crypto::verify_ed25519(&sighash[..], &join_split.pubkey.into(), &join_split.sig.into())
+				.map_err(|e| TransactionError::JoinSplitSignature(e))?;
+		}
+
 		self.proof.check()?;
 		self.nullifiers.check()
 	}

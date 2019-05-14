@@ -6,6 +6,7 @@ extern crate siphasher;
 extern crate bn;
 extern crate serde;
 extern crate rustc_hex as hex;
+extern crate ed25519_dalek as ed25519;
 
 pub extern crate bellman;
 pub extern crate pairing;
@@ -285,6 +286,22 @@ impl ::std::fmt::Debug for Groth16VerifyingKey {
 	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
 		f.write_str("Groth16VerifyingKey")
 	}
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Error {
+	InvalidSignature,
+	InvalidPublicEncoding,
+	InvalidSignatureEncoding,
+}
+
+pub fn verify_ed25519(msg: &[u8], public_key: &[u8; 32], signature: &[u8; 64]) -> Result<(), Error> {
+	use ed25519::{Signature, PublicKey};
+
+	let public = PublicKey::from_bytes(&public_key[..]).map_err(|_| Error::InvalidPublicEncoding)?;
+	let signature = Signature::from_bytes(&signature[..]).map_err(|_| Error::InvalidSignatureEncoding)?;
+
+	public.verify(msg, &signature).map_err(|_| Error::InvalidSignature)
 }
 
 #[cfg(test)]
