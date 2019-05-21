@@ -140,6 +140,8 @@ pub enum TransactionError {
 	JoinSplitDeclared(H256),
 	/// Join split is not supported in the transaction version.
 	JoinSplitVersionInvalid,
+	/// Invalid join split signature
+	JoinSplitSignature(::crypto::Error),
 	/// Transaction sapling verification has failed.
 	InvalidSapling,
 	/// Sapling nullifier already revealed earlier in the chain.

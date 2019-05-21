@@ -179,7 +179,7 @@ impl TransactionInputSigner {
 	fn signature_hash_sprout(&self, input_index: Option<usize>, script_pubkey: &Script, sighashtype: u32, sighash: Sighash) -> H256 {
 		let input_index = match input_index {
 			Some(input_index) if input_index < self.inputs.len() => input_index,
-			_ => return 1u8.into(),
+			_ => if sighash.anyone_can_pay || sighash.base == SighashBase::Single { return Default::default(); } else { usize::max_value()-1 },
 		};
 		let inputs = if sighash.anyone_can_pay {
 			let input = &self.inputs[input_index];
