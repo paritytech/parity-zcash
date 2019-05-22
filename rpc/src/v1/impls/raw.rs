@@ -49,8 +49,6 @@ impl RawClientCore {
 		lock_time: Option<u32>,
 		expiry_height: Option<u32>,
 	) -> Result<GlobalTransaction, String> {
-		use chain;
-		use keys;
 		use global_script::Builder as ScriptBuilder;
 
 		// overwinter is active atm => assume that all new transactions are created for sapling era

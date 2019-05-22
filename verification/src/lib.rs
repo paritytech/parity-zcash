@@ -131,8 +131,8 @@ pub use work::{work_required, is_valid_proof_of_work, is_valid_proof_of_work_has
 pub use deployments::Deployments;
 pub use tree_cache::TreeCache;
 
-/// Blocks verification level.
 bitflags! {
+	/// Blocks verification level.
 	pub struct VerificationLevel: u32 {
 		/// Base level: perform full block verification.
 		const FULL = 0x00000001;
