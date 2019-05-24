@@ -73,9 +73,9 @@ pub fn parse(matches: &clap::ArgMatches) -> Result<Config, String> {
 	};
 
 	// to skip idiotic 30 seconds delay in test-scripts
-	let user_agent_suffix = "";
 	let user_agent = match network {
-		Network::Testnet | Network::Mainnet | Network::Unitest | Network::Other(_) => format!("{}{}", USER_AGENT, user_agent_suffix),
+		Network::Testnet | Network::Mainnet | Network::Unitest | Network::Other(_)
+			=> USER_AGENT.into(),
 		Network::Regtest => REGTEST_USER_AGENT.into(),
 	};
 
