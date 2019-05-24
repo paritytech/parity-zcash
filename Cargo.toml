@@ -46,6 +46,23 @@ name = "pzec"
 members = [
     "bencher",
     "chain",
+	"db",
+	"import",
+	"keys",
+	"logs",
+	"message",
+	"miner",
+	"network",
+	"p2p",
+	"primitives",
+	"rpc",
+	"script",
+	"serialization",
+	"serialization_derive",
+	"storage",
+	"sync",
+	"test-data",
+	"verification",
 ]
 
 [patch.crates-io]
