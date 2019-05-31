@@ -44,8 +44,9 @@ name = "pzec"
 
 [workspace]
 members = [
-    "bencher",
-    "chain",
+	"bencher",
+	"./crypto",
+	"chain",
 	"db",
 	"import",
 	"keys",
