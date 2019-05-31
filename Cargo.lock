@@ -825,6 +825,11 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "linked-hash-map"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "local-encoding"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1652,7 +1657,7 @@ dependencies = [
  "db 0.1.0",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "keys 0.1.0",
- "linked-hash-map 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "linked-hash-map 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "message 0.1.0",
  "miner 0.1.0",
@@ -2181,6 +2186,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum lazycell 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b294d6fa9ee409a054354afc4352b0b9ef7ca222c69b8812cbea9e7d2bf3783f"
 "checksum libc 0.2.46 (registry+https://github.com/rust-lang/crates.io-index)" = "023a4cd09b2ff695f9734c1934145a315594b7986398496841c7031a5a1bbdbd"
 "checksum linked-hash-map 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7860ec297f7008ff7a1e3382d7f7e1dcd69efc94751a2284bafc3d013c2aa939"
+"checksum linked-hash-map 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ae91b68aebc4ddb91978b11a1b02ddd8602a05ec19002801c5666000e05e0f83"
 "checksum local-encoding 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e1ceb20f39ff7ae42f3ff9795f3986b1daad821caaa1e1732a0944103a5a1a66"
 "checksum lock_api 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "62ebf1391f6acad60e5c8b43706dde4582df75c06698ab44511d15016bc2442c"
 "checksum log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c84ec4b527950aa83a329754b01dbe3f58361d1c5efacd1f6d68c494d08a17c6"
