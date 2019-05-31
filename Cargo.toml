@@ -6,26 +6,26 @@ authors = ["Parity Technologies <admin@parity.io>"]
 description = "Parity bitcoin client."
 
 [dependencies]
-log = "0.4"
-env_logger = "0.5"
 app_dirs = { git = "https://github.com/paritytech/app-dirs-rs" }
-libc = "0.2"
-clap = { version = "2", features = ["yaml"] }
 chain = { path = "chain" }
+clap = { version = "2", features = ["yaml"] }
+db = { path = "db" }
+env_logger = "0.5"
+import = { path = "import" }
 keys = { path = "keys" }
+libc = "0.2"
+log = "0.4"
+logs = { path = "logs" }
 message = { path = "message" }
 network = { path = "network" }
 miner = { path = "miner" }
 p2p = { path = "p2p" }
+primitives = { path = "primitives" }
+rpc = { path = "rpc" }
 script = { path = "script" }
 storage = { path = "storage" }
-db = { path = "db" }
-verification = { path = "verification" }
 sync = { path = "sync" }
-import = { path = "import" }
-logs = { path = "logs" }
-rpc = { path = "rpc" }
-primitives = { path = "primitives" }
+verification = { path = "verification" }
 
 [profile.dev]
 debug = true
@@ -43,7 +43,28 @@ path = "pzec/main.rs"
 name = "pzec"
 
 [workspace]
-members = ["bencher"]
+members = [
+	"bencher",
+	"./crypto",
+	"chain",
+	"db",
+	"import",
+	"keys",
+	"logs",
+	"message",
+	"miner",
+	"network",
+	"p2p",
+	"primitives",
+	"rpc",
+	"script",
+	"serialization",
+	"serialization_derive",
+	"storage",
+	"sync",
+	"test-data",
+	"verification",
+]
 
 [patch.crates-io]
 heapsize = { git = "https://github.com/cheme/heapsize.git", branch = "ec-macfix" }
