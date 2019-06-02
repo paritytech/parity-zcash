@@ -414,7 +414,7 @@ dependencies = [
  "elastic-array 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "lru-cache 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "parity-rocksdb 0.5.0 (git+https://github.com/paritytech/rust-rocksdb)",
+ "parity-rocksdb 0.5.1 (git+https://github.com/paritytech/rust-rocksdb)",
  "parking_lot 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "primitives 0.1.0",
  "serialization 0.1.0",
@@ -1078,18 +1078,18 @@ dependencies = [
 
 [[package]]
 name = "parity-rocksdb"
-version = "0.5.0"
-source = "git+https://github.com/paritytech/rust-rocksdb#5c69c8a85c893a50050a18bf125660b6107686c1"
+version = "0.5.1"
+source = "git+https://github.com/paritytech/rust-rocksdb#6e099ebea51e5b5adb33405310504c8582649b34"
 dependencies = [
  "libc 0.2.46 (registry+https://github.com/rust-lang/crates.io-index)",
  "local-encoding 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "parity-rocksdb-sys 0.5.5 (git+https://github.com/paritytech/rust-rocksdb)",
+ "parity-rocksdb-sys 0.5.6 (git+https://github.com/paritytech/rust-rocksdb)",
 ]
 
 [[package]]
 name = "parity-rocksdb-sys"
-version = "0.5.5"
-source = "git+https://github.com/paritytech/rust-rocksdb#5c69c8a85c893a50050a18bf125660b6107686c1"
+version = "0.5.6"
+source = "git+https://github.com/paritytech/rust-rocksdb#6e099ebea51e5b5adb33405310504c8582649b34"
 dependencies = [
  "cmake 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.46 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1279,7 +1279,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "autocfg 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1300,7 +1300,7 @@ name = "rand_hc"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1338,7 +1338,7 @@ name = "rand_xorshift"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2244,8 +2244,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum opaque-debug 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "93f5bb2e8e8dec81642920ccff6b61f1eb94fa3020c5a325c9851ff604152409"
 "checksum owning_ref 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "49a4b8ea2179e6a2e27411d3bca09ca6dd630821cf6894c6c7c8467a8ee7ef13"
 "checksum pairing 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ceda21136251c6d5a422d3d798d8ac22515a6e8d3521bb60c59a8349d36d0d57"
-"checksum parity-rocksdb 0.5.0 (git+https://github.com/paritytech/rust-rocksdb)" = "<none>"
-"checksum parity-rocksdb-sys 0.5.5 (git+https://github.com/paritytech/rust-rocksdb)" = "<none>"
+"checksum parity-rocksdb 0.5.1 (git+https://github.com/paritytech/rust-rocksdb)" = "<none>"
+"checksum parity-rocksdb-sys 0.5.6 (git+https://github.com/paritytech/rust-rocksdb)" = "<none>"
 "checksum parity-snappy-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1a413d51e5e1927320c9de992998e4a279dffb8c8a7363570198bd8383e66f1b"
 "checksum parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ab41b4aed082705d1056416ae4468b6ea99d52599ecf3169b00088d43113e337"
 "checksum parking_lot 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fa7767817701cce701d5585b9c4db3cdd02086398322c1d7e8bf5094a96a2ce7"
