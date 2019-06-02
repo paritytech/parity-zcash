@@ -6,7 +6,7 @@ authors = ["Parity Technologies <admin@parity.io>"]
 [dependencies]
 parity-rocksdb = { git = "https://github.com/paritytech/rust-rocksdb" }
 elastic-array = "0.10"
-parking_lot = "0.7"
+parking_lot = "0.8"
 log = "0.4"
 bit-vec = "0.4"
 lru-cache = "0.1"

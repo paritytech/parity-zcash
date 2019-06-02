@@ -7,7 +7,7 @@ authors = ["Nikolay Volf <nikvolf@gmail.com>"]
 time = "0.1"
 log = "0.4"
 rayon = "1.0"
-parking_lot = "0.7"
+parking_lot = "0.8"
 byteorder = "1.2"
 keys = { path = "../keys" }
 primitives = { path = "../primitives" }
