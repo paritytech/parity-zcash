@@ -1,22 +1,25 @@
 workflow "On Push" {
   on = "push"
-  resolves = ["Doc", "Build Fuzz Targets"]
+  resolves = ["Benchmark", "Doc", "Build Fuzz Targets"]
 }
 
-action "Test" {
+action "Test and Build" {
   uses = "./.github"
-  args = "cargo test --all"
+  args = "cargo test --all && cargo build --release"
+  env = {
+    RUST_BACKTRACE = "1"
+  }
 }
 
-action "Build" {
-  needs = "Test"
+action "Benchmark" {
+  needs = "Test and Build"
   uses = "./.github"
-  args = "cargo build --release"
+  args = "./tools/bench.sh"
 }
 
 # Filter for master branch
 action "if branch = master:" {
-  needs = "Build"
+  needs = "Test and Build"
   uses = "actions/bin/filter@master"
   args = "branch master"
 }
@@ -30,7 +33,7 @@ action "Doc" {
 # Filter for fuzz branch
 # TODO: remove when fuzzing merged to master
 action "if branch = fuzz:" {
-  needs = "Build"
+  needs = "Test and Build"
   uses = "actions/bin/filter@master"
   args = "branch fuzz"
 }
