@@ -4,13 +4,13 @@ workflow "On Push" {
 }
 
 action "Build" {
-  uses = ".github/"
+  uses = "./.github"
   args = "cargo build --release"
 }
 
 action "Test" {
   needs = "Build"
-  uses = ".github/"
+  uses = "./.github"
   args = "cargo test --all"
 }
 
@@ -23,7 +23,7 @@ action "if branch = master:" {
 
 action "Doc" {
   needs = "if branch = master:"
-  uses = ".github/"
+  uses = "./.github/"
   args = "cargo doc"
 }
 
@@ -37,6 +37,6 @@ action "if branch = fuzz:" {
 
 action "Build Fuzz Targets" {
   needs = "if branch = fuzz:"
-  uses = ".github/"
+  uses = "./.github/"
   args = "cargo afl build"
 }
