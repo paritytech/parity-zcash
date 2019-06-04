@@ -1,4 +1,4 @@
-FROM rust:latest
+FROM rust:1.35.0
 
 LABEL "com.github.actions.name"="Rust Action"
 LABEL "com.github.actions.icon"="cpu"
