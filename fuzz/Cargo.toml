@@ -21,3 +21,7 @@ members = ["."]
 [[bin]]
 name = "crypto"
 path = "fuzz_targets/crypto.rs"
+
+[[bin]]
+name = "crypto-afl"
+path = "fuzz_targets/crypto-afl.rs"
