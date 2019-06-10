@@ -5,7 +5,7 @@ authors = ["debris <marek.kotewicz@gmail.com>"]
 
 [dependencies]
 tokio-core = "0.1.6"
-tokio-io = "0.1.1"
+tokio-io = "0.1.12"
 parking_lot = "0.8"
 futures = "0.1"
 futures-cpupool = "0.1"
